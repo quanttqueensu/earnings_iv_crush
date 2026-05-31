@@ -1,0 +1,12 @@
+numpy
+pandas
+scipy
+statsmodels
+scikit-learn
+matplotlib
+requests
+python-dotenv
+yfinance
+finnhub-python
+# Brokerage (live chains + greeks), add when IBKR account is ready:
+# ib_async

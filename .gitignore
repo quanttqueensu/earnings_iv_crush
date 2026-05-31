@@ -1,0 +1,30 @@
+# Secrets - never commit
+.env
+.env.*
+!.env.example
+
+# Private working material - never publish (charter, lit review, data plan,
+# faculty/WRDS outreach, methodology notes). Kept local; out of the public repo.
+_private/
+
+# Data (raw and processed pulls are git-ignored per the data plan)
+data/raw/
+data/processed/
+*.parquet
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Office temp/lock files
+~$*
