@@ -23,13 +23,26 @@ import pandas as pd
 _STRADDLE_K = 0.8
 
 
+_SECTORS = ("Tech", "Financials", "Healthcare", "Energy", "Consumer", "Industrials")
+
+
 def simulate_events(n: int = 300, seed: int = 0, edge_frac: float = 0.35,
                     holding_days: int = 2, days_to_expiry: int = 7,
-                    spot: float = 100.0) -> pd.DataFrame:
+                    spot: float = 100.0, with_vix: bool = False,
+                    high_vix_frac: float = 0.20, vix_low: float = 15.0,
+                    vix_high: float = 30.0, with_sectors: bool = False) -> pd.DataFrame:
     """Generate `n` synthetic pre-earnings events with a planted edge.
 
     `edge_frac` of events are rich (profitable to short); the rest are fair
     (break-even before costs, ~0 Sharpe like Agent 0).
+
+    Optional enrichment (all defaulting off, so existing callers are unchanged):
+
+    * ``with_vix`` adds a ``vix`` column where ``high_vix_frac`` of events sit at
+      ``vix_high`` (a defensive, iron-fly regime) and the rest at ``vix_low`` with
+      mild jitter. Lets the regime selector (``strategy.regime``) be exercised.
+    * ``with_sectors`` adds a GICS-like ``sector`` column so the concentration
+      caps (``engine.risk``) can be exercised.
     """
     rng = np.random.default_rng(seed)
     t_entry = days_to_expiry / 365.0
@@ -68,7 +81,7 @@ def simulate_events(n: int = 300, seed: int = 0, edge_frac: float = 0.35,
     entry = pd.bdate_range("2026-01-02", periods=n)
     exit_ = entry + pd.tseries.offsets.BDay(holding_days)
 
-    return pd.DataFrame({
+    out = pd.DataFrame({
         "ticker": [f"SYN{i:04d}" for i in range(n)],
         "announce_date": entry,
         "entry_date": entry.astype(str),
@@ -89,3 +102,13 @@ def simulate_events(n: int = 300, seed: int = 0, edge_frac: float = 0.35,
         "realised_move": realised_abs,
         "is_rich": rich,
     })
+
+    if with_vix:
+        defensive = rng.random(n) < high_vix_frac
+        out["vix"] = np.where(
+            defensive, vix_high, vix_low + rng.uniform(-2.0, 4.0, n)
+        )
+    if with_sectors:
+        out["sector"] = rng.choice(_SECTORS, size=n)
+
+    return out
