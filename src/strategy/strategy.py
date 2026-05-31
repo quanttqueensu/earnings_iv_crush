@@ -16,14 +16,15 @@ from .filters import select_events
 
 def run_strategy(events: pd.DataFrame, model: FairMoveModel,
                  account: float = ACCOUNT_SIZE, fraction: float = 0.05,
-                 r: float = 0.0) -> pd.DataFrame:
+                 r: float = 0.0, costs=None) -> pd.DataFrame:
     """Select tradeable events and return the short-straddle trade ledger.
 
     Predicts the fair move, keeps only events that pass both filters (implied
     move >= 1.20x fair AND term spread above its trailing 75th percentile), and
     books one short ATM straddle per surviving event. `model` must already be
-    fitted.
+    fitted. Pass a ``CostModel`` via ``costs`` to book net-of-cost P&L (spread
+    and slippage); ``None`` keeps the commission-only default.
     """
     fair = model.predict(events)
     selected = select_events(events, fair)
-    return build_ledger(selected, account=account, fraction=fraction, r=r)
+    return build_ledger(selected, account=account, fraction=fraction, r=r, costs=costs)

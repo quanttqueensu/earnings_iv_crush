@@ -17,16 +17,17 @@ from ..engine.pnl import ACCOUNT_SIZE, build_ledger
 
 def run_agent0(events: pd.DataFrame, seed: int = 0, account: float = ACCOUNT_SIZE,
                fraction: float = 0.05, r: float = 0.0,
-               sample_frac: float = 1.0) -> pd.DataFrame:
+               sample_frac: float = 1.0, costs=None) -> pd.DataFrame:
     """Trade an unfiltered random subset of events; return the trade ledger.
 
     No filter is applied: `sample_frac` of the events are chosen at random
     (default all) and each is booked as a short straddle, identically to the
-    strategy. `seed` makes the draw reproducible.
+    strategy. `seed` makes the draw reproducible. Pass a ``CostModel`` via
+    ``costs`` to book net-of-cost P&L on the same basis as the strategy.
     """
     n = len(events)
     if n == 0:
-        return build_ledger(events, account=account, fraction=fraction, r=r)
+        return build_ledger(events, account=account, fraction=fraction, r=r, costs=costs)
 
     k = int(round(sample_frac * n))
     if k >= n:
@@ -35,4 +36,4 @@ def run_agent0(events: pd.DataFrame, seed: int = 0, account: float = ACCOUNT_SIZ
         rng = np.random.default_rng(seed)
         idx = np.sort(rng.choice(n, size=k, replace=False))
         chosen = events.iloc[idx]
-    return build_ledger(chosen, account=account, fraction=fraction, r=r)
+    return build_ledger(chosen, account=account, fraction=fraction, r=r, costs=costs)

@@ -12,6 +12,9 @@ data/raw/
 data/processed/
 *.parquet
 
+# Generated research artefacts (tearsheets, metric dumps)
+outputs/
+
 # Python
 __pycache__/
 *.py[cod]
