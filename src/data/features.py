@@ -25,6 +25,9 @@ TRADING_DAYS = 252
 BACK_MONTH_MIN_GAP_DAYS = 21   # back expiry sits at least ~1 month past front
 NAN = float("nan")
 
+# np.trapz was renamed np.trapezoid in NumPy 2.0; support both.
+_trapz = getattr(np, "trapezoid", getattr(np, "trapz", None))
+
 # Feature keys this module produces, in dataset order.
 FEATURE_KEYS = [
     "implied_move",
@@ -33,6 +36,10 @@ FEATURE_KEYS = [
     "iv_term_spread",
     "trailing_rv",
     "skew_25d",
+    "vol_premium",            # front ATM IV - trailing RV (Goyal & Saretto 2009)
+    "variance_risk_premium",  # front ATM IV^2 - trailing RV^2 (Bollerslev-Tauchen-Zhou 2009)
+    "bkm_skew",               # model-free risk-neutral skew (Bakshi-Kapadia-Madan 2003)
+    "bkm_kurt",               # model-free risk-neutral kurtosis (BKM 2003)
 ]
 
 
@@ -161,6 +168,98 @@ def skew_25d(chain: pd.DataFrame, expiry, spot: float, t_years: float,
     return float(iv_put - iv_call)
 
 
+def volatility_premium(front_iv: float, trailing_rv: float) -> float:
+    """Goyal & Saretto (2009) volatility deviation: front ATM IV minus trailing RV.
+
+    A large positive value means options are priced above recently realised
+    volatility, which tends to mean-revert and is a short-vol signal.
+    """
+    if front_iv != front_iv or trailing_rv != trailing_rv:
+        return NAN
+    return float(front_iv - trailing_rv)
+
+
+def variance_risk_premium(front_iv: float, trailing_rv: float) -> float:
+    """Bollerslev-Tauchen-Zhou (2009) variance risk premium: IV^2 minus RV^2.
+
+    The compensation embedded in option prices for bearing variance risk, in
+    annualised variance units. Positive for the typical short-vol earnings setup.
+    """
+    if front_iv != front_iv or trailing_rv != trailing_rv:
+        return NAN
+    return float(front_iv ** 2 - trailing_rv ** 2)
+
+
+def bkm_moments(chain: pd.DataFrame, expiry, spot: float, t_years: float,
+                r: float = 0.0) -> dict:
+    """Model-free risk-neutral variance, skew and kurtosis (Bakshi-Kapadia-Madan 2003).
+
+    Builds the volatility, cubic and quartic "contracts" by integrating
+    out-of-the-money option prices (puts below spot, calls at/above spot) against
+    the BKM weighting kernels, then forms the risk-neutral moments. Equity
+    index/single-name distributions are typically left-skewed, so ``bkm_skew`` is
+    usually negative.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Option chain (needs ``expiry``, ``strike``, ``right``, ``bid``, ``ask``).
+    expiry :
+        The expiry to evaluate.
+    spot : float
+        Underlying price (USD).
+    t_years : float
+        Time to expiry in years.
+    r : float
+        Risk-free rate (annualised, continuously compounded). Defaults to ``0``.
+
+    Returns
+    -------
+    dict
+        ``bkm_var``, ``bkm_skew`` and ``bkm_kurt``. All ``nan`` when the OTM
+        cross-section is too thin (fewer than two strikes on either side) or the
+        implied variance is non-positive.
+    """
+    nan_out = {"bkm_var": NAN, "bkm_skew": NAN, "bkm_kurt": NAN}
+    if t_years is None or t_years <= 0 or spot <= 0:
+        return nan_out
+    rows = _with_mid(chain[chain["expiry"] == expiry])
+    if rows.empty:
+        return nan_out
+
+    puts = rows[(rows["right"] == "P") & (rows["strike"] < spot)]
+    calls = rows[(rows["right"] == "C") & (rows["strike"] >= spot)]
+    puts = puts.dropna(subset=["mid"]).sort_values("strike")
+    calls = calls.dropna(subset=["mid"]).sort_values("strike")
+    if len(puts) < 2 or len(calls) < 2:
+        return nan_out
+
+    strikes = np.concatenate([puts["strike"].to_numpy(float),
+                              calls["strike"].to_numpy(float)])
+    prices = np.concatenate([puts["mid"].to_numpy(float),
+                             calls["mid"].to_numpy(float)])
+    order = np.argsort(strikes)
+    strikes, prices = strikes[order], prices[order]
+
+    u = np.log(strikes / spot)
+    g_v = 2.0 * (1.0 - u) / strikes ** 2
+    g_w = (6.0 * u - 3.0 * u ** 2) / strikes ** 2
+    g_x = (12.0 * u ** 2 - 4.0 * u ** 3) / strikes ** 2
+
+    v = float(_trapz(g_v * prices, strikes))
+    w = float(_trapz(g_w * prices, strikes))
+    x = float(_trapz(g_x * prices, strikes))
+
+    er = np.exp(r * t_years)
+    mu = er - 1.0 - er / 2.0 * v - er / 6.0 * w - er / 24.0 * x
+    var = er * v - mu ** 2
+    if not np.isfinite(var) or var <= 0:
+        return nan_out
+    skew = (er * w - 3.0 * mu * er * v + 2.0 * mu ** 3) / var ** 1.5
+    kurt = (er * x - 4.0 * mu * er * w + 6.0 * er * mu ** 2 * v - 3.0 * mu ** 4) / var ** 2
+    return {"bkm_var": float(var), "bkm_skew": float(skew), "bkm_kurt": float(kurt)}
+
+
 def event_features(chain: pd.DataFrame, spot: float, announce_date, asof_date,
                    price_history: pd.DataFrame, r: float = 0.0,
                    rv_window: int = 20) -> dict:
@@ -183,11 +282,18 @@ def event_features(chain: pd.DataFrame, spot: float, announce_date, asof_date,
     t_front = (front - asof).days / 365.0 if front is not None else NAN
 
     spread = front_iv - back_iv if (front_iv == front_iv and back_iv == back_iv) else NAN
+    trailing = realised_vol(price_history, rv_window)
+    bkm = bkm_moments(chain, front, spot, t_front, r) if front is not None else \
+        {"bkm_skew": NAN, "bkm_kurt": NAN}
     return {
         "implied_move": implied_move(chain, spot, front, k_front) if front is not None else NAN,
         "front_atm_iv": front_iv,
         "back_atm_iv": back_iv,
         "iv_term_spread": spread,
-        "trailing_rv": realised_vol(price_history, rv_window),
+        "trailing_rv": trailing,
         "skew_25d": skew_25d(chain, front, spot, t_front, r) if front is not None else NAN,
+        "vol_premium": volatility_premium(front_iv, trailing),
+        "variance_risk_premium": variance_risk_premium(front_iv, trailing),
+        "bkm_skew": bkm["bkm_skew"],
+        "bkm_kurt": bkm["bkm_kurt"],
     }

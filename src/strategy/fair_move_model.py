@@ -33,11 +33,15 @@ import pandas as pd
 import statsmodels.api as sm
 
 FEATURES = [
-    "trailing_rv",      # trailing realised volatility
-    "skew_25d",         # 25-delta IV skew (jump-risk proxy)
-    "eps_dispersion",   # analyst EPS dispersion
-    "prior_surprise",   # prior earnings surprise magnitude
-    "oi_growth",        # pre-event open-interest growth
+    "trailing_rv",            # trailing realised volatility
+    "skew_25d",               # 25-delta IV skew (jump-risk proxy)
+    "eps_dispersion",         # analyst EPS dispersion
+    "prior_surprise",         # prior earnings surprise magnitude
+    "oi_growth",              # pre-event open-interest growth
+    "vol_premium",            # front IV - trailing RV (Goyal & Saretto 2009)
+    "variance_risk_premium",  # front IV^2 - trailing RV^2 (Bollerslev-Tauchen-Zhou 2009)
+    "bkm_skew",               # model-free risk-neutral skew (Bakshi-Kapadia-Madan 2003)
+    "bkm_kurt",               # model-free risk-neutral kurtosis (BKM 2003)
 ]
 
 
