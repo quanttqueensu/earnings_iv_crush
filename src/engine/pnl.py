@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from .costs import CostModel
 from .greeks import straddle_price
 
 COST_PER_CONTRACT = 0.65    # USD per contract per fill (Khan & Khan 2024)
@@ -24,6 +25,10 @@ LEDGER_COLUMNS = [
     "entry_credit", "exit_value", "commissions", "pnl", "margin",
     "return_on_margin",
 ]
+
+# Extra columns appended when a full CostModel is supplied (spread + slippage).
+# The default commission-only path leaves the schema at LEDGER_COLUMNS.
+COST_COLUMNS = ["exchange_fee", "spread_cost", "slippage_cost", "total_cost"]
 
 
 def _straddle_value(spot, strike, t, r, sigma):
@@ -55,27 +60,58 @@ def size_contracts(account, spot, strike, premium_per_share, fraction=0.05):
 
 
 def straddle_pnl(spot_entry, strike, t_entry, t_exit, iv_entry, iv_exit,
-                 spot_exit, r, contracts, cost_per_contract=COST_PER_CONTRACT):
-    """Short-straddle P&L (USD) = entry credit - exit value - commissions."""
+                 spot_exit, r, contracts, cost_per_contract=COST_PER_CONTRACT,
+                 costs: CostModel | None = None):
+    """Short-straddle P&L (USD) = entry credit - exit value - costs.
+
+    With ``costs=None`` (default) the only cost is commissions at
+    ``cost_per_contract`` per fill, matching the original commission-only model.
+    Pass a ``CostModel`` to charge the full stack (commission, exchange fee,
+    bid-ask spread and slippage); the per-contract commission argument is then
+    ignored in favour of the model's own commission assumption.
+    """
     credit = _straddle_value(spot_entry, strike, t_entry, r, iv_entry)
     exit_val = _straddle_value(spot_exit, strike, t_exit, r, iv_exit)
     gross = (credit - exit_val) * CONTRACT_MULTIPLIER * contracts
-    commissions = cost_per_contract * FILLS_PER_STRADDLE * contracts
-    return gross - commissions
+    if costs is None:
+        commissions = cost_per_contract * FILLS_PER_STRADDLE * contracts
+        return gross - commissions
+    return gross - costs.round_trip_cost(credit, exit_val, contracts).total_cost
 
 
 def build_trade(ticker, entry_date, exit_date, spot_entry, strike, t_entry,
                 t_exit, iv_entry, iv_exit, spot_exit, contracts, r=0.0,
-                cost_per_contract=COST_PER_CONTRACT) -> dict:
-    """Assemble one ledger row for a short straddle. Keys = LEDGER_COLUMNS."""
+                cost_per_contract=COST_PER_CONTRACT,
+                costs: CostModel | None = None) -> dict:
+    """Assemble one ledger row for a short straddle.
+
+    With ``costs=None`` the row keys are exactly ``LEDGER_COLUMNS`` and the only
+    cost is commissions. Pass a ``CostModel`` to charge the full cost stack; the
+    row then also carries ``COST_COLUMNS`` (``exchange_fee``, ``spread_cost``,
+    ``slippage_cost``, ``total_cost``) and ``pnl`` is net of every component.
+    """
     credit_ps = _straddle_value(spot_entry, strike, t_entry, r, iv_entry)
     exit_ps = _straddle_value(spot_exit, strike, t_exit, r, iv_exit)
     entry_credit = credit_ps * CONTRACT_MULTIPLIER * contracts
     exit_value = exit_ps * CONTRACT_MULTIPLIER * contracts
-    commissions = cost_per_contract * FILLS_PER_STRADDLE * contracts
-    pnl = entry_credit - exit_value - commissions
     margin = regt_straddle_margin(spot_entry, strike, credit_ps, contracts)
-    return {
+
+    if costs is None:
+        commissions = cost_per_contract * FILLS_PER_STRADDLE * contracts
+        extra: dict = {}
+    else:
+        breakdown = costs.round_trip_cost(credit_ps, exit_ps, contracts)
+        commissions = breakdown.commission
+        extra = {
+            "exchange_fee": breakdown.exchange_fee,
+            "spread_cost": breakdown.spread_cost,
+            "slippage_cost": breakdown.slippage_cost,
+            "total_cost": breakdown.total_cost,
+        }
+    total_deducted = commissions + sum(extra.get(c, 0.0) for c in COST_COLUMNS[:-1])
+    pnl = entry_credit - exit_value - total_deducted
+
+    row = {
         "ticker": ticker,
         "entry_date": entry_date,
         "exit_date": exit_date,
@@ -94,6 +130,8 @@ def build_trade(ticker, entry_date, exit_date, spot_entry, strike, t_entry,
         "margin": margin,
         "return_on_margin": pnl / margin if margin else float("nan"),
     }
+    row.update(extra)
+    return row
 
 
 # Columns a per-event frame must supply for the ledger builder. `iv_entry` may
@@ -105,13 +143,17 @@ EXECUTION_COLUMNS = [
 
 
 def build_ledger(events: pd.DataFrame, account=ACCOUNT_SIZE, fraction=0.05,
-                 r=0.0) -> pd.DataFrame:
+                 r=0.0, costs: CostModel | None = None) -> pd.DataFrame:
     """Turn a per-event frame into a short-straddle ledger.
 
     Each row is priced at entry (front IV) to set the credit, sized to the
     margin fraction, then booked with `build_trade`. Events that size to zero
     contracts are skipped. Shared by the live strategy and the Agent 0 control
     so both book trades identically.
+
+    With ``costs=None`` the ledger schema is ``LEDGER_COLUMNS`` (commission-only).
+    Pass a ``CostModel`` to charge the full cost stack; the ledger then also
+    carries ``COST_COLUMNS`` and every ``pnl`` is net of spread and slippage.
     """
     rows = []
     for _, e in events.iterrows():
@@ -125,6 +167,7 @@ def build_ledger(events: pd.DataFrame, account=ACCOUNT_SIZE, fraction=0.05,
             ticker=e["ticker"], entry_date=e["entry_date"], exit_date=e["exit_date"],
             spot_entry=spot, strike=strike, t_entry=t_entry, t_exit=float(e["t_exit"]),
             iv_entry=iv_entry, iv_exit=float(e["iv_exit"]), spot_exit=float(e["spot_exit"]),
-            contracts=contracts, r=r,
+            contracts=contracts, r=r, costs=costs,
         ))
-    return pd.DataFrame(rows, columns=LEDGER_COLUMNS)
+    columns = LEDGER_COLUMNS + (COST_COLUMNS if costs is not None else [])
+    return pd.DataFrame(rows, columns=columns)
