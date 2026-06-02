@@ -9,9 +9,11 @@ one-line change here. Provider modules:
     sec_edgar.py  -> SEC EDGAR filings (no key, needs SEC_USER_AGENT)
     earnings.py   -> Finnhub earnings calendar (needs FINNHUB_API_KEY)
 
-fetch_option_chain currently uses the keyless yfinance fallback (current
-snapshot only); IBKR / Alpaca / OptionMetrics replace it for live/historical
-work as those accounts land.
+fetch_option_chain is the keyless yfinance fallback (current snapshot only), used
+for live/development work. fetch_historical_option_chain is the Alpaca-backed
+provider (needs ALPACA_KEY/SECRET) that serves dated chains back to ~Feb 2024 with
+a locally inverted IV, for the backtest; it is a drop-in with the same schema and
+is the one to inject as `fetch_chain` into the historical-surface builder.
 
 Still pending (implemented when the access lands):
     fetch_analyst_dispersion  -> IBES via WRDS, fallback Finnhub/FMP/Zacks
@@ -20,6 +22,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from .alpaca_options import fetch_option_chain as fetch_historical_option_chain
 from .earnings import fetch_earnings_calendar
 from .equities import fetch_equity_ohlcv
 from .options import fetch_option_chain
@@ -30,6 +33,7 @@ __all__ = [
     "fetch_equity_ohlcv",
     "fetch_index_vol",
     "fetch_option_chain",
+    "fetch_historical_option_chain",
     "fetch_analyst_dispersion",
 ]
 

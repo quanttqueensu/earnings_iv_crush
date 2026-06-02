@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.data import data_intake, earnings, equities, options, vix
+from src.data import alpaca_options, data_intake, earnings, equities, options, vix
 
 
 def test_facade_reexports_working_adapters():
@@ -16,6 +16,8 @@ def test_facade_reexports_working_adapters():
     assert data_intake.fetch_equity_ohlcv is equities.fetch_equity_ohlcv
     assert data_intake.fetch_index_vol is vix.fetch_index_vol
     assert data_intake.fetch_option_chain is options.fetch_option_chain
+    # The dated/historical chain provider (Alpaca, IV inverted locally).
+    assert data_intake.fetch_historical_option_chain is alpaca_options.fetch_option_chain
 
 
 def test_all_lists_the_public_surface():
@@ -24,6 +26,7 @@ def test_all_lists_the_public_surface():
         "fetch_equity_ohlcv",
         "fetch_index_vol",
         "fetch_option_chain",
+        "fetch_historical_option_chain",
         "fetch_analyst_dispersion",
     }
     assert set(data_intake.__all__) == expected
