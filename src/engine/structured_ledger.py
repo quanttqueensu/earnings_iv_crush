@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from ..config import STRATEGY
 from ..strategy.regime import CALENDAR, IRON_FLY
 from ..strategy.structures import calendar_pnl, iron_fly_pnl
 from .costs import CostModel
@@ -40,7 +41,7 @@ STRUCTURED_COLUMNS = [
     "capital_at_risk", "return_on_risk",
 ]
 
-PREMIUM_STOP_MULTIPLE = 3.0
+PREMIUM_STOP_MULTIPLE = STRATEGY.premium_stop_multiple   # central config
 DEFAULT_BACK_GAP_YEARS = 30.0 / 365.0
 DEFAULT_BACK_CRUSH = 0.92
 

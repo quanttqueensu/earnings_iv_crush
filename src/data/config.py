@@ -1,4 +1,6 @@
-"""Loads API keys from the project-root .env file.
+"""
+config.py
+Loads API keys from the project-root .env file.
 
 Never hard-code keys and never commit .env. Code references key NAMES only;
 the values live on disk in .env (git-ignored).

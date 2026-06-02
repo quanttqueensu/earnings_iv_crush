@@ -1,4 +1,6 @@
-"""Filtered strategy entry point.
+"""
+strategy.py
+Filtered strategy entry point.
 
 Turns a per-event dataset into a trade ledger: predicts the fair move with the
 regression, applies both cross-sectional gates, and emits trades for the

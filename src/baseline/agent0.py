@@ -1,4 +1,6 @@
-"""Agent 0 - the unfiltered control.
+"""
+agent0.py
+Agent 0 - the unfiltered control.
 
 Sells a random sample of unfiltered short ATM straddles. This replicates the
 Khan & Khan (2024) result (~0 net Sharpe) and is the benchmark the filtered

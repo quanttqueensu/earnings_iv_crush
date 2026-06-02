@@ -1,4 +1,6 @@
-"""Prior earnings surprise, a fair-move regression feature.
+"""
+surprise.py
+Prior earnings surprise, a fair-move regression feature.
 
 surprise = (eps_actual - eps_estimate) / |eps_estimate|. The feature is the
 PRIOR quarter's surprise magnitude - the most recent one already known before

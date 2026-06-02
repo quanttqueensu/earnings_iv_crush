@@ -21,13 +21,16 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from ..config import STRATEGY
+
 IRON_FLY = "iron_fly"
 CALENDAR = "calendar"
 STRADDLE = "straddle"
 
-VIX_DEFENSIVE_THRESHOLD = 25.0
-CALENDAR_MIN_TERM_SPREAD = 0.10
-CALENDAR_DOMINANCE = 1.0
+# Sourced from the central config (see ``src/config.py``).
+VIX_DEFENSIVE_THRESHOLD = STRATEGY.vix_defensive_threshold
+CALENDAR_MIN_TERM_SPREAD = STRATEGY.calendar_min_term_spread
+CALENDAR_DOMINANCE = STRATEGY.calendar_dominance
 
 
 def select_structure(vix: float, term_spread: float, level_richness: float,

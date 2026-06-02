@@ -22,11 +22,14 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-RISK_FRAC_PER_TRADE = 0.01      # 1.0% NAV worst-case per position
-PREMIUM_STOP_MULTIPLE = 3.0     # naked stop at 3x the entry credit
-DRAWDOWN_CIRCUIT_BREAKER = 0.15  # 15% portfolio drawdown halts new entries
-MAX_PER_SECTOR = 3
-CONTRACT_MULTIPLIER = 100
+from ..config import GLOBAL, STRATEGY
+
+# Sourced from the central config (see ``src/config.py``).
+RISK_FRAC_PER_TRADE = STRATEGY.risk_frac_per_trade        # 1.0% NAV worst-case per position
+PREMIUM_STOP_MULTIPLE = STRATEGY.premium_stop_multiple    # naked stop at 3x the entry credit
+DRAWDOWN_CIRCUIT_BREAKER = STRATEGY.drawdown_circuit_breaker  # 15% drawdown halts new entries
+MAX_PER_SECTOR = STRATEGY.max_per_sector
+CONTRACT_MULTIPLIER = GLOBAL.contract_multiplier
 
 
 # ─────────────────────────────────────────────────────────────────────────────

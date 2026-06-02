@@ -1,4 +1,6 @@
-"""Historical and current option chains via Alpaca's free options data.
+"""
+alpaca_options.py
+Historical and current option chains via Alpaca's free options data.
 
 Alpaca's free "indicative" tier serves option *prices* (daily bars, trades) and
 the full contract universe back to roughly February 2024, but **not** implied
@@ -26,6 +28,8 @@ Caveats of the free tier, by design:
 """
 from __future__ import annotations
 
+import time
+
 import pandas as pd
 import requests
 
@@ -37,6 +41,8 @@ _TRADING_HOST = "https://paper-api.alpaca.markets"
 _DATA_HOST = "https://data.alpaca.markets"
 _BAR_CHUNK = 100          # option symbols per bars request
 _TIMEOUT = 30
+_MAX_RETRIES = 4          # transient network/5xx retries before giving up
+_RETRY_BACKOFF = 2.0      # seconds, multiplied by the attempt number
 
 
 def _headers() -> dict[str, str]:
@@ -48,11 +54,27 @@ def _headers() -> dict[str, str]:
 
 
 def _get(host: str, path: str, params: dict) -> dict:
-    """GET ``host+path`` with auth, returning parsed JSON (raises on HTTP error)."""
-    r = requests.get(f"{host}{path}", params=params, headers=_headers(),
-                     timeout=_TIMEOUT)
-    r.raise_for_status()
-    return r.json()
+    """GET ``host+path`` with auth, returning parsed JSON.
+
+    Retries transient failures (dropped connections, timeouts, 5xx) with a
+    linear backoff so one network blip does not abort a long panel build. A 4xx
+    raises immediately (``_bars_batch`` relies on that to split a bad batch).
+    """
+    last_error: Exception | None = None
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            r = requests.get(f"{host}{path}", params=params, headers=_headers(),
+                             timeout=_TIMEOUT)
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            last_error = exc
+        else:
+            if r.status_code < 500:
+                r.raise_for_status()         # 4xx -> immediate (callers may catch)
+                return r.json()
+            last_error = requests.HTTPError(f"{r.status_code} server error: {path}")
+        if attempt < _MAX_RETRIES:
+            time.sleep(_RETRY_BACKOFF * attempt)
+    raise last_error
 
 
 def list_contracts(underlying: str, asof: str, horizon_days: int = 90,

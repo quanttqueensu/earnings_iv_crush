@@ -1,4 +1,6 @@
-"""Synthetic earnings-event generator for the crude backtest and tests.
+"""
+simulate.py
+Synthetic earnings-event generator for the crude backtest and tests.
 
 NOT a production data source and NOT a claim of edge. It plants a controlled
 structure so the end-to-end wiring (fair-move model -> filter -> ledger ->

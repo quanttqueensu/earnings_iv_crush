@@ -1,4 +1,6 @@
-"""A tiny dependency-free progress bar with a live ETA.
+"""
+progress.py
+A tiny dependency-free progress bar with a live ETA.
 
 The real-data assembly (event chains, daily term-spread panels) is network-bound
 and slow, so the long loops report progress to stderr: a bar, the count, percent,

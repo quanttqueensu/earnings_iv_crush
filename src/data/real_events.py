@@ -1,4 +1,6 @@
-"""Assemble execution-ready earnings events from real market data.
+"""
+real_events.py
+Assemble execution-ready earnings events from real market data.
 
 ``data_pipeline.build_event_dataset`` produces the *filter* features for each
 event but not the *execution* columns the ledger needs (exit IV, exit spot,

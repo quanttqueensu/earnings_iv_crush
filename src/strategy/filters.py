@@ -1,4 +1,6 @@
-"""The two cross-sectional filters that define a tradeable event.
+"""
+filters.py
+The two cross-sectional filters that define a tradeable event.
 
 This selection step is the strategy's edge: the unfiltered trade (Agent 0)
 does not survive costs, so an event must pass both gates to be traded.
@@ -8,10 +10,13 @@ from __future__ import annotations
 import pandas as pd
 from pandas.tseries.offsets import BDay
 
-IMPLIED_FAIR_RATIO = 1.20
-TERM_SPREAD_PCTL = 0.75
-TRAILING_WINDOW = 30          # trailing days (panel form) or events (legacy form)
-TERM_MIN_PERIODS = 15         # min daily obs before the panel gate will fire
+from ..config import STRATEGY
+
+# Sourced from the central config (see ``src/config.py``).
+IMPLIED_FAIR_RATIO = STRATEGY.implied_fair_ratio
+TERM_SPREAD_PCTL = STRATEGY.term_spread_pctl
+TRAILING_WINDOW = STRATEGY.trailing_window      # trailing days (panel form) or events (legacy form)
+TERM_MIN_PERIODS = STRATEGY.term_min_periods    # min daily obs before the panel gate will fire
 
 
 def passes_move_filter(implied_move, fair_move, ratio=IMPLIED_FAIR_RATIO):

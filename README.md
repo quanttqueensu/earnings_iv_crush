@@ -30,13 +30,19 @@ net of costs, is the whole point of the project.
 
 | Path | Contents |
 | --- | --- |
-| [`src/data/`](src/data/) | Data intake facade, pipeline, per-event features |
+| [`src/config.py`](src/config.py) | Central `GlobalConfig` / `StrategyConfig` — every tunable parameter in one place |
+| [`src/data/`](src/data/) | Intake facade, providers (Alpaca historical chains, Yahoo calendar, FRED, SEC), pipeline, per-event features, term-spread panel |
 | [`src/strategy/`](src/strategy/) | Fair-move model, the two filters, trade structures (iron fly, calendar), VIX regime selector, strategy book |
 | [`src/engine/`](src/engine/) | Greeks and P&L attribution, cost model, risk and sizing, statistics (Sortino, bootstrap, Deflated Sharpe), backtester, simulator, tearsheet |
 | [`src/baseline/`](src/baseline/) | Agent 0 unfiltered control |
+| [`src/util/`](src/util/) | Shared utilities (progress bar with live ETA) |
 | [`scripts/`](scripts/) | Smoke test, demo backtest, enriched research runner |
 | [`tests/`](tests/) | Test suite (mirrors `src/`) |
 | [`data/`](data/) | Raw and processed pulls (git-ignored) |
+
+All tunable parameters (account size, costs, the 1.20x / 75th-percentile filter thresholds, risk
+limits, regime cut-offs) live in [`src/config.py`](src/config.py) as two frozen dataclasses; the
+domain modules re-export the individual fields under their established names.
 
 ## Setup
 
@@ -56,21 +62,28 @@ code.
 ## Running
 
 ```bash
-python -m pytest                  # full suite (156 tests). Live-network tests are
-                                  # deselected by default; run them with -m live
+python -m pytest                  # full suite. Live-network tests are deselected
+                                  # by default; run them with -m live
 python scripts/smoke_test.py      # probe each wired data source (keyless ones return rows,
                                   # keyed ones print SKIP until you add the key)
 python scripts/run_backtest.py    # end-to-end demo on SYNTHETIC events
-python scripts/run_research.py    # enriched run: net-of-cost strategy vs Agent 0, significance,
-                                  # regime structure mix, P&L attribution, and a tearsheet
+python scripts/run_research.py    # enriched SYNTHETIC run: net-of-cost strategy vs Agent 0
+python scripts/run_research.py --real --term-gate panel \
+    --cache outputs/research/events.parquet \
+    --term-panel-cache outputs/research/panel.parquet
+                                  # REAL run on Alpaca historical surfaces, with the
+                                  # spec-faithful per-name trailing-30-day term gate.
+                                  # A live progress bar shows elapsed time and ETA;
+                                  # both caches make re-runs instant.
 ```
 
-`run_backtest.py` runs the core chain (fit fair-move model, apply both filters, book the ledger,
-score against Agent 0) on a synthetic event set with a planted edge. `run_research.py` adds the
-full cost stack, the significance comparison (bootstrap CI, Deflated Sharpe), the regime structure
-mix and the vega/gamma/theta/delta P&L attribution, writing a tearsheet to `outputs/research/`.
-Both validate the harness wiring. **Neither is evidence of real edge:** that needs historical
-option surfaces.
+`run_research.py` (synthetic, default) validates the harness wiring on a planted-edge event set:
+the full cost stack, the significance comparison (bootstrap CI, Deflated Sharpe), the regime
+structure mix and the vega/gamma/theta/delta P&L attribution, writing a tearsheet to
+`outputs/research/`. **`--real`** swaps in the live pipeline — Yahoo earnings dates, Alpaca
+historical chains with locally inverted IV, and the per-name term-spread panel — for the first read
+on real edge. It needs `ALPACA_KEY`/`ALPACA_SECRET` set and assembles a usable universe of events
+(use `--tickers` and a full-year window so the term gate's trailing window warms up).
 
 ## Status
 
@@ -86,20 +99,23 @@ control all run and are tested. The engine now models the economics the thesis d
 - **Attribution.** Full Greeks and a vega/gamma/theta/delta decomposition of realised P&L, plus the
   once-at-close delta hedge, showing the edge is the vega (crush) leg.
 - **Structures and regime.** Iron-fly and calendar variants, selected per event from the VIX level
-  and term-structure premium (VIX is now consumed).
+  and term-structure premium, and routed through the structured ledger (`engine/structured_ledger.py`)
+  so each variant books its own economics rather than falling back to the naked straddle.
 - **Risk.** 1% NAV worst-case sizing, the 3x-premium stop, a 15% portfolio circuit breaker, and
   concentration caps by ticker and sector.
 - **Fair-move model depth.** Fit diagnostics (R-squared, t-statistics), an optional ridge variant,
   and out-of-sample walk-forward evaluation.
+- **Real data.** A `--real` pipeline assembles events from Alpaca's free historical option data
+  (IV inverted locally via Black-Scholes), Yahoo earnings dates and FRED VIX. The term gate uses
+  the spec's per-name trailing-30-day percentile from a daily surface panel.
 
 Outstanding work before the readiness review:
 
-- No real historical option surfaces collected yet. Alpaca keys are unset; OptionMetrics/IvyDB via
-  WRDS and a brokerage account for live chains are pending.
-- The fair-move model still fits on two of its five features on live data; `eps_dispersion`
-  (IBES/WRDS) and `oi_growth` (historical OI) come online with those sources.
-- The trade-structure variants are priced and regime-selected but not yet routed through the
-  production ledger and backtester (the booked economics remain the naked straddle).
+- Real option data is Alpaca-free (daily closes back to ~Feb 2024, IV derived locally; no historical
+  NBBO quotes). OptionMetrics/IvyDB via WRDS (clean 2020–2025 single-name surfaces) and a brokerage
+  account for live chains are still pending a faculty sponsor.
+- The fair-move model fits on the chain/price features available today; `eps_dispersion` (IBES/WRDS)
+  and `oi_growth` (historical OI) come online with those sources.
 
 ### Checkpoints
 

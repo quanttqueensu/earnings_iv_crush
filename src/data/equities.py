@@ -1,4 +1,6 @@
-"""Equity OHLCV. Default provider: yfinance (no key required).
+"""
+equities.py
+Equity OHLCV. Default provider: yfinance (no key required).
 
 Tiingo (keyed) can be added later as a more reliable source; yfinance is fine
 for spot reference and realised-vol features in development.

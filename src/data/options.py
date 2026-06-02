@@ -1,4 +1,6 @@
-"""Option chains via yfinance (no key required) - the development fallback.
+"""
+options.py
+Option chains via yfinance (no key required) - the development fallback.
 
 This is the keyless development fallback: it returns the
 *current* chain only (yfinance has no history) and its IV/greeks are rough, so

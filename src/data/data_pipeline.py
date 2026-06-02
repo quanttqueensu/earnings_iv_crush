@@ -1,4 +1,6 @@
-"""Assemble the clean per-event dataset the strategy trades on.
+"""
+data_pipeline.py
+Assemble the clean per-event dataset the strategy trades on.
 
 Joins earnings dates to ATM chains, computes front-week and back-month ATM IV,
 the implied event move, and the trailing features the fair-move model needs.

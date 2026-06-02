@@ -1,4 +1,6 @@
-"""Per-event feature maths for the strategy dataset.
+"""
+features.py
+Per-event feature maths for the strategy dataset.
 
 Pure functions only: each takes already-fetched market data (an option chain,
 the underlying price history) and returns numbers. No network access lives
@@ -19,10 +21,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from ..config import GLOBAL
 from ..engine.greeks import bs_delta
 
-TRADING_DAYS = 252
-BACK_MONTH_MIN_GAP_DAYS = 21   # back expiry sits at least ~1 month past front
+# Sourced from the central config (see ``src/config.py``).
+TRADING_DAYS = GLOBAL.trading_days_per_year
+BACK_MONTH_MIN_GAP_DAYS = GLOBAL.back_month_min_gap_days   # back expiry ~1 month past front
 NAN = float("nan")
 
 # np.trapz was renamed np.trapezoid in NumPy 2.0; support both.

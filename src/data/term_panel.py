@@ -1,4 +1,6 @@
-"""Build the per-name daily term-spread panel the term filter gates on.
+"""
+term_panel.py
+Build the per-name daily term-spread panel the term filter gates on.
 
 The spec's term gate compares each event's front-minus-back ATM IV against the
 trailing 30-DAY distribution of that name's term spread. That needs a *daily*
@@ -88,11 +90,16 @@ def build_term_panel(events: pd.DataFrame, *, fetch_chain=None, fetch_prices=Non
         closes = (prices.assign(date=pd.to_datetime(prices["date"]))
                   .set_index("date")["close"].astype(float).sort_index())
         spot_lookup = _spot_lookup_from_series(closes)
-        # One day at a time so the progress bar (and its ETA) is granular.
+        # One day at a time so the progress bar (and its ETA) is granular. A day
+        # that still fails after the provider's own retries is skipped, not fatal
+        # - the trailing percentile tolerates a few gaps.
         for d in dates:
-            day = historical_surfaces.build_surface_panel(
-                [ticker], [d.strftime("%Y-%m-%d")],
-                fetch_chain=fetch_chain, spot_lookup=spot_lookup)
+            try:
+                day = historical_surfaces.build_surface_panel(
+                    [ticker], [d.strftime("%Y-%m-%d")],
+                    fetch_chain=fetch_chain, spot_lookup=spot_lookup)
+            except Exception:
+                day = pd.DataFrame()
             if not day.empty:
                 frames.append(day[["ticker", "date", "iv_term_spread"]])
             bar.update()

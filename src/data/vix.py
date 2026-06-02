@@ -1,4 +1,6 @@
-"""VIX level and term structure from FRED - no API key required.
+"""
+vix.py
+VIX level and term structure from FRED - no API key required.
 
 Uses the public fredgraph CSV endpoint, so it runs with zero setup.
 Series: VIXCLS (spot VIX), VXVCLS (3-month VIX, a.k.a. VIX3M).

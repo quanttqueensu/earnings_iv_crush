@@ -1,4 +1,6 @@
-"""Earnings calendar via Finnhub free tier. Requires FINNHUB_API_KEY.
+"""
+earnings.py
+Earnings calendar via Finnhub free tier. Requires FINNHUB_API_KEY.
 
 Cross-check the 'hour' field (bmo/amc/dmh) against SEC EDGAR acceptance times
 and Yahoo before trusting the session (the 2-of-3 rule).

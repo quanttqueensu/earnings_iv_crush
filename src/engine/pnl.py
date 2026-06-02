@@ -1,4 +1,6 @@
-"""Short-straddle trade economics: margin, sizing, P&L, ledger schema.
+"""
+pnl.py
+Short-straddle trade economics: margin, sizing, P&L, ledger schema.
 
 Pure functions shared by the live strategy and the Agent 0 control, so both
 book trades identically and only the *selection* differs. P&L follows the agreed
@@ -11,13 +13,15 @@ from __future__ import annotations
 
 import pandas as pd
 
+from ..config import GLOBAL
 from .costs import CostModel
 from .greeks import straddle_price
 
-COST_PER_CONTRACT = 0.65    # USD per contract per fill (Khan & Khan 2024)
-ACCOUNT_SIZE = 250_000      # Reg-T account
-CONTRACT_MULTIPLIER = 100   # shares per option contract
-FILLS_PER_STRADDLE = 4      # 2 legs x (open + close)
+# Sourced from the central GlobalConfig (see ``src/config.py``).
+COST_PER_CONTRACT = GLOBAL.cost_per_contract    # USD per contract per fill (Khan & Khan 2024)
+ACCOUNT_SIZE = GLOBAL.account_size              # Reg-T account
+CONTRACT_MULTIPLIER = GLOBAL.contract_multiplier  # shares per option contract
+FILLS_PER_STRADDLE = GLOBAL.fills_per_straddle    # 2 legs x (open + close)
 
 LEDGER_COLUMNS = [
     "ticker", "entry_date", "exit_date", "strike", "contracts",

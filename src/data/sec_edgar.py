@@ -1,4 +1,6 @@
-"""SEC EDGAR access - no API key, but a User-Agent is required.
+"""
+sec_edgar.py
+SEC EDGAR access - no API key, but a User-Agent is required.
 
 Set SEC_USER_AGENT in .env (format: "Name email"). SEC blocks requests
 without it and rate-limits to ~10 requests/second.

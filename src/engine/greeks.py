@@ -1,4 +1,6 @@
-"""Black-Scholes pricing and Greeks for ATM straddles.
+"""
+greeks.py
+Black-Scholes pricing and Greeks for ATM straddles.
 
 Used to price entries/exits, to translate quoted prices into implied vols when
 the data feed does not supply them, and to attribute realised straddle P&L to

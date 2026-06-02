@@ -1,4 +1,6 @@
-"""Raw data intake facade - one import surface for the whole pipeline.
+"""
+data_intake.py
+Raw data intake facade - one import surface for the whole pipeline.
 
 Provider choices follow a free-first stack. Each public function delegates to a
 provider module so swapping a provider is a
