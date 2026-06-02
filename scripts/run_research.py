@@ -1,27 +1,33 @@
-"""run_research.py
+"""
+run_research.py
 Enriched end-to-end research run: filtered strategy vs Agent 0, net of costs.
 
-Runs the full chain on a synthetic, VIX- and sector-tagged event set with a
-planted edge: fit the fair-move model, select through both filters, book the
-ledger both gross (commission-only) and net (full cost stack), score with the
+Runs the full chain: fit the fair-move model, select through both filters, book
+the ledger gross (commission-only) and net (full cost stack), score with the
 expanded metric set, run the significance comparison (Sharpe spread, paired
 t-test, bootstrap CI, Deflated Sharpe), report the regime structure mix and the
 Greek P&L attribution, and write a tearsheet.
 
-It validates the W1-W7 machinery against a known answer. It is NOT evidence of
-real edge — that needs historical option surfaces.
+The default run uses a synthetic, planted-edge event set and validates the
+machinery against a known answer. ``--real`` swaps in the live pipeline: Yahoo
+earnings dates, Alpaca historical chains with locally inverted IV, and (with
+``--term-gate panel``) the per-name daily term-spread panel. Real mode needs
+``ALPACA_KEY``/``ALPACA_SECRET`` and shows a live progress bar with an ETA.
 
-Usage (from the project root):
-    python scripts/run_research.py                # synthetic, planted edge
-    python scripts/run_research.py --real         # REAL Alpaca surfaces
+Usage
+-----
+From the project root::
 
-In --real mode it pulls the live Finnhub earnings calendar (restricted to a
-liquid basket), assembles execution-ready events from Alpaca historical chains
-(IV inverted locally) plus prices, and runs the identical strategy/backtest path.
-This is the first read on real edge; it needs ALPACA_KEY/SECRET and FINNHUB_API_KEY.
+    python scripts/run_research.py                       # synthetic, planted edge
+    python scripts/run_research.py --real --term-gate panel \\
+        --cache outputs/research/events.parquet \\
+        --term-panel-cache outputs/research/panel.parquet
 
-Outputs: outputs/research/tearsheet.png and outputs/research/metrics.csv
-Runtime: seconds (synthetic) / minutes (real, network-bound).
+Outputs
+-------
+A tearsheet and metrics CSV under ``outputs/research/``. Real-mode event and
+panel caches make subsequent runs instant. Runtime: seconds (synthetic) /
+minutes (real, network-bound).
 """
 
 from __future__ import annotations

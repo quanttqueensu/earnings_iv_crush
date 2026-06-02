@@ -28,10 +28,31 @@ def run_strategy(events: pd.DataFrame, model: FairMoveModel,
 
     Predicts the fair move, keeps only events that pass both filters (implied
     move >= 1.20x fair AND a steep term spread), and books one short ATM straddle
-    per surviving event. `model` must already be fitted. Pass a ``CostModel`` via
-    ``costs`` to book net-of-cost P&L. Pass ``term_panel`` (a per-name daily
-    surface panel) to use the spec-faithful trailing-day term gate instead of the
-    legacy events-rolling one.
+    per surviving event.
+
+    Parameters
+    ----------
+    events : pd.DataFrame
+        Per-event dataset carrying the filter and execution columns.
+    model : FairMoveModel
+        An already-fitted fair-move regression.
+    account : float
+        Account notional used for sizing. Defaults to ``ACCOUNT_SIZE``.
+    fraction : float
+        Margin fraction per position. Defaults to ``0.05``.
+    r : float
+        Risk-free rate for pricing. Defaults to ``0.0``.
+    costs : CostModel, optional
+        Full cost stack (spread + slippage). ``None`` keeps the commission-only
+        default.
+    term_panel : pd.DataFrame, optional
+        Per-name daily surface panel. When supplied, the spec-faithful
+        trailing-day term gate is used instead of the legacy events-rolling one.
+
+    Returns
+    -------
+    pd.DataFrame
+        The short-straddle trade ledger (``pnl.LEDGER_COLUMNS``).
     """
     fair = model.predict(events)
     selected = select_events(events, fair, term_panel=term_panel)
@@ -49,10 +70,30 @@ def run_strategy_structured(events: pd.DataFrame, model: FairMoveModel,
     Predicts the fair move, applies both filters, then routes every surviving
     event to the structure the regime selector picks (iron fly when VIX is high,
     calendar when the term-structure premium dominates, else the naked straddle)
-    and books it with worst-case (1% NAV) sizing. `model` must already be fitted.
+    and books it with worst-case (1% NAV) sizing.
 
-    Returns the structured ledger (``structured_ledger.STRUCTURED_COLUMNS``);
-    ``engine.backtester`` scores it directly off the ``pnl`` column.
+    Parameters
+    ----------
+    events, model : see :func:`run_strategy`.
+    account : float
+        Account notional. Defaults to ``ACCOUNT_SIZE``.
+    risk_frac : float
+        Worst-case capital at risk per position. Defaults to ``RISK_FRAC_PER_TRADE``.
+    r : float
+        Risk-free rate. Defaults to ``0.0``.
+    costs : CostModel, optional
+        Full cost stack; ``None`` is commission-only.
+    vix_level : float, optional
+        Override VIX level for the regime selector; ``None`` reads the per-event
+        ``vix`` column.
+    term_panel : pd.DataFrame, optional
+        Per-name daily surface panel for the trailing-day term gate.
+
+    Returns
+    -------
+    pd.DataFrame
+        The structured ledger (``structured_ledger.STRUCTURED_COLUMNS``);
+        ``engine.backtester`` scores it directly off the ``pnl`` column.
     """
     fair = model.predict(events)
     selected = select_events(events, fair, term_panel=term_panel)

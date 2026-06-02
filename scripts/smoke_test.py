@@ -1,11 +1,16 @@
-"""Smoke test: pull one small sample from each wired data source.
+"""
+smoke_test.py
+Pull one small sample from each wired data source.
 
 No-key sources (FRED VIX, yfinance, SEC EDGAR) run immediately - SEC only
 needs SEC_USER_AGENT in .env. Keyed sources (Finnhub) print SKIP until you add
 the key. A source that errors prints FAIL with the reason but does not stop the
 others.
 
-Run from the project root:
+Usage
+-----
+From the project root::
+
     python scripts/smoke_test.py
 """
 from __future__ import annotations

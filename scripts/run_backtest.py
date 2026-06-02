@@ -1,12 +1,17 @@
-"""Crude backtest demo: filtered strategy vs the Agent 0 control.
+"""
+run_backtest.py
+Crude backtest demo: filtered strategy vs the Agent 0 control.
 
 Runs the full chain end-to-end on a SYNTHETIC event set with a planted edge
-(see src/engine/simulate.py): fit the fair-move model, select events through
+(see ``src/engine/simulate.py``): fit the fair-move model, select events through
 both filters, book the ledger, and score it against an unfiltered Agent 0 book.
 This validates the harness wiring and is the 30 June "crude backtest"
 deliverable. It is NOT evidence of real edge - that needs historical option data.
 
-Run from the project root:
+Usage
+-----
+From the project root::
+
     python scripts/run_backtest.py
 """
 from __future__ import annotations

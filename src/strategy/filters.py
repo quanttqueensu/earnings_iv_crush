@@ -19,9 +19,28 @@ TRAILING_WINDOW = STRATEGY.trailing_window      # trailing days (panel form) or 
 TERM_MIN_PERIODS = STRATEGY.term_min_periods    # min daily obs before the panel gate will fire
 
 
+# ── Gate 1: rich implied move ────────────────────────────────────────────────
+
+
 def passes_move_filter(implied_move, fair_move, ratio=IMPLIED_FAIR_RATIO):
-    """True when the implied event move is at least `ratio` times the fair move."""
+    """True when the implied event move is at least ``ratio`` times the fair move.
+
+    Parameters
+    ----------
+    implied_move, fair_move : float or Series
+        The market-implied event move and the regression fair move.
+    ratio : float
+        Required richness multiple. Defaults to ``IMPLIED_FAIR_RATIO`` (1.20).
+
+    Returns
+    -------
+    bool or Series
+        Whether ``implied_move >= ratio * fair_move``.
+    """
     return implied_move >= ratio * fair_move
+
+
+# ── Gate 2: steep term structure ─────────────────────────────────────────────
 
 
 def passes_term_filter(events: pd.DataFrame, pctl=TERM_SPREAD_PCTL, window=TRAILING_WINDOW):
@@ -80,6 +99,9 @@ def passes_term_filter_panel(events: pd.DataFrame, panel: pd.DataFrame,
     return pd.Series(flags, index=events.index)
 
 
+# ── Combined selection ───────────────────────────────────────────────────────
+
+
 def select_events(events: pd.DataFrame, fair_move,
                   ratio=IMPLIED_FAIR_RATIO, pctl=TERM_SPREAD_PCTL,
                   window=TRAILING_WINDOW, *, term_panel: pd.DataFrame | None = None,
@@ -87,11 +109,28 @@ def select_events(events: pd.DataFrame, fair_move,
                   asof_offset_days=1) -> pd.DataFrame:
     """Return only the events that pass BOTH filters.
 
-    Gate 1: implied event move >= `ratio` x the fair move (`fair_move` aligned to
-    `events` by position). Gate 2: the term spread is steep versus its recent
-    history - the per-name trailing-day percentile when `term_panel` is supplied
-    (preferred, spec-faithful), else the legacy events-rolling percentile.
-    `events` must hold `implied_move` and `iv_term_spread`.
+    Gate 1: implied event move >= ``ratio`` x the fair move. Gate 2: the term
+    spread is steep versus its recent history - the per-name trailing-day
+    percentile when ``term_panel`` is supplied (preferred, spec-faithful), else
+    the legacy events-rolling percentile.
+
+    Parameters
+    ----------
+    events : pd.DataFrame
+        Must hold ``implied_move`` and ``iv_term_spread`` (and ``ticker`` /
+        ``announce_date`` when ``term_panel`` is used).
+    fair_move : sequence
+        Predicted fair move per event, aligned to ``events`` by position.
+    ratio, pctl, window : see the module constants.
+    term_panel : pd.DataFrame, optional
+        Per-name daily term-spread panel; switches Gate 2 to the trailing-day form.
+    window_days, min_periods, asof_offset_days :
+        Panel-gate parameters (ignored by the legacy gate).
+
+    Returns
+    -------
+    pd.DataFrame
+        The subset of ``events`` that clears both gates.
     """
     fair = pd.Series(list(fair_move), index=events.index)
     move_ok = passes_move_filter(events["implied_move"], fair, ratio)

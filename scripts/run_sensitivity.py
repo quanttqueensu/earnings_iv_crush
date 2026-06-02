@@ -1,4 +1,5 @@
-"""run_sensitivity.py
+"""
+run_sensitivity.py
 Filter-threshold sensitivity sweep plus an out-of-sample walk-forward check.
 
 Sweeps the implied-vs-fair ratio against the term-structure percentile on a
@@ -11,10 +12,15 @@ walk-forward backtest at the default thresholds.
 This is the 31 July sensitivity / walk-forward deliverable on synthetic data; it
 is not evidence of real edge.
 
-Usage (from the project root):
+Usage
+-----
+From the project root::
+
     python scripts/run_sensitivity.py
 
-Outputs: outputs/sensitivity/heatmap.png and outputs/sensitivity/sweep.csv
+Outputs
+-------
+``outputs/sensitivity/heatmap.png`` and ``outputs/sensitivity/sweep.csv``.
 Runtime: a few seconds (pure CPU, no network).
 """
 
