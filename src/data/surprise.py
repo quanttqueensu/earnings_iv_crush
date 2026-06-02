@@ -25,10 +25,22 @@ def earnings_surprise(eps_actual, eps_estimate) -> pd.Series:
 
 
 def prior_surprise(calendar: pd.DataFrame) -> pd.Series:
-    """Per-event prior surprise magnitude, aligned to `calendar.index`.
+    """Per-event prior surprise magnitude, aligned to ``calendar.index``.
 
     Returns all-NaN (still aligned) when the calendar lacks the estimate/actual
     columns, so callers can attach it unconditionally.
+
+    Parameters
+    ----------
+    calendar : pandas.DataFrame
+        Earnings calendar; needs ``ticker``, ``announce_date``,
+        ``eps_estimate`` and ``eps_actual`` for a non-trivial result.
+
+    Returns
+    -------
+    pandas.Series
+        The prior quarter's absolute surprise per event, indexed like
+        ``calendar``.
     """
     if not _REQUIRED.issubset(calendar.columns):
         return pd.Series(np.nan, index=calendar.index, dtype=float)

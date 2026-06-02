@@ -43,6 +43,24 @@ __all__ = [
 def fetch_analyst_dispersion(ticker: str, start: str, end: str) -> pd.DataFrame:
     """Analyst EPS forecast dispersion (IBES via WRDS; fallback Finnhub/FMP).
 
-    Columns: ticker, announce_date, eps_mean, eps_std, n_estimates.
+    Not yet implemented - placeholder until WRDS access lands.
+
+    Parameters
+    ----------
+    ticker : str
+        Underlying symbol.
+    start, end : str
+        Inclusive date window in ``YYYY-MM-DD`` form.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``ticker``, ``announce_date``, ``eps_mean``, ``eps_std`` and
+        ``n_estimates``.
+
+    Raises
+    ------
+    NotImplementedError
+        Always, until WRDS access is available.
     """
     raise NotImplementedError("Pending WRDS access.")

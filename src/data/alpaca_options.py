@@ -45,6 +45,9 @@ _MAX_RETRIES = 4          # transient network/5xx retries before giving up
 _RETRY_BACKOFF = 2.0      # seconds, multiplied by the attempt number
 
 
+# ── HTTP transport ───────────────────────────────────────────────────────────
+
+
 def _headers() -> dict[str, str]:
     """Auth headers, raising a clear error if the keys are not set."""
     return {
@@ -77,6 +80,9 @@ def _get(host: str, path: str, params: dict) -> dict:
     raise last_error
 
 
+# ── Contract listing and price bars ──────────────────────────────────────────
+
+
 def list_contracts(underlying: str, asof: str, horizon_days: int = 90,
                    strike_window: float | None = 0.20, spot: float | None = None,
                    max_pages: int = 20) -> pd.DataFrame:
@@ -87,7 +93,26 @@ def list_contracts(underlying: str, asof: str, horizon_days: int = 90,
     and ``strike_window`` is set, strikes are limited to +/-``strike_window`` of
     spot server-side to keep the payload small.
 
-    Returns a DataFrame with ``symbol, expiry, strike, right, open_interest``.
+    Parameters
+    ----------
+    underlying : str
+        Underlying ticker.
+    asof : str
+        As-of date (``YYYY-MM-DD``); the expiry lower bound.
+    horizon_days : int, optional
+        Calendar days past ``asof`` to include expiries. Defaults to ``90``.
+    strike_window : float or None, optional
+        Half-width of the strike band as a fraction of spot, applied only when
+        ``spot`` is given. Defaults to ``0.20``.
+    spot : float or None, optional
+        Underlying price used to centre the strike band. Defaults to ``None``.
+    max_pages : int, optional
+        Page-token follow limit per status. Defaults to ``20``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Columns ``symbol``, ``expiry``, ``strike``, ``right``, ``open_interest``.
     """
     asof_ts = pd.Timestamp(asof)
     base = {
@@ -189,6 +214,9 @@ def _underlying_close(ticker: str, asof: str, lookback_days: int = 7) -> float:
     return float(bars[-1]["c"])
 
 
+# ── Public chain fetcher ─────────────────────────────────────────────────────
+
+
 def fetch_option_chain(ticker: str, asof: str, horizon_days: int = 90,
                        strike_window: float = 0.20, r: float = 0.0,
                        spot: float | None = None) -> pd.DataFrame:
@@ -196,8 +224,29 @@ def fetch_option_chain(ticker: str, asof: str, horizon_days: int = 90,
 
     Drop-in for ``options.fetch_option_chain`` with the same return schema, but
     backed by Alpaca's historical data and a locally inverted ``iv`` column.
-    ``asof`` may be any trading day back to ~Feb 2024. Returns an empty,
-    correctly-typed frame when the spot or contract universe cannot be resolved.
+    ``asof`` may be any trading day back to ~Feb 2024.
+
+    Parameters
+    ----------
+    ticker : str
+        Underlying ticker.
+    asof : str
+        As-of date (``YYYY-MM-DD``).
+    horizon_days : int, optional
+        Calendar days past ``asof`` to include expiries. Defaults to ``90``.
+    strike_window : float, optional
+        Half-width of the strike band as a fraction of spot. Defaults to ``0.20``.
+    r : float, optional
+        Risk-free rate for the local IV inversion. Defaults to ``0.0``.
+    spot : float or None, optional
+        Underlying price; resolved from the latest IEX close when ``None``.
+        Defaults to ``None``.
+
+    Returns
+    -------
+    pd.DataFrame
+        Chain with ``CHAIN_COLUMNS``; empty (correctly typed) when the spot or
+        contract universe cannot be resolved.
     """
     if spot is None:
         spot = _underlying_close(ticker, asof)

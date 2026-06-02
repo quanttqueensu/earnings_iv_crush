@@ -63,18 +63,39 @@ def build_execution_events(
 ) -> pd.DataFrame:
     """One execution-ready row per earnings event, from real entry/exit data.
 
-    Parameters
-    ----------
-    calendar : DataFrame with ``ticker`` and ``announce_date``.
-    fetch_chain : ``fetch_chain(ticker, 'YYYY-MM-DD') -> chain`` (defaults to the
-        Alpaca historical provider via ``data_intake.fetch_historical_option_chain``).
-    fetch_prices : ``fetch_prices(ticker, start, end) -> OHLCV`` (defaults to
-        ``data_intake.fetch_equity_ohlcv``).
-    holding_days : business days held after the announcement (the exit).
-    asof_offset_days : business days before the announcement for entry.
-
     Events whose entry chain, front expiry or spots cannot be resolved are
     skipped, so one thin name never sinks the build.
+
+    Parameters
+    ----------
+    calendar : pd.DataFrame
+        Earnings calendar with ``ticker`` and ``announce_date``.
+    fetch_chain : callable, optional
+        ``fetch_chain(ticker, 'YYYY-MM-DD') -> chain``. Defaults to the Alpaca
+        historical provider via ``data_intake.fetch_historical_option_chain``.
+    fetch_prices : callable, optional
+        ``fetch_prices(ticker, start, end) -> OHLCV``. Defaults to
+        ``data_intake.fetch_equity_ohlcv``.
+    holding_days : int, optional
+        Business days held after the announcement (the exit). Defaults to ``2``.
+    asof_offset_days : int, optional
+        Business days before the announcement at which to enter. Defaults to ``1``.
+    lookback_days : int, optional
+        Calendar days of price history pulled before entry for realised vol.
+        Defaults to ``60``.
+    rv_window : int, optional
+        Trailing-return window for realised vol, in observations. Defaults to
+        ``20``.
+    r : float, optional
+        Risk-free rate passed to the feature maths. Defaults to ``0.0``.
+    progress : bool, optional
+        Whether to render a progress bar over events. Defaults to ``False``.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per resolvable event with ``EVENT_COLUMNS``; empty (correctly
+        typed) when the calendar is empty.
     """
     fetch_chain = fetch_chain or data_intake.fetch_historical_option_chain
     fetch_prices = fetch_prices or data_intake.fetch_equity_ohlcv

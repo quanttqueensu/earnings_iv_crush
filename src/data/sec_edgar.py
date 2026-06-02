@@ -37,6 +37,9 @@ def _headers() -> dict:
     return {"User-Agent": SEC_USER_AGENT, "Accept-Encoding": "gzip, deflate"}
 
 
+# ── Ticker -> CIK resolution ─────────────────────────────────────────────────
+
+
 @functools.lru_cache(maxsize=1)
 def cik_map() -> dict:
     """Ticker -> 10-digit zero-padded CIK. Cached for the process run."""
@@ -48,18 +51,33 @@ def cik_map() -> dict:
 
 
 def get_cik(ticker: str) -> str:
+    """Resolve a ticker to its 10-digit CIK, raising ``KeyError`` if unknown."""
     cik = cik_map().get(ticker.upper())
     if cik is None:
         raise KeyError(f"No CIK found for ticker {ticker!r}")
     return cik
 
 
+# ── Filings: 8-Ks and session ────────────────────────────────────────────────
+
+
 def infer_session(acceptance) -> str:
     """BMO / AMC / ambiguous from an EDGAR acceptance timestamp.
 
-    EDGAR acceptance times are Eastern wall-clock (the trailing 'Z' is a
+    EDGAR acceptance times are Eastern wall-clock (the trailing ``Z`` is a
     quirk, not real UTC). Validate once against a known print. Logic:
-      before 09:30 ET -> bmo ; at/after 16:00 ET -> amc ; else ambiguous.
+    before 09:30 ET -> ``"bmo"`` ; at/after 16:00 ET -> ``"amc"`` ; else
+    ``"ambiguous"``.
+
+    Parameters
+    ----------
+    acceptance : str or datetime-like
+        EDGAR acceptance timestamp.
+
+    Returns
+    -------
+    str
+        One of ``"bmo"``, ``"amc"`` or ``"ambiguous"``.
     """
     ts = pd.to_datetime(acceptance)
     if ts.tzinfo is not None:
@@ -75,10 +93,20 @@ def infer_session(acceptance) -> str:
 def earnings_8ks(ticker: str) -> pd.DataFrame:
     """Recent earnings 8-Ks (Item 2.02) with acceptance time and session.
 
-    Note: the submissions 'recent' block only covers roughly the last year /
+    Note: the submissions ``recent`` block only covers roughly the last year /
     ~1000 filings. For the 2020-2025 backtest, page through the older shards
-    under filings.files (TODO when WRDS/backtest data lands).
-    Columns: accession, acceptance, session.
+    under ``filings.files`` (TODO when WRDS/backtest data lands).
+
+    Parameters
+    ----------
+    ticker : str
+        Underlying symbol.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``accession``, ``acceptance`` and ``session``. Empty when no
+        matching 8-K is found.
     """
     cik = get_cik(ticker)
     r = requests.get(_SUBMISSIONS_URL.format(cik=cik),
@@ -99,10 +127,22 @@ def earnings_8ks(ticker: str) -> pd.DataFrame:
     return df
 
 
+# ── XBRL: reported EPS ───────────────────────────────────────────────────────
+
+
 def reported_eps(ticker: str) -> pd.DataFrame:
     """Reported diluted EPS history from XBRL.
 
-    Columns: end (period end), val (EPS), filed, form.
+    Parameters
+    ----------
+    ticker : str
+        Underlying symbol.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``end`` (period end), ``val`` (EPS), ``filed`` and ``form``,
+        sorted by ``end``. Empty when XBRL has no data.
     """
     cik = get_cik(ticker)
     r = requests.get(_CONCEPT_URL.format(cik=cik),

@@ -33,9 +33,10 @@ def simulate_events(n: int = 300, seed: int = 0, edge_frac: float = 0.35,
                     spot: float = 100.0, with_vix: bool = False,
                     high_vix_frac: float = 0.20, vix_low: float = 15.0,
                     vix_high: float = 30.0, with_sectors: bool = False) -> pd.DataFrame:
-    """Generate `n` synthetic pre-earnings events with a planted edge.
+    """
+    Generate ``n`` synthetic pre-earnings events with a planted edge.
 
-    `edge_frac` of events are rich (profitable to short); the rest are fair
+    ``edge_frac`` of events are rich (profitable to short); the rest are fair
     (break-even before costs, ~0 Sharpe like Agent 0).
 
     Optional enrichment (all defaulting off, so existing callers are unchanged):
@@ -45,6 +46,39 @@ def simulate_events(n: int = 300, seed: int = 0, edge_frac: float = 0.35,
       mild jitter. Lets the regime selector (``strategy.regime``) be exercised.
     * ``with_sectors`` adds a GICS-like ``sector`` column so the concentration
       caps (``engine.risk``) can be exercised.
+
+    Parameters
+    ----------
+    n : int
+        Number of events to generate. Defaults to ``300``.
+    seed : int
+        Seed for the random generator. Defaults to ``0``.
+    edge_frac : float
+        Fraction of events that are rich (overpriced move, wide term spread,
+        hard post-event crush). Defaults to ``0.35``.
+    holding_days : int
+        Business days the position is held after entry. Defaults to ``2``.
+    days_to_expiry : int
+        Calendar days from entry to the front expiry. Defaults to ``7``.
+    spot : float
+        Underlying spot at entry. Defaults to ``100.0``.
+    with_vix : bool
+        Add a ``vix`` column for the regime selector. Defaults to ``False``.
+    high_vix_frac : float
+        Fraction of events placed in the defensive high-VIX regime when
+        ``with_vix`` is set. Defaults to ``0.20``.
+    vix_low, vix_high : float
+        Calm and defensive VIX levels. Default to ``15.0`` and ``30.0``.
+    with_sectors : bool
+        Add a GICS-like ``sector`` column for the concentration caps. Defaults
+        to ``False``.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per event carrying both the filter features and the execution
+        columns the ledger builder needs, plus an ``is_rich`` ground-truth flag
+        (and ``vix`` / ``sector`` when the corresponding flags are set).
     """
     rng = np.random.default_rng(seed)
     t_entry = days_to_expiry / 365.0

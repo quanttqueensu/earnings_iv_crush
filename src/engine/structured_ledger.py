@@ -53,6 +53,11 @@ def _straddle_ps(spot: float, strike: float, t: float, r: float, sigma: float) -
     return straddle_price(spot, strike, t, r, sigma)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Dispatch
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 def build_structured_ledger(events: pd.DataFrame, structures,
                             account: float = ACCOUNT_SIZE,
                             risk_frac: float = RISK_FRAC_PER_TRADE,
@@ -118,6 +123,11 @@ def build_structured_ledger(events: pd.DataFrame, structures,
             rows.append(row)
 
     return pd.DataFrame(rows, columns=STRUCTURED_COLUMNS)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Per-structure booking
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 def _common(e, structure: str, contracts: int, entry_credit: float,

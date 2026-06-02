@@ -29,7 +29,7 @@ TRADING_DAYS = GLOBAL.trading_days_per_year
 BACK_MONTH_MIN_GAP_DAYS = GLOBAL.back_month_min_gap_days   # back expiry ~1 month past front
 NAN = float("nan")
 
-# np.trapz was renamed np.trapezoid in NumPy 2.0; support both.
+# ``np.trapz`` was renamed ``np.trapezoid`` in NumPy 2.0; support both.
 _trapz = getattr(np, "trapezoid", getattr(np, "trapz", None))
 
 # Feature keys this module produces, in dataset order.
@@ -47,8 +47,11 @@ FEATURE_KEYS = [
 ]
 
 
+# ── Chain structure: strikes and expiries ────────────────────────────────────
+
+
 def _with_mid(chain: pd.DataFrame) -> pd.DataFrame:
-    """Return a copy of the chain with a `mid` column from bid/ask.
+    """Return a copy of the chain with a ``mid`` column from bid/ask.
 
     Falls back to whichever side is present when one is missing.
     """
@@ -74,6 +77,20 @@ def nearest_strike(chain: pd.DataFrame, expiry, spot: float) -> float:
     Strike grids differ across expiries (weeklies are sparser), so the ATM
     strike must be chosen per expiry rather than globally - otherwise an exact
     lookup can miss a strike that only some other expiry lists.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Option chain (needs ``expiry`` and ``strike``).
+    expiry :
+        The expiry whose strike grid is searched.
+    spot : float
+        Underlying price (USD).
+
+    Returns
+    -------
+    float
+        The closest listed strike, or NaN when the expiry lists no strikes.
     """
     strikes = pd.to_numeric(
         chain.loc[chain["expiry"] == expiry, "strike"], errors="coerce"
@@ -89,9 +106,24 @@ def nearest_expiries(chain: pd.DataFrame, announce_date,
     """(front, back) expiries straddling the announcement.
 
     Front is the first expiry strictly after the announcement (the front-week
-    that prices the event). Back is the first expiry at least `back_gap_days`
+    that prices the event). Back is the first expiry at least ``back_gap_days``
     beyond the front, falling back to the latest available expiry. Either may
-    be None when the chain does not reach far enough.
+    be ``None`` when the chain does not reach far enough.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Option chain (needs ``expiry``).
+    announce_date :
+        The earnings announcement date.
+    back_gap_days : int, optional
+        Minimum gap from the front expiry to the back expiry, in calendar days.
+        Defaults to ``BACK_MONTH_MIN_GAP_DAYS``.
+
+    Returns
+    -------
+    tuple
+        ``(front, back)`` as ``pd.Timestamp`` or ``None`` each.
     """
     announce = pd.Timestamp(pd.to_datetime(announce_date))
     exps = np.sort(pd.to_datetime(chain["expiry"].unique()))
@@ -106,6 +138,9 @@ def nearest_expiries(chain: pd.DataFrame, announce_date,
         last = pd.Timestamp(exps[-1])
         back = last if last > front else None
     return front, back
+
+
+# ── ATM IV, implied move and realised vol ────────────────────────────────────
 
 
 def atm_iv(chain: pd.DataFrame, expiry, strike: float) -> float:
@@ -153,6 +188,27 @@ def skew_25d(chain: pd.DataFrame, expiry, spot: float, t_years: float,
     Each option's delta is computed from its own quoted IV, then IV is
     interpolated to the +/-0.25 delta points. Positive means puts are bid up
     relative to calls (the usual equity skew).
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Option chain (needs ``expiry``, ``strike``, ``right``, ``iv``).
+    expiry :
+        The expiry to evaluate.
+    spot : float
+        Underlying price (USD).
+    t_years : float
+        Time to expiry in years.
+    r : float, optional
+        Risk-free rate (annualised, continuously compounded). Defaults to ``0.0``.
+    target : float, optional
+        Delta magnitude at which to read the skew. Defaults to ``0.25``.
+
+    Returns
+    -------
+    float
+        The 25-delta skew, or NaN when either wing has fewer than two quotes or
+        the time to expiry is non-positive.
     """
     rows = chain[chain["expiry"] == expiry].copy()
     rows["iv"] = pd.to_numeric(rows["iv"], errors="coerce")
@@ -172,11 +228,26 @@ def skew_25d(chain: pd.DataFrame, expiry, spot: float, t_years: float,
     return float(iv_put - iv_call)
 
 
+# ── Volatility premia and risk-neutral moments ───────────────────────────────
+
+
 def volatility_premium(front_iv: float, trailing_rv: float) -> float:
     """Goyal & Saretto (2009) volatility deviation: front ATM IV minus trailing RV.
 
     A large positive value means options are priced above recently realised
     volatility, which tends to mean-revert and is a short-vol signal.
+
+    Parameters
+    ----------
+    front_iv : float
+        Front-week ATM implied vol (annualised).
+    trailing_rv : float
+        Trailing realised vol (annualised).
+
+    Returns
+    -------
+    float
+        ``front_iv - trailing_rv``, or NaN when either input is NaN.
     """
     if front_iv != front_iv or trailing_rv != trailing_rv:
         return NAN
@@ -188,6 +259,18 @@ def variance_risk_premium(front_iv: float, trailing_rv: float) -> float:
 
     The compensation embedded in option prices for bearing variance risk, in
     annualised variance units. Positive for the typical short-vol earnings setup.
+
+    Parameters
+    ----------
+    front_iv : float
+        Front-week ATM implied vol (annualised).
+    trailing_rv : float
+        Trailing realised vol (annualised).
+
+    Returns
+    -------
+    float
+        ``front_iv ** 2 - trailing_rv ** 2``, or NaN when either input is NaN.
     """
     if front_iv != front_iv or trailing_rv != trailing_rv:
         return NAN
@@ -264,13 +347,40 @@ def bkm_moments(chain: pd.DataFrame, expiry, spot: float, t_years: float,
     return {"bkm_var": float(var), "bkm_skew": float(skew), "bkm_kurt": float(kurt)}
 
 
+# ── Per-event aggregator ─────────────────────────────────────────────────────
+
+
 def event_features(chain: pd.DataFrame, spot: float, announce_date, asof_date,
                    price_history: pd.DataFrame, r: float = 0.0,
                    rv_window: int = 20) -> dict:
     """Compute the chain/price-derived features for one earnings event.
 
-    Returns a dict keyed by FEATURE_KEYS. Missing inputs yield NaN rather than
-    raising, so one thin chain never sinks the whole dataset build.
+    Missing inputs yield NaN rather than raising, so one thin chain never sinks
+    the whole dataset build.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Option chain as of the entry date (the canonical chain schema).
+    spot : float
+        Underlying price at entry (USD).
+    announce_date :
+        The earnings announcement date.
+    asof_date :
+        The entry (as-of) date, used for the time-to-expiry of the front leg.
+    price_history : pd.DataFrame
+        Trailing OHLCV for the realised-vol window.
+    r : float, optional
+        Risk-free rate passed to the skew and BKM maths. Defaults to ``0.0``.
+    rv_window : int, optional
+        Trailing-return window for realised vol, in observations. Defaults to
+        ``20``.
+
+    Returns
+    -------
+    dict
+        A dict keyed by ``FEATURE_KEYS``; entries are NaN where the underlying
+        inputs are missing.
     """
     blank = {k: NAN for k in FEATURE_KEYS}
     if chain is None or chain.empty:

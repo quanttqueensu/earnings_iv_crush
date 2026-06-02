@@ -20,9 +20,21 @@ _SERIES = {"vix": "VIXCLS", "vix3m": "VXVCLS"}
 
 
 def fetch_index_vol(start: str, end: str) -> pd.DataFrame:
-    """Daily VIX spot and 3-month between start and end (YYYY-MM-DD).
+    """Daily VIX spot and 3-month level from FRED.
 
-    Columns: date, vix, vix3m. A term-structure slope is vix3m / vix.
+    A term-structure slope is ``vix3m / vix``. Each series is fetched
+    independently so one bad id never breaks the rest.
+
+    Parameters
+    ----------
+    start, end : str
+        Inclusive date window in ``YYYY-MM-DD`` form.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``date``, ``vix`` and ``vix3m``. Empty (same columns) when no
+        series could be fetched.
     """
     series = []
     for col, series_id in _SERIES.items():

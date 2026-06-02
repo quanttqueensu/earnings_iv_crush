@@ -35,6 +35,11 @@ LEDGER_COLUMNS = [
 COST_COLUMNS = ["exchange_fee", "spread_cost", "slippage_cost", "total_cost"]
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Margin and sizing
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 def _straddle_value(spot, strike, t, r, sigma):
     """Straddle price per share, falling back to intrinsic at/after expiry."""
     if t <= 0 or sigma <= 0:
@@ -61,6 +66,11 @@ def size_contracts(account, spot, strike, premium_per_share, fraction=0.05):
     if margin_one <= 0:
         return 0
     return int((fraction * account) // margin_one)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# P&L and ledger
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 def straddle_pnl(spot_entry, strike, t_entry, t_exit, iv_entry, iv_exit,

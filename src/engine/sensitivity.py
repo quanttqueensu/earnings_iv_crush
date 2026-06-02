@@ -35,6 +35,11 @@ SWEEP_COLUMNS = ["ratio", "pctl", "n_trades", "sharpe", "sharpe_delta",
                  "total_return", "hit_rate", "max_drawdown"]
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Threshold grid sweep
+# ─────────────────────────────────────────────────────────────────────────────
+
+
 def threshold_sweep(events: pd.DataFrame, model: FairMoveModel,
                     ratios, pctls, account: float = ACCOUNT_SIZE,
                     fraction: float = 0.05, r: float = 0.0, costs=None,
@@ -88,6 +93,11 @@ def threshold_sweep(events: pd.DataFrame, model: FairMoveModel,
                 "max_drawdown": stats["max_drawdown"],
             })
     return pd.DataFrame(rows, columns=SWEEP_COLUMNS)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Deflated-Sharpe inputs from a sweep
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 def sweep_dsr_params(sweep: pd.DataFrame, periods_per_year: int = 252) -> tuple[int, float]:

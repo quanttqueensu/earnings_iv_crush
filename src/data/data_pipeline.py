@@ -48,6 +48,9 @@ def _spot_from_prices(prices: pd.DataFrame) -> float:
     return float(close.iloc[-1]) if not close.empty else float("nan")
 
 
+# ── Dataset build ────────────────────────────────────────────────────────────
+
+
 def build_event_dataset(
     start: str,
     end: str,
@@ -62,14 +65,45 @@ def build_event_dataset(
 ) -> pd.DataFrame:
     """Return one row per earnings event with the fields the filters consume.
 
-    Target columns:
-        ticker, announce_date,
-        implied_move, front_atm_iv, back_atm_iv, iv_term_spread,
-        trailing_rv, skew_25d, eps_dispersion, prior_surprise, oi_growth
+    The output frame carries ``COLUMNS`` in order: ``ticker``, ``announce_date``,
+    ``implied_move``, ``front_atm_iv``, ``back_atm_iv``, ``iv_term_spread``,
+    ``trailing_rv``, ``skew_25d``, ``vol_premium``, ``variance_risk_premium``,
+    ``bkm_skew``, ``bkm_kurt``, ``eps_dispersion``, ``prior_surprise`` and
+    ``oi_growth``. The chain and prices are pulled as of ``asof_offset_days``
+    business days before each announcement (the pre-event entry).
 
-    Providers default to the `data_intake` facade but can be injected for
-    testing. The chain/prices are pulled as of `asof_offset_days` business days
-    before each announcement (the pre-event entry).
+    Parameters
+    ----------
+    start, end : str
+        Backtest window bounds (``YYYY-MM-DD``); used only to fetch the calendar
+        when ``calendar`` is not supplied.
+    calendar : pd.DataFrame, optional
+        Earnings calendar with ``ticker`` and ``announce_date``. Defaults to the
+        ``data_intake`` facade's calendar for the window.
+    fetch_chain : callable, optional
+        ``fetch_chain(ticker, 'YYYY-MM-DD') -> chain``. Defaults to
+        ``data_intake.fetch_option_chain``; injectable for testing.
+    fetch_prices : callable, optional
+        ``fetch_prices(ticker, start, end) -> OHLCV``. Defaults to
+        ``data_intake.fetch_equity_ohlcv``; injectable for testing.
+    asof_offset_days : int, optional
+        Business days before the announcement at which to read the entry chain
+        and prices. Defaults to ``1``.
+    lookback_days : int, optional
+        Calendar days of price history to pull before the as-of date for the
+        realised-vol window. Defaults to ``60``.
+    rv_window : int, optional
+        Trailing-return window for realised vol, in observations. Defaults to
+        ``20``.
+    r : float, optional
+        Risk-free rate passed to the feature maths. Defaults to ``0.0``.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per calendar event with ``COLUMNS``; empty (correctly typed)
+        when the calendar is empty. ``eps_dispersion`` and ``oi_growth`` stay
+        NaN until their sources are wired (see ``PENDING_FEATURES``).
     """
     cal = calendar if calendar is not None else data_intake.fetch_earnings_calendar(start, end)
     fetch_chain = fetch_chain or data_intake.fetch_option_chain

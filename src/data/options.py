@@ -19,10 +19,10 @@ CHAIN_COLUMNS = ["expiry", "strike", "right", "bid", "ask", "iv", "open_interest
 
 
 def _fetch_raw(ticker: str, asof: str, max_expiries: int, horizon_days: int):
-    """Return (spot, [(expiry, calls_df, puts_df), ...]) from yfinance.
+    """Return ``(spot, [(expiry, calls_df, puts_df), ...])`` from yfinance.
 
-    Pulls expiries on/after `asof` up to `horizon_days` out, capped at
-    `max_expiries`. Isolated so tests can monkeypatch it without the network.
+    Pulls expiries on/after ``asof`` up to ``horizon_days`` out, capped at
+    ``max_expiries``. Isolated so tests can monkeypatch it without the network.
     """
     import yfinance as yf  # lazy import, matching equities.py
 
@@ -51,8 +51,8 @@ def _fetch_raw(ticker: str, asof: str, max_expiries: int, horizon_days: int):
 def _normalize(spot, raw, strike_window: float) -> pd.DataFrame:
     """Flatten raw (calls, puts) frames into the canonical chain schema.
 
-    When spot is known, strikes are limited to +/-`strike_window` of it so the
-    result is ATM-centred; otherwise all strikes are kept.
+    When ``spot`` is known, strikes are limited to +/-``strike_window`` of it so
+    the result is ATM-centred; otherwise all strikes are kept.
     """
     lo = spot * (1 - strike_window) if spot else None
     hi = spot * (1 + strike_window) if spot else None
@@ -75,13 +75,36 @@ def _normalize(spot, raw, strike_window: float) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=CHAIN_COLUMNS)
 
 
+# ── Public: chain fetch ──────────────────────────────────────────────────────
+
+
 def fetch_option_chain(ticker: str, asof: str, max_expiries: int = 6,
                        horizon_days: int = 90, strike_window: float = 0.20) -> pd.DataFrame:
     """ATM-centred option chain for one name across the nearest expiries.
 
-    `asof` should be ~today: yfinance serves only the live chain, so a far-past
-    date yields an empty frame. Columns: expiry, strike, right, bid, ask, iv,
-    open_interest.
+    ``asof`` should be ~today: yfinance serves only the live chain, so a
+    far-past date yields an empty frame.
+
+    Parameters
+    ----------
+    ticker : str
+        Underlying symbol.
+    asof : str
+        Snapshot date in ``YYYY-MM-DD`` form; should be close to today.
+    max_expiries : int, optional
+        Maximum number of expiries to include. Defaults to ``6``.
+    horizon_days : int, optional
+        Only keep expiries within this many days of ``asof``. Defaults to
+        ``90``.
+    strike_window : float, optional
+        Half-width of the strike band as a fraction of spot. Defaults to
+        ``0.20``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``expiry``, ``strike``, ``right``, ``bid``, ``ask``, ``iv`` and
+        ``open_interest``.
     """
     spot, raw = _fetch_raw(ticker, asof, max_expiries, horizon_days)
     return _normalize(spot, raw, strike_window)

@@ -13,9 +13,21 @@ _COLS = ["date", "open", "high", "low", "close", "volume"]
 
 
 def fetch_equity_ohlcv(ticker: str, start: str, end: str) -> pd.DataFrame:
-    """Daily OHLCV via yfinance between start and end (YYYY-MM-DD).
+    """Daily OHLCV via yfinance between two dates.
 
-    Columns: date, open, high, low, close, volume.
+    Parameters
+    ----------
+    ticker : str
+        Underlying symbol to download.
+    start, end : str
+        Inclusive date window in ``YYYY-MM-DD`` form.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per trading day with columns ``date``, ``open``, ``high``,
+        ``low``, ``close`` and ``volume``. Empty (same columns) when yfinance
+        returns nothing.
     """
     import yfinance as yf  # imported lazily so module import never fails
 
