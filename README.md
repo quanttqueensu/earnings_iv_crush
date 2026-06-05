@@ -117,15 +117,6 @@ Outstanding work before the readiness review:
 - The fair-move model fits on the chain/price features available today; `eps_dispersion` (IBES/WRDS)
   and `oi_growth` (historical OI) come online with those sources.
 
-### Checkpoints
-
-| Date | Deliverable |
-| --- | --- |
-| 31 May | Charter |
-| 30 June | Pipeline + Agent 0 + crude backtest |
-| 31 July | Walk-forward + sensitivity analysis |
-| 22 August | Readiness review |
-
 ## Attribution
 
 Jordan Odorico, for QUANTT (Queen's University Algorithmic Network and Trading Team).
