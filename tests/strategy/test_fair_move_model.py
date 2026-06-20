@@ -1,12 +1,13 @@
 """Tests for the fair-move regression: coefficient recovery, NaN handling,
 walk-forward look-ahead safety."""
+
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from src.strategy.fair_move_model import FairMoveModel
+from earnings_iv_crush.strategy.fair_move_model import FairMoveModel
 
 
 def _events(n=200, seed=0):
@@ -41,7 +42,7 @@ def test_predict_is_nonnegative_and_aligned():
 
 def test_ignores_entirely_missing_features():
     ev = _events(60)
-    ev["eps_dispersion"] = np.nan      # pending source -> all NaN
+    ev["eps_dispersion"] = np.nan  # pending source -> all NaN
     ev["oi_growth"] = np.nan
     y = 0.02 + 0.10 * ev["trailing_rv"]
     model = FairMoveModel().fit(ev, y)

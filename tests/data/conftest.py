@@ -3,6 +3,7 @@
 `FakeResponse` mimics the slice of `requests.Response` the adapters use
 (`.text`, `.json()`, `.raise_for_status()`), so tests never touch the network.
 """
+
 from __future__ import annotations
 
 import requests

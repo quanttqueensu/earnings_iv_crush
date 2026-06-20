@@ -1,20 +1,21 @@
 """Tests for engine.costs and its integration into engine.pnl.
 
-Covers the cost-stack arithmetic (commission, spread, slippage), the spec's
-headline figures (§6), and the optional cost path through the ledger builder
-(which must leave the commission-only default untouched).
+Covers the cost-stack arithmetic (commission, spread, slippage), the headline
+cost figures, and the optional cost path through the ledger builder (which must
+leave the commission-only default untouched).
 """
+
 from __future__ import annotations
 
 import pytest
 
-from src.engine import pnl
-from src.engine.costs import CostModel
-
+from earnings_iv_crush.engine import pnl
+from earnings_iv_crush.engine.costs import CostModel
 
 # --- cost arithmetic ---------------------------------------------------------
 
-def test_default_commission_matches_spec_round_trip():
+
+def test_default_commission_round_trip():
     # IBKR Pro $0.65 x 4 fills (2 legs, open+close) = $2.60 for one contract.
     b = CostModel().round_trip_cost(5.0, 5.0, contracts=1)
     assert b.commission == pytest.approx(2.60)
@@ -62,9 +63,19 @@ def test_cost_fraction_of_credit():
 
 # --- integration with pnl ----------------------------------------------------
 
+
 def test_costs_reduce_straddle_pnl():
-    kw = dict(spot_entry=100, strike=100, t_entry=0.02, t_exit=0.005,
-              iv_entry=0.60, iv_exit=0.20, spot_exit=100.0, r=0.0, contracts=3)
+    kw = dict(
+        spot_entry=100,
+        strike=100,
+        t_entry=0.02,
+        t_exit=0.005,
+        iv_entry=0.60,
+        iv_exit=0.20,
+        spot_exit=100.0,
+        r=0.0,
+        contracts=3,
+    )
     commission_only = pnl.straddle_pnl(**kw)
     full = pnl.straddle_pnl(**kw, costs=CostModel())
     assert full < commission_only
@@ -73,8 +84,16 @@ def test_costs_reduce_straddle_pnl():
 def test_default_ledger_schema_unchanged():
     # Without a CostModel the schema must stay exactly LEDGER_COLUMNS.
     row = pnl.build_trade(
-        ticker="X", entry_date="d0", exit_date="d1", spot_entry=100, strike=100,
-        t_entry=0.02, t_exit=0.005, iv_entry=0.6, iv_exit=0.2, spot_exit=101.0,
+        ticker="X",
+        entry_date="d0",
+        exit_date="d1",
+        spot_entry=100,
+        strike=100,
+        t_entry=0.02,
+        t_exit=0.005,
+        iv_entry=0.6,
+        iv_exit=0.2,
+        spot_exit=101.0,
         contracts=2,
     )
     assert set(row) == set(pnl.LEDGER_COLUMNS)
@@ -82,15 +101,21 @@ def test_default_ledger_schema_unchanged():
 
 def test_cost_ledger_adds_columns_and_nets_pnl():
     row = pnl.build_trade(
-        ticker="X", entry_date="d0", exit_date="d1", spot_entry=100, strike=100,
-        t_entry=0.02, t_exit=0.005, iv_entry=0.6, iv_exit=0.2, spot_exit=101.0,
-        contracts=2, costs=CostModel(),
+        ticker="X",
+        entry_date="d0",
+        exit_date="d1",
+        spot_entry=100,
+        strike=100,
+        t_entry=0.02,
+        t_exit=0.005,
+        iv_entry=0.6,
+        iv_exit=0.2,
+        spot_exit=101.0,
+        contracts=2,
+        costs=CostModel(),
     )
     assert set(row) == set(pnl.LEDGER_COLUMNS) | set(pnl.COST_COLUMNS)
-    assert row["pnl"] == pytest.approx(
-        row["entry_credit"] - row["exit_value"] - row["total_cost"]
-    )
+    assert row["pnl"] == pytest.approx(row["entry_credit"] - row["exit_value"] - row["total_cost"])
     assert row["total_cost"] == pytest.approx(
-        row["commissions"] + row["exchange_fee"]
-        + row["spread_cost"] + row["slippage_cost"]
+        row["commissions"] + row["exchange_fee"] + row["spread_cost"] + row["slippage_cost"]
     )

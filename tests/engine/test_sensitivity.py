@@ -1,10 +1,11 @@
 """Tests for engine.sensitivity (threshold sweep) and engine.walkforward."""
+
 from __future__ import annotations
 
-from src.engine.sensitivity import SWEEP_COLUMNS, sweep_dsr_params, threshold_sweep
-from src.engine.simulate import simulate_events
-from src.engine.walkforward import walk_forward_backtest
-from src.strategy.fair_move_model import FairMoveModel
+from earnings_iv_crush.engine.sensitivity import SWEEP_COLUMNS, sweep_dsr_params, threshold_sweep
+from earnings_iv_crush.engine.simulate import simulate_events
+from earnings_iv_crush.engine.walkforward import walk_forward_backtest
+from earnings_iv_crush.strategy.fair_move_model import FairMoveModel
 
 
 def _fitted():
@@ -13,6 +14,7 @@ def _fitted():
 
 
 # --- sensitivity sweep -------------------------------------------------------
+
 
 def test_sweep_covers_full_grid():
     ev, model = _fitted()
@@ -40,6 +42,7 @@ def test_sweep_dsr_params():
 
 # --- walk-forward ------------------------------------------------------------
 
+
 def test_walk_forward_is_out_of_sample():
     ev, _ = _fitted()
     stats, ledger = walk_forward_backtest(ev, ev["realised_move"], min_train=20)
@@ -52,4 +55,4 @@ def test_walk_forward_is_out_of_sample():
 def test_walk_forward_selects_a_subset():
     ev, _ = _fitted()
     stats, _ = walk_forward_backtest(ev, ev["realised_move"], min_train=20)
-    assert stats["n_selected"] < stats["n_oos"]   # the filter bites out of sample
+    assert stats["n_selected"] < stats["n_oos"]  # the filter bites out of sample

@@ -1,20 +1,23 @@
-"""Tests for src.data.options: yfinance chain normalisation + ATM windowing."""
+"""Tests for earnings_iv_crush.data.options: yfinance chain normalisation + ATM windowing."""
+
 from __future__ import annotations
 
 import pandas as pd
 
-from src.data import options
+from earnings_iv_crush.data import options
 
 
 def _yf_leg(strikes, iv):
     """A yfinance-style calls/puts frame (only the columns we read)."""
-    return pd.DataFrame({
-        "strike": strikes,
-        "bid": [s / 100 for s in strikes],
-        "ask": [s / 100 + 0.1 for s in strikes],
-        "impliedVolatility": [iv] * len(strikes),
-        "openInterest": [100] * len(strikes),
-    })
+    return pd.DataFrame(
+        {
+            "strike": strikes,
+            "bid": [s / 100 for s in strikes],
+            "ask": [s / 100 + 0.1 for s in strikes],
+            "impliedVolatility": [iv] * len(strikes),
+            "openInterest": [100] * len(strikes),
+        }
+    )
 
 
 def _raw():

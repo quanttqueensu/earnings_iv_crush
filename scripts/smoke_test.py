@@ -13,16 +13,11 @@ From the project root::
 
     python scripts/smoke_test.py
 """
+
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-# Make `import src...` work when run from the project root.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-from src.data import vix, equities, sec_edgar, earnings          # noqa: E402
-from src.data.config import FINNHUB_API_KEY, SEC_USER_AGENT       # noqa: E402
+from earnings_iv_crush.data import earnings, equities, sec_edgar, vix
+from earnings_iv_crush.data.config import FINNHUB_API_KEY, SEC_USER_AGENT
 
 
 def section(name: str) -> None:
@@ -67,8 +62,10 @@ def main() -> None:
         except Exception as exc:
             print("  FAIL:", exc)
 
-    print("\nDone. No-key sources should show rows; keyed sources show SKIP "
-          "until you add their keys to .env.\n")
+    print(
+        "\nDone. No-key sources should show rows; keyed sources show SKIP "
+        "until you add their keys to .env.\n"
+    )
 
 
 if __name__ == "__main__":

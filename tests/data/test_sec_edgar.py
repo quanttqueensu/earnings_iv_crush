@@ -1,9 +1,10 @@
-"""Tests for src.data.sec_edgar: CIK map, session inference, 8-Ks, EPS."""
+"""Tests for earnings_iv_crush.data.sec_edgar: CIK map, session inference, 8-Ks, EPS."""
+
 from __future__ import annotations
 
 import pytest
 
-from src.data import sec_edgar
+from earnings_iv_crush.data import sec_edgar
 from tests.data.conftest import FakeResponse
 
 _TICKERS = {
@@ -93,5 +94,5 @@ def test_earnings_8ks_filters_to_item_202():
 
 def test_reported_eps_sorted_by_period_end():
     df = sec_edgar.reported_eps("AAPL")
-    assert list(df["val"]) == [2.4, 2.5]               # sorted by 'end' ascending
+    assert list(df["val"]) == [2.4, 2.5]  # sorted by 'end' ascending
     assert df["end"].is_monotonic_increasing

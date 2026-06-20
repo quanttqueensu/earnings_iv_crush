@@ -1,13 +1,12 @@
 """Tests for backtester.compare and the expanded backtest metric set."""
+
 from __future__ import annotations
 
-import numpy as np
-
-from src.baseline.agent0 import run_agent0
-from src.engine.backtester import backtest, compare, daily_return_series
-from src.engine.simulate import simulate_events
-from src.strategy.fair_move_model import FairMoveModel
-from src.strategy.strategy import run_strategy
+from earnings_iv_crush.baseline.agent0 import run_agent0
+from earnings_iv_crush.engine.backtester import backtest, compare, daily_return_series
+from earnings_iv_crush.engine.simulate import simulate_events
+from earnings_iv_crush.strategy.fair_move_model import FairMoveModel
+from earnings_iv_crush.strategy.strategy import run_strategy
 
 
 def _books():
@@ -16,7 +15,7 @@ def _books():
     return run_strategy(ev, model), run_agent0(ev, seed=3)
 
 
-def test_backtest_reports_charter_metrics():
+def test_backtest_reports_core_metrics():
     strat, _ = _books()
     s = backtest(strat)
     for key in ("sortino", "profit_factor", "win_loss_ratio", "max_dd_duration"):
@@ -33,7 +32,7 @@ def test_empty_ledger_has_new_keys():
 def test_daily_return_series_aggregates_by_exit_date():
     strat, _ = _books()
     ser = daily_return_series(strat)
-    assert ser.index.is_unique          # one point per exit date
+    assert ser.index.is_unique  # one point per exit date
     assert ser.index.is_monotonic_increasing
 
 

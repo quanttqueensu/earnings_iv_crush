@@ -1,23 +1,26 @@
 """Tests for filters.select_events: the two gates combined, with boundaries."""
+
 from __future__ import annotations
 
 import pandas as pd
 
-from src.strategy import filters
+from earnings_iv_crush.strategy import filters
 
 
 def _events(term_spreads, implied_moves):
-    return pd.DataFrame({
-        "iv_term_spread": term_spreads,
-        "implied_move": implied_moves,
-    })
+    return pd.DataFrame(
+        {
+            "iv_term_spread": term_spreads,
+            "implied_move": implied_moves,
+        }
+    )
 
 
 def test_keeps_only_rows_passing_both_gates():
     # Flat baseline then a spike, so only the spike clears its trailing 75th pctl.
     term = [0.03, 0.03, 0.03, 0.03, 0.03, 0.20]
     implied = [0.10] * 6
-    fair = [0.05] * 6                              # implied/fair = 2.0 >= 1.20 for all
+    fair = [0.05] * 6  # implied/fair = 2.0 >= 1.20 for all
     ev = _events(term, implied)
 
     out = filters.select_events(ev, fair, window=5)
@@ -26,9 +29,8 @@ def test_keeps_only_rows_passing_both_gates():
 
 
 def test_move_gate_boundary_is_inclusive():
-    ev = _events([0.20, 0.20], [0.06, 0.05])
-    fair = [0.05, 0.05]      # 1.20*fair = 0.06; row0 implied==0.06 passes, row1 0.05 fails
-    # Make both clear term-spread passers by using a tiny window and a rising series.
+    # 1.20*fair = 0.06; row0 implied == 0.06 passes, row1 0.05 fails. A tiny
+    # window and a rising spread make both clear the term gate.
     ev = _events([0.01, 0.50], [0.06, 0.05])
     out = filters.select_events(ev, [0.05, 0.05], window=1, pctl=0.5)
     # Row1 fails the move gate (0.05 < 0.06) regardless of term gate.

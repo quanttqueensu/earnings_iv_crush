@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "earnings-iv-crush"
+version = "0.1.0"
+description = "Filtered cross-sectional short-volatility strategy around scheduled earnings."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["quant", "options", "volatility", "earnings", "backtest"]
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.0",
+    "scipy>=1.11",
+    "statsmodels>=0.14",
+    "scikit-learn>=1.3",
+    "matplotlib>=3.7",
+    "requests>=2.31",
+    "python-dotenv>=1.0",
+    "yfinance>=0.2",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.6", "black>=24.0", "mypy>=1.8", "pytest>=8.0", "pre-commit>=3.5"]
+
+[tool.setuptools.packages.find]
+include = ["earnings_iv_crush*"]
+
+# ── Lint / format / type ──────────────────────────────────────────────────────
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]   # line length is owned by black
+
+[tool.ruff.lint.per-file-ignores]
+# Test fixtures build equal-length columns by construction, so the strict-zip
+# rule adds noise without catching bugs there.
+"tests/**" = ["B905"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+check_untyped_defs = true
+namespace_packages = true
+explicit_package_bases = true
+
+# ── Tests ─────────────────────────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = '-m "not live" -ra'
+markers = [
+    "live: hits real network/APIs; deselected by default. Run with -m live.",
+]

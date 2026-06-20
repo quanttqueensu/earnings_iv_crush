@@ -3,9 +3,13 @@
 .env.*
 !.env.example
 
-# Private working material - never publish (charter, lit review, data plan,
-# faculty/WRDS outreach, methodology notes). Kept local; out of the public repo.
+# Local working material - kept out of the repo (notes, drafts, scratch).
 _private/
+
+# Local tooling and editor-agent material - never part of the project
+.claude/
+CLAUDE.md
+.understand-anything/
 
 # Data (raw and processed pulls are git-ignored per the data plan)
 data/raw/
@@ -24,6 +28,17 @@ venv/
 env/
 .pytest_cache/
 .ipynb_checkpoints/
+.mypy_cache/
+.ruff_cache/
+
+# LaTeX build artefacts (the compiled PDF is kept; intermediates are not)
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+paper/*.fls
+paper/*.fdb_latexmk
+paper/*.synctex.gz
 
 # OS / editor
 .DS_Store

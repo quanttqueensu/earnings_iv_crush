@@ -1,19 +1,22 @@
 """Tests for the fair-move model depth: diagnostics, ridge, OOS evaluation."""
+
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from src.strategy.fair_move_model import FairMoveModel
+from earnings_iv_crush.strategy.fair_move_model import FairMoveModel
 
 
 def _events(n=200, seed=0):
     rng = np.random.default_rng(seed)
-    return pd.DataFrame({
-        "trailing_rv": rng.uniform(0.2, 0.8, n),
-        "skew_25d": rng.uniform(-0.1, 0.1, n),
-    })
+    return pd.DataFrame(
+        {
+            "trailing_rv": rng.uniform(0.2, 0.8, n),
+            "skew_25d": rng.uniform(-0.1, 0.1, n),
+        }
+    )
 
 
 def _clean_target(ev):
@@ -21,6 +24,7 @@ def _clean_target(ev):
 
 
 # --- diagnostics -------------------------------------------------------------
+
 
 def test_ols_diagnostics_report_perfect_fit_without_noise():
     ev = _events()
@@ -38,6 +42,7 @@ def test_diagnostics_before_fit_raises():
 
 
 # --- ridge -------------------------------------------------------------------
+
 
 def test_ridge_fits_predicts_and_reports_params():
     ev = _events(120)
@@ -60,6 +65,7 @@ def test_ridge_walk_forward_runs():
 
 
 # --- out-of-sample evaluation ------------------------------------------------
+
 
 def test_evaluate_walk_forward_recovers_clean_signal():
     ev = _events(120)

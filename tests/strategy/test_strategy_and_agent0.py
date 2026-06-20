@@ -3,16 +3,15 @@
 The strategy must select a subset of events and, on the simulated planted edge,
 beat the unfiltered Agent 0 control on Sharpe.
 """
+
 from __future__ import annotations
 
-import pandas as pd
-
-from src.baseline.agent0 import run_agent0
-from src.engine.backtester import backtest
-from src.engine.pnl import LEDGER_COLUMNS
-from src.engine.simulate import simulate_events
-from src.strategy.fair_move_model import FairMoveModel
-from src.strategy.strategy import run_strategy
+from earnings_iv_crush.baseline.agent0 import run_agent0
+from earnings_iv_crush.engine.backtester import backtest
+from earnings_iv_crush.engine.pnl import LEDGER_COLUMNS
+from earnings_iv_crush.engine.simulate import simulate_events
+from earnings_iv_crush.strategy.fair_move_model import FairMoveModel
+from earnings_iv_crush.strategy.strategy import run_strategy
 
 
 def _events():
@@ -23,7 +22,7 @@ def test_agent0_books_every_event_by_default():
     ev = _events()
     ledger = run_agent0(ev, seed=3)
     assert list(ledger.columns) == LEDGER_COLUMNS
-    assert len(ledger) == len(ev)            # unfiltered, sample_frac=1.0
+    assert len(ledger) == len(ev)  # unfiltered, sample_frac=1.0
 
 
 def test_agent0_subsamples_with_sample_frac():
@@ -37,7 +36,7 @@ def test_strategy_selects_a_strict_subset():
     model = FairMoveModel().fit(ev, ev["realised_move"])
     ledger = run_strategy(ev, model)
     assert list(ledger.columns) == LEDGER_COLUMNS
-    assert 0 < len(ledger) < len(ev)         # the filter actually bites
+    assert 0 < len(ledger) < len(ev)  # the filter actually bites
     assert set(ledger["ticker"]).issubset(set(ev["ticker"]))
 
 
@@ -47,7 +46,7 @@ def test_strategy_concentrates_on_rich_events():
     ledger = run_strategy(ev, model)
     rich_tickers = set(ev.loc[ev["is_rich"], "ticker"])
     hit_rich = sum(t in rich_tickers for t in ledger["ticker"]) / len(ledger)
-    assert hit_rich > 0.7                    # mostly the planted rich events
+    assert hit_rich > 0.7  # mostly the planted rich events
 
 
 def test_strategy_beats_agent0_on_planted_edge():

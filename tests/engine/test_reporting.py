@@ -1,15 +1,19 @@
 """Tests for engine.reporting: attribution aggregation and tearsheet output."""
+
 from __future__ import annotations
 
-from src.baseline.agent0 import run_agent0
-from src.engine.backtester import compare
-from src.engine.costs import CostModel
-from src.engine.reporting import (
-    ATTRIBUTION_KEYS, aggregate_pnl_attribution, build_tearsheet, cumulative_equity,
+from earnings_iv_crush.baseline.agent0 import run_agent0
+from earnings_iv_crush.engine.backtester import compare
+from earnings_iv_crush.engine.costs import CostModel
+from earnings_iv_crush.engine.reporting import (
+    ATTRIBUTION_KEYS,
+    aggregate_pnl_attribution,
+    build_tearsheet,
+    cumulative_equity,
 )
-from src.engine.simulate import simulate_events
-from src.strategy.fair_move_model import FairMoveModel
-from src.strategy.strategy import run_strategy
+from earnings_iv_crush.engine.simulate import simulate_events
+from earnings_iv_crush.strategy.fair_move_model import FairMoveModel
+from earnings_iv_crush.strategy.strategy import run_strategy
 
 
 def _net_books():
@@ -41,7 +45,13 @@ def test_cumulative_equity_starts_at_account():
 def test_build_tearsheet_writes_files(tmp_path):
     strat, agent0 = _net_books()
     cmp = compare(strat, agent0, n_boot=200, seed=1)
-    png = build_tearsheet(strat, agent0, cmp, account=250_000, outdir=tmp_path,
-                          structure_counts={"straddle": 40, "iron_fly": 8})
+    png = build_tearsheet(
+        strat,
+        agent0,
+        cmp,
+        account=250_000,
+        outdir=tmp_path,
+        structure_counts={"straddle": 40, "iron_fly": 8},
+    )
     assert png.exists()
     assert (tmp_path / "metrics.csv").exists()

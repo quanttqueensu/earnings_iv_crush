@@ -1,11 +1,12 @@
-"""Tests for src.data.features: the pure per-event feature maths."""
+"""Tests for earnings_iv_crush.data.features: the pure per-event feature maths."""
+
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from src.data import features
+from earnings_iv_crush.data import features
 
 
 def _rows(expiry, strikes, ivs, mids):
@@ -13,44 +14,51 @@ def _rows(expiry, strikes, ivs, mids):
     out = []
     for k, iv, m in zip(strikes, ivs, mids):
         for right in ("C", "P"):
-            out.append({
-                "expiry": pd.Timestamp(expiry), "strike": float(k), "right": right,
-                "bid": m - 0.05, "ask": m + 0.05, "iv": iv, "open_interest": 100,
-            })
+            out.append(
+                {
+                    "expiry": pd.Timestamp(expiry),
+                    "strike": float(k),
+                    "right": right,
+                    "bid": m - 0.05,
+                    "ask": m + 0.05,
+                    "iv": iv,
+                    "open_interest": 100,
+                }
+            )
     return out
 
 
 # --- atm_strike --------------------------------------------------------------
 
+
 def test_atm_strike_picks_closest():
-    chain = pd.DataFrame(_rows("2026-06-05", [90, 95, 100, 105], [.5] * 4, [1] * 4))
+    chain = pd.DataFrame(_rows("2026-06-05", [90, 95, 100, 105], [0.5] * 4, [1] * 4))
     assert features.atm_strike(chain, 101.0) == 100.0
     assert features.atm_strike(chain, 103.0) == 105.0  # ties broken toward nearer
 
 
 # --- nearest_expiries --------------------------------------------------------
 
+
 def _multi_expiry_chain(expiries):
     rows = []
     for e in expiries:
-        rows += _rows(e, [100], [.5], [3.0])
+        rows += _rows(e, [100], [0.5], [3.0])
     return pd.DataFrame(rows)
 
 
 def test_nearest_expiries_front_and_back():
-    chain = _multi_expiry_chain(
-        ["2026-05-28", "2026-06-05", "2026-06-12", "2026-07-03"]
-    )
+    chain = _multi_expiry_chain(["2026-05-28", "2026-06-05", "2026-06-12", "2026-07-03"])
     front, back = features.nearest_expiries(chain, "2026-06-01")
-    assert front == pd.Timestamp("2026-06-05")     # first expiry after announce
-    assert back == pd.Timestamp("2026-07-03")       # >= front + 21 days
+    assert front == pd.Timestamp("2026-06-05")  # first expiry after announce
+    assert back == pd.Timestamp("2026-07-03")  # >= front + 21 days
 
 
 def test_nearest_expiries_back_falls_back_to_latest():
     chain = _multi_expiry_chain(["2026-06-05", "2026-06-12"])  # gap < 21 days
     front, back = features.nearest_expiries(chain, "2026-06-01")
     assert front == pd.Timestamp("2026-06-05")
-    assert back == pd.Timestamp("2026-06-12")        # latest available
+    assert back == pd.Timestamp("2026-06-12")  # latest available
 
 
 def test_nearest_expiries_single_expiry_gives_no_back():
@@ -62,14 +70,16 @@ def test_nearest_expiries_single_expiry_gives_no_back():
 
 # --- implied_move ------------------------------------------------------------
 
+
 def test_implied_move_is_atm_straddle_over_spot():
     # ATM strike 100, call mid = put mid = 3.0 -> straddle 6.0, spot 100 -> 0.06.
-    chain = pd.DataFrame(_rows("2026-06-05", [95, 100, 105], [.5, .5, .5], [4, 3, 2]))
+    chain = pd.DataFrame(_rows("2026-06-05", [95, 100, 105], [0.5, 0.5, 0.5], [4, 3, 2]))
     mv = features.implied_move(chain, 100.0, pd.Timestamp("2026-06-05"), 100.0)
     assert mv == pytest.approx(0.06)
 
 
 # --- realised_vol ------------------------------------------------------------
+
 
 def test_realised_vol_zero_for_flat_prices():
     prices = pd.DataFrame({"close": [100.0] * 10})
@@ -91,6 +101,7 @@ def test_realised_vol_uses_only_trailing_window():
 
 
 # --- skew_25d ----------------------------------------------------------------
+
 
 def _smile_chain(expiry, slope):
     """IV decreasing (slope<0) / flat / increasing across strikes 80..120."""
@@ -120,15 +131,19 @@ def test_skew_nan_for_nonpositive_tenor():
 
 # --- event_features ----------------------------------------------------------
 
+
 def test_event_features_assembles_all_keys():
-    front = _rows("2026-06-05", [95, 100, 105], [.5, .5, .5], [4, 3, 2])
-    back = _rows("2026-07-03", [95, 100, 105], [.4, .4, .4], [5, 4, 3])
+    front = _rows("2026-06-05", [95, 100, 105], [0.5, 0.5, 0.5], [4, 3, 2])
+    back = _rows("2026-07-03", [95, 100, 105], [0.4, 0.4, 0.4], [5, 4, 3])
     chain = pd.DataFrame(front + back)
     prices = pd.DataFrame({"close": [100, 102, 99, 101, 100]})
 
     feats = features.event_features(
-        chain, spot=100.0, announce_date="2026-06-01",
-        asof_date="2026-05-29", price_history=prices,
+        chain,
+        spot=100.0,
+        announce_date="2026-06-01",
+        asof_date="2026-05-29",
+        price_history=prices,
     )
     assert set(feats) == set(features.FEATURE_KEYS)
     assert feats["front_atm_iv"] == pytest.approx(0.5)
@@ -148,8 +163,11 @@ def test_event_features_handles_per_expiry_strike_grids():
     prices = pd.DataFrame({"close": [312.5] * 5})
 
     feats = features.event_features(
-        chain, spot=312.5, announce_date="2026-06-01",
-        asof_date="2026-05-29", price_history=prices,
+        chain,
+        spot=312.5,
+        announce_date="2026-06-01",
+        asof_date="2026-05-29",
+        price_history=prices,
     )
     assert not np.isnan(feats["front_atm_iv"])
     assert not np.isnan(feats["implied_move"])
@@ -160,7 +178,9 @@ def test_event_features_empty_chain_is_all_nan_but_rv():
     prices = pd.DataFrame({"close": [100, 101, 100, 102]})
     feats = features.event_features(
         pd.DataFrame(columns=["expiry", "strike", "right", "bid", "ask", "iv", "open_interest"]),
-        spot=100.0, announce_date="2026-06-01", asof_date="2026-05-29",
+        spot=100.0,
+        announce_date="2026-06-01",
+        asof_date="2026-05-29",
         price_history=prices,
     )
     assert np.isnan(feats["front_atm_iv"])

@@ -1,14 +1,15 @@
 """Tests for engine.stats: risk-adjusted, win/loss, and significance metrics."""
+
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
 import pytest
 
-from src.engine import stats
-
+from earnings_iv_crush.engine import stats
 
 # --- risk-adjusted -----------------------------------------------------------
+
 
 def test_sharpe_zero_for_constant_series():
     assert stats.sharpe(pd.Series([0.01, 0.01, 0.01])) == 0.0
@@ -25,6 +26,7 @@ def test_sortino_only_penalises_downside():
 
 
 # --- win / loss --------------------------------------------------------------
+
 
 def test_profit_factor():
     assert stats.profit_factor(pd.Series([100, -50, 200, -50])) == pytest.approx(3.0)
@@ -47,6 +49,7 @@ def test_max_drawdown_duration():
 
 
 # --- significance ------------------------------------------------------------
+
 
 def test_bootstrap_ci_brackets_point_estimate():
     rng = np.random.default_rng(0)

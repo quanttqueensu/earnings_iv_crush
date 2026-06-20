@@ -1,9 +1,10 @@
-"""Tests for src.data.earnings: Finnhub calendar normalisation and guards."""
+"""Tests for earnings_iv_crush.data.earnings: Finnhub calendar normalisation and guards."""
+
 from __future__ import annotations
 
 import pytest
 
-from src.data import earnings
+from earnings_iv_crush.data import earnings
 from tests.data.conftest import FakeResponse
 
 _PAYLOAD = {
@@ -37,7 +38,8 @@ _PAYLOAD = {
 def test_fetch_earnings_calendar_renames_columns(monkeypatch):
     monkeypatch.setenv("FINNHUB_API_KEY", "key")
     monkeypatch.setattr(
-        earnings.requests, "get",
+        earnings.requests,
+        "get",
         lambda url, params=None, timeout=None, **kw: FakeResponse(json_data=_PAYLOAD),
     )
     df = earnings.fetch_earnings_calendar("2026-06-01", "2026-06-05")
@@ -51,8 +53,11 @@ def test_fetch_earnings_calendar_renames_columns(monkeypatch):
 def test_empty_calendar_returns_empty_frame(monkeypatch):
     monkeypatch.setenv("FINNHUB_API_KEY", "key")
     monkeypatch.setattr(
-        earnings.requests, "get",
-        lambda url, params=None, timeout=None, **kw: FakeResponse(json_data={"earningsCalendar": []}),
+        earnings.requests,
+        "get",
+        lambda url, params=None, timeout=None, **kw: FakeResponse(
+            json_data={"earningsCalendar": []}
+        ),
     )
     df = earnings.fetch_earnings_calendar("2026-06-01", "2026-06-05")
     assert df.empty

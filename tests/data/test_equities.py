@@ -1,4 +1,5 @@
-"""Tests for src.data.equities: yfinance normalisation, MultiIndex, empty."""
+"""Tests for earnings_iv_crush.data.equities: yfinance normalisation, MultiIndex, empty."""
+
 from __future__ import annotations
 
 import sys
@@ -6,7 +7,7 @@ import types
 
 import pandas as pd
 
-from src.data import equities
+from earnings_iv_crush.data import equities
 
 
 def _raw_frame(multiindex: bool = False) -> pd.DataFrame:

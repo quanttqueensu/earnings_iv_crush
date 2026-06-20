@@ -1,4 +1,5 @@
 """Tests for engine.backtester: ledger scoring, drawdown, Sharpe, empties."""
+
 from __future__ import annotations
 
 import math
@@ -6,18 +7,20 @@ import math
 import pandas as pd
 import pytest
 
-from src.engine import backtester
+from earnings_iv_crush.engine import backtester
 
 
 def _ledger(pnls, dates=None, margins=None):
     n = len(pnls)
     dates = dates or pd.bdate_range("2026-01-02", periods=n).astype(str).tolist()
     margins = margins or [10_000] * n
-    return pd.DataFrame({
-        "pnl": pnls,
-        "exit_date": dates,
-        "return_on_margin": [p / m for p, m in zip(pnls, margins)],
-    })
+    return pd.DataFrame(
+        {
+            "pnl": pnls,
+            "exit_date": dates,
+            "return_on_margin": [p / m for p, m in zip(pnls, margins)],
+        }
+    )
 
 
 def test_basic_aggregates():
@@ -56,3 +59,39 @@ def test_same_day_trades_aggregate_into_one_period():
     stats = backtester.backtest(led)
     assert stats["n_trades"] == 2
     assert stats["total_pnl"] == pytest.approx(60.0)
+
+
+def test_frequency_neutral_rewards_better_per_trade_book():
+    # Strategy: a few high-mean, low-dispersion trades (a selective filter).
+    # Control: many noisier trades (the unfiltered book). The daily Sharpe in
+    # compare() zero-fills the strategy on the control's extra dates, but the
+    # frequency-neutral per-trade Sharpe must still favour the cleaner book.
+    dates = pd.bdate_range("2026-01-02", periods=40).astype(str).tolist()
+    strat = _ledger([120.0, 130.0, 110.0, 125.0], dates=dates[:4])
+    ctrl_pnls = [120.0, -200.0, 130.0, 110.0, -180.0, 125.0, 90.0, -150.0] * 5
+    ctrl = _ledger(ctrl_pnls, dates=dates[: len(ctrl_pnls)])
+
+    fn = backtester.frequency_neutral_stats(strat, ctrl, n_boot=200, seed=0)
+    assert fn["per_trade_sharpe_strategy"] > fn["per_trade_sharpe_agent0"]
+    assert fn["filter_edge_per_trade"] is True
+    # Size-matched control is drawn down to the strategy's trade count.
+    assert 0.0 <= fn["size_matched_win_prob"] <= 1.0
+    assert (
+        fn["size_matched_delta_ci_low"]
+        <= fn["size_matched_delta_mean"]
+        <= fn["size_matched_delta_ci_high"]
+    )
+
+
+def test_frequency_neutral_merged_into_compare():
+    dates = pd.bdate_range("2026-01-02", periods=12).astype(str).tolist()
+    strat = _ledger([100.0, 110.0, 95.0], dates=dates[:3])
+    ctrl = _ledger([100.0, -50.0, 110.0, 95.0, -40.0, 80.0], dates=dates[:6])
+    cmp = backtester.compare(strat, ctrl, n_boot=100, seed=1)
+    for key in (
+        "per_trade_sharpe_strategy",
+        "per_trade_sharpe_delta",
+        "size_matched_win_prob",
+        "filter_edge_per_trade",
+    ):
+        assert key in cmp

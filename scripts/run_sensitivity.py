@@ -9,8 +9,8 @@ best cell with the number of trials set to the grid size (so the headline Sharpe
 is discounted for having searched the grid). It then runs a no-look-ahead
 walk-forward backtest at the default thresholds.
 
-This is the 31 July sensitivity / walk-forward deliverable on synthetic data; it
-is not evidence of real edge.
+This is the sensitivity / walk-forward analysis on synthetic data; it is not
+evidence of real edge.
 
 Usage
 -----
@@ -26,24 +26,22 @@ Runtime: a few seconds (pure CPU, no network).
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 import matplotlib  # noqa: E402
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-from src.engine.backtester import daily_return_series           # noqa: E402
-from src.engine.costs import CostModel                          # noqa: E402
-from src.engine.pnl import build_ledger                         # noqa: E402
-from src.engine.sensitivity import sweep_dsr_params, threshold_sweep  # noqa: E402
-from src.engine.simulate import simulate_events                 # noqa: E402
-from src.engine.stats import deflated_sharpe_ratio              # noqa: E402
-from src.engine.walkforward import walk_forward_backtest        # noqa: E402
-from src.strategy.fair_move_model import FairMoveModel          # noqa: E402
-from src.strategy.filters import select_events                  # noqa: E402
+from earnings_iv_crush.engine.backtester import daily_return_series  # noqa: E402
+from earnings_iv_crush.engine.costs import CostModel  # noqa: E402
+from earnings_iv_crush.engine.pnl import build_ledger  # noqa: E402
+from earnings_iv_crush.engine.sensitivity import sweep_dsr_params, threshold_sweep  # noqa: E402
+from earnings_iv_crush.engine.simulate import simulate_events  # noqa: E402
+from earnings_iv_crush.engine.stats import deflated_sharpe_ratio  # noqa: E402
+from earnings_iv_crush.engine.walkforward import walk_forward_backtest  # noqa: E402
+from earnings_iv_crush.strategy.fair_move_model import FairMoveModel  # noqa: E402
+from earnings_iv_crush.strategy.filters import select_events  # noqa: E402
 
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "outputs" / "sensitivity"
 RATIOS = [1.05, 1.10, 1.15, 1.20, 1.25, 1.30, 1.40, 1.50]
@@ -76,16 +74,20 @@ def main() -> None:
     print("=" * 70)
     print("Earnings IV-Crush — threshold sensitivity + walk-forward (synthetic)")
     print("=" * 70)
-    print(f"Events: {len(events)}  |  grid: {len(RATIOS)}x{len(PCTLS)} "
-          f"= {len(RATIOS) * len(PCTLS)} cells  |  output: {OUTPUT_DIR}")
+    print(
+        f"Events: {len(events)}  |  grid: {len(RATIOS)}x{len(PCTLS)} "
+        f"= {len(RATIOS) * len(PCTLS)} cells  |  output: {OUTPUT_DIR}"
+    )
 
     sweep = threshold_sweep(events, model, RATIOS, PCTLS, costs=costs, agent0_seed=21)
     sweep.to_csv(OUTPUT_DIR / "sweep.csv", index=False)
     _heatmap(sweep, OUTPUT_DIR / "heatmap.png")
 
     best = sweep.sort_values("sharpe_delta", ascending=False).iloc[0]
-    print(f"\nBest cell: ratio={best['ratio']:.2f}, pctl={best['pctl']:.2f} -> "
-          f"Sharpe delta {best['sharpe_delta']:+.2f} on {int(best['n_trades'])} trades")
+    print(
+        f"\nBest cell: ratio={best['ratio']:.2f}, pctl={best['pctl']:.2f} -> "
+        f"Sharpe delta {best['sharpe_delta']:+.2f} on {int(best['n_trades'])} trades"
+    )
 
     # Deflated Sharpe of the best cell, deflated by the whole grid search.
     fair = model.predict(events)
@@ -99,9 +101,11 @@ def main() -> None:
 
     # Out-of-sample walk-forward at the default thresholds.
     wf, _ = walk_forward_backtest(events, events["realised_move"], costs=costs)
-    print(f"\nWalk-forward (default thresholds): "
-          f"OOS events {wf['n_oos']}, selected {wf['n_selected']}, "
-          f"Sharpe {wf['sharpe']:.2f}, hit rate {wf['hit_rate']:.2%}")
+    print(
+        f"\nWalk-forward (default thresholds): "
+        f"OOS events {wf['n_oos']}, selected {wf['n_selected']}, "
+        f"Sharpe {wf['sharpe']:.2f}, hit rate {wf['hit_rate']:.2%}"
+    )
 
     print("\n" + "=" * 70)
     print(f"Heatmap: {OUTPUT_DIR / 'heatmap.png'}")

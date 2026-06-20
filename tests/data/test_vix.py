@@ -1,9 +1,12 @@
-"""Tests for src.data.vix: FRED CSV parsing, missing points, failed series."""
+"""Tests for earnings_iv_crush.data.vix: FRED CSV parsing, missing points, failed series."""
+
 from __future__ import annotations
+
+import logging
 
 import requests
 
-from src.data import vix
+from earnings_iv_crush.data import vix
 from tests.data.conftest import FakeResponse
 
 # Minimal fredgraph CSV bodies keyed by series id. A '.' marks a missing point.
@@ -17,6 +20,7 @@ def _fake_get(csv_by_series):
     def _get(url, timeout=None, **kwargs):
         series_id = next(s for s in csv_by_series if f"id={s}" in url)
         return FakeResponse(text=csv_by_series[series_id])
+
     return _get
 
 
@@ -32,18 +36,19 @@ def test_fetch_index_vol_merges_series(monkeypatch):
     assert df.loc[df["date"] == "2026-05-02", "vix3m"].iloc[0] == 15.2
 
 
-def test_one_failed_series_does_not_kill_the_rest(monkeypatch, capsys):
+def test_one_failed_series_does_not_kill_the_rest(monkeypatch, caplog):
     def _get(url, timeout=None, **kwargs):
         if "id=VXVCLS" in url:
             raise requests.ConnectionError("boom")
         return FakeResponse(text=_CSV["VIXCLS"])
 
     monkeypatch.setattr(vix.requests, "get", _get)
-    df = vix.fetch_index_vol("2026-05-01", "2026-05-02")
+    with caplog.at_level(logging.WARNING):
+        df = vix.fetch_index_vol("2026-05-01", "2026-05-02")
 
     assert "vix" in df.columns
-    assert "vix3m" not in df.columns           # the failed series is absent
-    assert "warning" in capsys.readouterr().out.lower()
+    assert "vix3m" not in df.columns  # the failed series is absent
+    assert "could not fetch" in caplog.text.lower()  # warning logged, not raised
 
 
 def test_all_series_fail_returns_empty_frame(monkeypatch):
