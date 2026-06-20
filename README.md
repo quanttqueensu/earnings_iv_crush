@@ -1,5 +1,7 @@
 # Earnings IV-Crush
 
+[![CI](https://github.com/quanttqueensu/earnings_iv_crush/actions/workflows/ci.yml/badge.svg)](https://github.com/quanttqueensu/earnings_iv_crush/actions/workflows/ci.yml)
+
 **Earnings implied-volatility reversion via a filtered cross-sectional vol-crush.**
 
 Short pre-earnings ATM straddles, traded only on names that pass a cross-sectional term-structure
