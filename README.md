@@ -110,6 +110,8 @@ historical chains with locally inverted IV, and the per-name term-spread panel) 
 edge. It needs `ALPACA_KEY`/`ALPACA_SECRET` set and assembles a usable universe of events (use
 `--tickers` and a full-year window so the term gate's trailing window warms up).
 
+Dashboard in the works.
+
 ## Author
 
 Jordan Odorico. Built for QUANTT (Queen's University Algorithmic and Network Trading Team).
