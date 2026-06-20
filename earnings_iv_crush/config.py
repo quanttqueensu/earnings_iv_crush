@@ -189,8 +189,97 @@ class StrategyConfig:
     calendar_dominance: float = 1.0
 
 
+@dataclass(frozen=True)
+class LiveConfig:
+    """
+    Paper-trading / live-execution settings for the Interactive Brokers loop.
+
+    These govern the forward paper-trading harness only (``earnings_iv_crush.live``
+    and ``scripts/paper_trade_ibkr.py``); the research backtest never reads them.
+    They are kept here so the one place that holds assumptions also holds the
+    execution wiring, but no broker credential ever lives in this file - TWS / IB
+    Gateway holds the login, and the only secrets are the data-feed keys in
+    ``.env`` (see ``data/config.py``).
+
+    Attributes
+    ----------
+    ib_host : str
+        Host the TWS / IB Gateway API listens on. Defaults to ``"127.0.0.1"``.
+    ib_paper_port : int
+        Socket port for the **paper** account. TWS paper is ``7497`` (IB Gateway
+        paper is ``4002``). Defaults to ``7497``.
+    ib_live_ports : tuple of int
+        Ports that belong to a **live** account (TWS ``7496``, IB Gateway
+        ``4001``). The connection guard refuses to connect to any of these so the
+        loop can never reach a funded account. Defaults to ``(7496, 4001)``.
+    ib_client_id : int
+        API client id for this session. Any integer unique among connected API
+        clients. Defaults to ``17``.
+    kill_switch_file : str
+        Path to a sentinel file; when it exists the loop places no new orders
+        (existing positions are untouched). Lets you halt entries without killing
+        the scheduled task. Defaults to ``"outputs/live/STOP"``.
+    open_positions_path, paper_ledger_path : str
+        Parquet stores for open paper positions (entry leg, no exit yet) and the
+        completed-trade ledger (the backtest's ``LEDGER_COLUMNS`` schema).
+    skew_history_path, term_panel_path : str
+        Parquet stores for the accumulating per-event skew history (the skew
+        gate's expanding cross-section) and the per-name daily term-spread panel
+        (the term gate's trailing window).
+    skew_seed_path : str
+        Cached research events whose ``skew_25d`` seeds the skew gate before the
+        live book has enough of its own history. Defaults to the megacap sample.
+    strike_window : float
+        Half-width of the strike band pulled around spot, as a fraction of spot.
+        Defaults to ``0.20``.
+    horizon_days : int
+        Calendar days past the as-of date to include option expiries when
+        snapshotting the chain. Defaults to ``90``.
+    entry_offset_days : int
+        Business days before the announcement at which the position is entered.
+        Defaults to ``1`` (enter the session before the report).
+    skew_keep_frac : float
+        Keep an event only if its ``skew_25d`` is at or below this quantile of the
+        prior skew cross-section (the validated low-skew gate). Defaults to
+        ``0.67``.
+    term_pctl : float
+        Term-gate percentile, mirrored from ``StrategyConfig`` so the live gate
+        matches the backtest. Defaults to ``0.75``.
+    order_type : str
+        ``"LMT"`` (marketable limit, recommended) or ``"MKT"``. Defaults to
+        ``"LMT"``.
+    limit_cross_frac : float
+        For a limit order, the fraction of the bid-ask spread to give up to be
+        marketable (0 = sit on the near touch, 1 = cross fully). Defaults to
+        ``0.5``.
+    """
+
+    ib_host: str = "127.0.0.1"
+    ib_paper_port: int = 7497
+    ib_live_ports: tuple[int, ...] = (7496, 4001)
+    ib_client_id: int = 17
+
+    kill_switch_file: str = "outputs/live/STOP"
+    open_positions_path: str = "outputs/live/open_positions.parquet"
+    paper_ledger_path: str = "outputs/live/paper_ledger.parquet"
+    skew_history_path: str = "outputs/live/skew_history.parquet"
+    term_panel_path: str = "outputs/live/term_panel_live.parquet"
+    skew_seed_path: str = "outputs/research/events_megacap_v2.parquet"
+
+    strike_window: float = 0.20
+    horizon_days: int = 90
+    entry_offset_days: int = 1
+
+    skew_keep_frac: float = 0.67
+    term_pctl: float = 0.75
+
+    order_type: str = "LMT"
+    limit_cross_frac: float = 0.5
+
+
 # Canonical singletons. Domain modules import these and re-export the individual
 # fields under their established names, so this file stays the single source of
 # truth without altering any public API.
 GLOBAL = GlobalConfig()
 STRATEGY = StrategyConfig()
+LIVE = LiveConfig()
