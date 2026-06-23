@@ -17,6 +17,16 @@ provider (needs ALPACA_KEY/SECRET) that serves dated chains back to ~Feb 2024 wi
 a locally inverted IV, for the backtest; it is a drop-in with the same schema and
 is the one to inject as `fetch_chain` into the historical-surface builder.
 
+fetch_dolthub_option_chain is a keyless coarse-surface provider (public DoltHub
+database); it is a ~3-sessions/week, monthly-expiry snapshot, so it suits
+cross-sectional surface work but cannot bracket an event-timed straddle.
+
+fetch_databento_option_chain is the multi-year historical provider (needs
+DATABENTO_API_KEY) backed by OPRA daily bars and definitions to 2013, with the
+full weekly/monthly expiry ladder. It is the one to inject as `fetch_chain` for
+the pre-2024 out-of-sample backtest; it marks off the daily close with locally
+inverted IV (no NBBO pre-2023) and no open interest (see databento_options).
+
 fetch_analyst_dispersion follows the same free-first stack: Finnhub's
 eps-estimate endpoint when the plan allows it (403 on the free tier), then a
 yfinance analyst-estimate snapshot. The snapshot is current-only, so for past
@@ -37,6 +47,8 @@ import pandas as pd
 from .alpaca_options import fetch_option_chain as fetch_historical_option_chain
 from .alpaca_options import fetch_underlying_ohlcv as fetch_historical_equity_ohlcv
 from .config import FINNHUB_API_KEY
+from .databento_options import fetch_option_chain as fetch_databento_option_chain
+from .dolthub_options import fetch_option_chain as fetch_dolthub_option_chain
 from .earnings import fetch_earnings_calendar
 from .equities import fetch_equity_ohlcv
 from .options import fetch_option_chain
@@ -49,6 +61,8 @@ __all__ = [
     "fetch_index_vol",
     "fetch_option_chain",
     "fetch_historical_option_chain",
+    "fetch_dolthub_option_chain",
+    "fetch_databento_option_chain",
     "fetch_analyst_dispersion",
 ]
 

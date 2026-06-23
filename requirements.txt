@@ -9,3 +9,5 @@ matplotlib==3.10.8
 requests==2.32.5
 python-dotenv==1.2.2
 yfinance==1.0
+databento==0.80.0
+ib_async==2.1.0

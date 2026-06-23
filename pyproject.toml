@@ -20,6 +20,8 @@ dependencies = [
     "requests>=2.31",
     "python-dotenv>=1.0",
     "yfinance>=0.2",
+    "databento>=0.80",
+    "ib_async>=2.0",
 ]
 
 [project.optional-dependencies]

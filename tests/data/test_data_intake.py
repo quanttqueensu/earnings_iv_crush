@@ -6,7 +6,16 @@ working adapters and stubs the not-yet-available sources with a clear error.
 
 from __future__ import annotations
 
-from earnings_iv_crush.data import alpaca_options, data_intake, earnings, equities, options, vix
+from earnings_iv_crush.data import (
+    alpaca_options,
+    data_intake,
+    databento_options,
+    dolthub_options,
+    earnings,
+    equities,
+    options,
+    vix,
+)
 
 
 def test_facade_reexports_working_adapters():
@@ -17,6 +26,10 @@ def test_facade_reexports_working_adapters():
     assert data_intake.fetch_option_chain is options.fetch_option_chain
     # The dated/historical chain provider (Alpaca, IV inverted locally).
     assert data_intake.fetch_historical_option_chain is alpaca_options.fetch_option_chain
+    # The longer-history provider (DoltHub, real IV/greeks, ~2019 to late 2024).
+    assert data_intake.fetch_dolthub_option_chain is dolthub_options.fetch_option_chain
+    # The multi-year OPRA provider (Databento, daily bars + definitions to 2013).
+    assert data_intake.fetch_databento_option_chain is databento_options.fetch_option_chain
 
 
 def test_all_lists_the_public_surface():
@@ -26,6 +39,8 @@ def test_all_lists_the_public_surface():
         "fetch_index_vol",
         "fetch_option_chain",
         "fetch_historical_option_chain",
+        "fetch_dolthub_option_chain",
+        "fetch_databento_option_chain",
         "fetch_historical_equity_ohlcv",
         "fetch_analyst_dispersion",
     }

@@ -230,14 +230,18 @@ def build_execution_events(
             continue
         t_exit = (front - exit_).days / 365.0
         exit_chain = fetch_chain(ticker, exit_.strftime("%Y-%m-%d"))
-        iv_exit = (
-            features.atm_iv(exit_chain, front, strike)
-            if (exit_chain is not None and len(exit_chain))
-            else float("nan")
-        )
-        # The executed expiry is chosen to outlive the exit (t_exit > 0), so the
-        # post-event ATM IV drives the mark; fall back to entry IV only when the
-        # exit chain is missing the ATM quote, so the row stays usable.
+        # Mark the held straddle at the post-event *at-the-money* IV (the strike
+        # nearest the exit spot), not at the original entry strike. After a large
+        # earnings move the entry strike is deep ITM/OTM, and inverting IV from a
+        # near-expiry off-ATM daily close explodes (300%+), which would massively
+        # overstate the buy-back cost. The exit ATM IV is the stable post-crush vol
+        # level; repricing the held strike at it via BS gives ~intrinsic + fair time
+        # value, the real mark. Fall back to entry IV only if the exit chain lacks it.
+        if exit_chain is not None and len(exit_chain):
+            exit_atm_strike = features.nearest_strike(exit_chain, front, spot_exit)
+            iv_exit = features.atm_iv(exit_chain, front, exit_atm_strike)
+        else:
+            iv_exit = float("nan")
         if iv_exit != iv_exit:
             iv_exit = iv_entry
 
