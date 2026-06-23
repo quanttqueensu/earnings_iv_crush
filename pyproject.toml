@@ -49,7 +49,9 @@ line-length = 100
 target-version = ["py310"]
 
 [tool.mypy]
-python_version = "3.10"
+# Match the version CI runs on (3.12): modern numpy ships stubs using 3.12-only
+# `type` statements, which a 3.10 target rejects at parse time before checking our code.
+python_version = "3.12"
 ignore_missing_imports = true
 check_untyped_defs = true
 namespace_packages = true
