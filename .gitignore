@@ -46,3 +46,6 @@ Thumbs.db
 
 # Office temp/lock files
 ~$*
+
+# Research paper drafts: kept local, not published
+paper/

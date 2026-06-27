@@ -60,8 +60,7 @@ The honest state of the evidence: the point estimate is firm and positive every 
 137 trades on one mega-cap universe the bootstrap 95% interval still grazes zero
 ([-0.033, +0.410] per trade). The remaining work is confirmatory: a broad-universe replication
 on the multi-year source and a forward paper test that converts a backtest costed off closing
-quotes into observed fills. The full account, with figures, is in
-[`paper/iv_crush_main.tex`](paper/iv_crush_main.tex).
+quotes into observed fills.
 
 ## Repository layout
 
@@ -74,7 +73,6 @@ quotes into observed fills. The full account, with figures, is in
 | [`earnings_iv_crush/baseline/`](earnings_iv_crush/baseline/) | Agent 0 unfiltered control |
 | [`earnings_iv_crush/live/`](earnings_iv_crush/live/) | IBKR paper-trading harness (connection, market data, orders, paper book) |
 | [`scripts/`](scripts/) | Entry points: smoke test, demo backtest, research runner, sensitivity sweep, chain fetcher, IBKR paper trade |
-| [`paper/`](paper/) | The research paper and figures |
 | [`tests/`](tests/) | Test suite (mirrors `earnings_iv_crush/`) |
 | [`data/`](data/) | Raw and processed pulls (git-ignored) |
 
@@ -120,11 +118,10 @@ structure mix and the vega/gamma/theta/delta P&L attribution, writing a tearshee
 with locally inverted IV, and the per-name term-spread panel) for a read on real edge.
 
 The multi-year, market-marked Databento study behind the **Research status** numbers is run
-through the metered OPRA pipeline and documented end to end in the paper and methodology
-document; raw pulls and generated outputs are git-ignored.
+through the metered OPRA pipeline; raw pulls and generated outputs are git-ignored.
 
 `scripts/paper_trade_ibkr.py` drives the IBKR paper harness against a running TWS/IB Gateway,
-the natural next evidence step and the forward test the paper calls for.
+the natural next evidence step and the forward test the strategy calls for.
 
 ## Author
 
