@@ -61,8 +61,7 @@ The honest state of the evidence: the point estimate is firm and positive every 
 ([-0.033, +0.410] per trade). The remaining work is confirmatory: a broad-universe replication
 on the multi-year source and a forward paper test that converts a backtest costed off closing
 quotes into observed fills. The full account, with figures, is in
-[`paper/iv_crush_main.tex`](paper/iv_crush_main.tex) and
-[`docs/methodology_and_results.md`](docs/methodology_and_results.md).
+[`paper/iv_crush_main.tex`](paper/iv_crush_main.tex).
 
 ## Repository layout
 
