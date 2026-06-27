@@ -64,16 +64,6 @@ quotes into observed fills. The full account, with figures, is in
 [`paper/iv_crush_main.tex`](paper/iv_crush_main.tex) and
 [`docs/methodology_and_results.md`](docs/methodology_and_results.md).
 
-## Why Databento
-
-The methodology was first specified on free Alpaca daily chains, which begin only in 2024 and
-carry no real bid-ask quotes, pinning every result to one regime and forcing the trade's cost to
-be assumed. The option chains have since been upgraded to **Databento OPRA.PILLAR** in a tightly
-budgeted pull, which fixes both weak points: daily bars and instrument definitions reach back to
-2013 (enabling the continuous 2019-2024 sample), and consolidated NBBO quotes from 28 March 2023
-let the transaction cost be *measured* on the actual quoted spread. The supporting feeds
-(earnings calendar, equity prices, VIX, SEC metadata) remain free.
-
 ## Repository layout
 
 | Path | Contents |
