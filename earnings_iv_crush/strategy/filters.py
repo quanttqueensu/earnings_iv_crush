@@ -15,6 +15,7 @@ from ..config import STRATEGY
 
 # Sourced from the central config (see ``earnings_iv_crush/config.py``).
 IMPLIED_FAIR_RATIO = STRATEGY.implied_fair_ratio
+USE_MOVE_GATE = STRATEGY.use_move_gate  # whether Gate 1 (move filter) is applied
 TERM_SPREAD_PCTL = STRATEGY.term_spread_pctl
 TRAILING_WINDOW = STRATEGY.trailing_window  # trailing days (panel form) or events (legacy form)
 TERM_MIN_PERIODS = STRATEGY.term_min_periods  # min daily obs before the panel gate will fire
@@ -114,17 +115,18 @@ def select_events(
     pctl=TERM_SPREAD_PCTL,
     window=TRAILING_WINDOW,
     *,
+    use_move_gate: bool = USE_MOVE_GATE,
     term_panel: pd.DataFrame | None = None,
     window_days=TRAILING_WINDOW,
     min_periods=TERM_MIN_PERIODS,
     asof_offset_days=1,
 ) -> pd.DataFrame:
-    """Return only the events that pass BOTH filters.
+    """Return only the events that pass the active filters.
 
-    Gate 1: implied event move >= ``ratio`` x the fair move. Gate 2: the term
-    spread is steep versus its recent history - the per-name trailing-day
-    percentile when ``term_panel`` is supplied (preferred), else the legacy
-    events-rolling percentile.
+    Gate 1 (optional): implied event move >= ``ratio`` x the fair move, applied
+    only when ``use_move_gate`` is true. Gate 2: the term spread is steep versus
+    its recent history - the per-name trailing-day percentile when ``term_panel``
+    is supplied (preferred), else the legacy events-rolling percentile.
 
     Parameters
     ----------
@@ -134,6 +136,10 @@ def select_events(
     fair_move : sequence
         Predicted fair move per event, aligned to ``events`` by position.
     ratio, pctl, window : see the module constants.
+    use_move_gate : bool
+        Whether Gate 1 is applied. Defaults to ``USE_MOVE_GATE`` (the config
+        value, ``False`` in the term-only baseline). When false the move filter
+        is a pass-through and selection rests on the term gate alone.
     term_panel : pd.DataFrame, optional
         Per-name daily term-spread panel; switches Gate 2 to the trailing-day form.
     window_days, min_periods, asof_offset_days :
@@ -142,10 +148,13 @@ def select_events(
     Returns
     -------
     pd.DataFrame
-        The subset of ``events`` that clears both gates.
+        The subset of ``events`` that clears the active gates.
     """
     fair = pd.Series(list(fair_move), index=events.index)
-    move_ok = passes_move_filter(events["implied_move"], fair, ratio)
+    if use_move_gate:
+        move_ok = passes_move_filter(events["implied_move"], fair, ratio)
+    else:
+        move_ok = pd.Series(True, index=events.index)
     if term_panel is not None:
         term_ok = passes_term_filter_panel(
             events, term_panel, pctl, window_days, min_periods, asof_offset_days

@@ -40,7 +40,40 @@ EULER_MASCHERONI = 0.5772156649015329
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def sharpe(returns: pd.Series, periods_per_year: int = 252) -> float:
+def infer_periods_per_year(index: pd.Index) -> float:
+    """
+    Observations-per-year implied by a dated series' own calendar span.
+
+    The frequency-consistent annualisation base. A book that records ``n``
+    distinct dated observations across a span of ``span`` years realises
+    ``n / span`` periods a year, so annualising its per-period Sharpe by
+    ``sqrt(n / span)`` neither inflates a sparse event book to a daily cadence
+    (the ``sqrt(252)`` artefact) nor deflates a dense one.
+
+    Parameters
+    ----------
+    index : pd.Index
+        Index of the return series being annualised, ideally a ``DatetimeIndex``.
+
+    Returns
+    -------
+    float
+        Observations per year. Falls back to ``252.0`` when the index is not
+        datetime-like, has fewer than two points, or spans no calendar time.
+    """
+    try:
+        idx = pd.DatetimeIndex(index)
+    except (TypeError, ValueError):
+        return 252.0
+    if len(idx) < 2:
+        return 252.0
+    span_days = (idx.max() - idx.min()).days
+    if span_days <= 0:
+        return 252.0
+    return float(len(idx) * 365.25 / span_days)
+
+
+def sharpe(returns: pd.Series, periods_per_year: float = 252) -> float:
     """
     Annualised Sharpe ratio of a per-trade or per-day return series.
 
@@ -48,8 +81,10 @@ def sharpe(returns: pd.Series, periods_per_year: int = 252) -> float:
     ----------
     returns : pd.Series
         Periodic (e.g. daily) returns, already net of costs.
-    periods_per_year : int
-        Annualisation factor. Defaults to ``252`` trading days.
+    periods_per_year : float
+        Annualisation factor. Defaults to ``252`` trading days. For a sparse
+        event book pass the realised observations-per-year from
+        :func:`infer_periods_per_year` so the figure is not inflated.
 
     Returns
     -------
@@ -63,7 +98,7 @@ def sharpe(returns: pd.Series, periods_per_year: int = 252) -> float:
     return float(returns.mean() / sd * np.sqrt(periods_per_year))
 
 
-def sortino_ratio(returns: pd.Series, periods_per_year: int = 252, target: float = 0.0) -> float:
+def sortino_ratio(returns: pd.Series, periods_per_year: float = 252, target: float = 0.0) -> float:
     """
     Annualised Sortino ratio (downside-deviation risk adjustment).
 
@@ -74,7 +109,7 @@ def sortino_ratio(returns: pd.Series, periods_per_year: int = 252, target: float
     ----------
     returns : pd.Series
         Periodic returns, net of costs.
-    periods_per_year : int
+    periods_per_year : float
         Annualisation factor. Defaults to ``252``.
     target : float
         Minimum acceptable periodic return. Defaults to ``0.0``.

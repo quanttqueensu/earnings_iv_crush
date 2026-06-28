@@ -113,11 +113,19 @@ class StrategyConfig:
     Attributes
     ----------
     implied_fair_ratio : float
-        Gate 1. Trade only when the implied event move is at least this multiple
-        of the regression fair move. Defaults to ``1.20``.
+        Gate 1 threshold. When Gate 1 is active, trade only when the implied
+        event move is at least this multiple of the regression fair move.
+        Defaults to ``1.20``.
+    use_move_gate : bool
+        Whether Gate 1 (the implied/fair move filter) is applied. Defaults to
+        ``False``: out-of-sample validation showed the move gate does not add
+        risk-adjusted return over the term gate alone (it fails its own
+        expanding-window test), so the baseline selects on the term structure
+        only. Set ``True`` to restore the two-gate book.
     term_spread_pctl : float
         Gate 2. Trade only when the front-minus-back ATM IV term spread is above
-        this percentile of its trailing distribution. Defaults to ``0.75``.
+        this percentile of its trailing distribution. Defaults to ``0.80`` (the
+        interior-stable operating point of the per-trade Sharpe surface).
     trailing_window : int
         Length of the term-spread trailing window — trading days for the
         per-name panel gate, or events for the legacy gate. Defaults to ``30``.
@@ -166,7 +174,8 @@ class StrategyConfig:
 
     # ── Entry filters ────────────────────────────────────────────────────────
     implied_fair_ratio: float = 1.20
-    term_spread_pctl: float = 0.75
+    use_move_gate: bool = False
+    term_spread_pctl: float = 0.80
     trailing_window: int = 30
     term_min_periods: int = 15
 
@@ -244,7 +253,7 @@ class LiveConfig:
         ``0.67``.
     term_pctl : float
         Term-gate percentile, mirrored from ``StrategyConfig`` so the live gate
-        matches the backtest. Defaults to ``0.75``.
+        matches the backtest. Defaults to ``0.80``.
     order_type : str
         ``"LMT"`` (marketable limit, recommended) or ``"MKT"``. Defaults to
         ``"LMT"``.
@@ -271,7 +280,7 @@ class LiveConfig:
     entry_offset_days: int = 1
 
     skew_keep_frac: float = 0.67
-    term_pctl: float = 0.75
+    term_pctl: float = 0.80
 
     order_type: str = "LMT"
     limit_cross_frac: float = 0.5

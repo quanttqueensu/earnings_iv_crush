@@ -26,6 +26,7 @@ from ..strategy.filters import (
     IMPLIED_FAIR_RATIO,
     TERM_SPREAD_PCTL,
     TRAILING_WINDOW,
+    USE_MOVE_GATE,
     select_events,
 )
 from .backtester import backtest
@@ -44,6 +45,7 @@ def walk_forward_backtest(
     ratio: float = IMPLIED_FAIR_RATIO,
     pctl: float = TERM_SPREAD_PCTL,
     window: int = TRAILING_WINDOW,
+    use_move_gate: bool = USE_MOVE_GATE,
 ) -> tuple[dict, pd.DataFrame]:
     """
     Score the strategy out-of-sample with an expanding-window fair move.
@@ -68,6 +70,9 @@ def walk_forward_backtest(
         Passed through to the ledger builder (see ``pnl.build_ledger``).
     ratio, pctl, window :
         Filter thresholds (see ``strategy.filters.select_events``).
+    use_move_gate : bool
+        Whether Gate 1 (the move filter) is applied. Defaults to the config
+        value (``False`` in the term-only baseline).
 
     Returns
     -------
@@ -82,7 +87,9 @@ def walk_forward_backtest(
 
     events_oos = events[oos_mask]
     fair_oos = fair[oos_mask]
-    selected = select_events(events_oos, fair_oos, ratio=ratio, pctl=pctl, window=window)
+    selected = select_events(
+        events_oos, fair_oos, ratio=ratio, pctl=pctl, window=window, use_move_gate=use_move_gate
+    )
     ledger = build_ledger(selected, account=account, fraction=fraction, r=r, costs=costs)
 
     stats = backtest(ledger, account)

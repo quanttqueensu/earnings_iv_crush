@@ -37,6 +37,8 @@ _EMPTY_STATS = {
     "avg_pnl": 0.0,
     "avg_return_on_margin": float("nan"),
     "sharpe": 0.0,
+    "per_trade_sharpe": float("nan"),
+    "periods_per_year": float(252),
     "sortino": 0.0,
     "profit_factor": 0.0,
     "win_loss_ratio": 0.0,
@@ -88,7 +90,9 @@ def daily_return_series(trades: pd.DataFrame, account: float = ACCOUNT_SIZE) -> 
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def backtest(trades: pd.DataFrame, account=ACCOUNT_SIZE, periods_per_year: int = 252) -> dict:
+def backtest(
+    trades: pd.DataFrame, account=ACCOUNT_SIZE, periods_per_year: int | str = "auto"
+) -> dict:
     """
     Score a trade ledger and return performance statistics.
 
@@ -98,23 +102,38 @@ def backtest(trades: pd.DataFrame, account=ACCOUNT_SIZE, periods_per_year: int =
     annualised from those daily returns, and the drawdown stats are read off the
     equity curve (starting capital ``account``).
 
+    Annualisation. ``periods_per_year`` defaults to ``"auto"``, which derives the
+    base from the daily series' own calendar span (see
+    :func:`stats.infer_periods_per_year`). This is the honest,
+    frequency-consistent figure: a book that trades ~25 names a year is annualised
+    by ``sqrt(25)``, not ``sqrt(252)``. Pass an explicit integer to override (e.g.
+    ``252`` for a genuinely daily series). The per-trade Sharpe, reported
+    alongside as ``per_trade_sharpe``, is frequency-neutral and is the verdict
+    metric; the annualised ``sharpe`` is a presentational scaling of it.
+
     Returns
     -------
     dict
         ``n_trades``, ``total_pnl``, ``total_return``, ``hit_rate``, ``avg_pnl``,
-        ``avg_return_on_margin``, ``sharpe``, ``sortino``, ``profit_factor``,
-        ``win_loss_ratio``, ``max_drawdown``, ``max_dd_duration``,
-        ``final_equity``.
+        ``avg_return_on_margin``, ``sharpe``, ``per_trade_sharpe``,
+        ``periods_per_year``, ``sortino``, ``profit_factor``, ``win_loss_ratio``,
+        ``max_drawdown``, ``max_dd_duration``, ``final_equity``.
     """
     if trades is None or len(trades) == 0:
         return {**_EMPTY_STATS, "final_equity": float(account)}
 
     pnl = trades["pnl"].astype(float)
     daily_return = daily_return_series(trades, account)
+    ppy = (
+        stats.infer_periods_per_year(daily_return.index)
+        if periods_per_year == "auto"
+        else float(periods_per_year)
+    )
     daily_pnl = daily_return * account
     equity = account + daily_pnl.cumsum()
     drawdown = (equity - equity.cummax()) / equity.cummax()
     ror = trades["return_on_margin"] if "return_on_margin" in trades else None
+    _, per_trade_sr = _per_trade_sharpe(trades)
 
     return {
         "n_trades": int(len(trades)),
@@ -123,8 +142,10 @@ def backtest(trades: pd.DataFrame, account=ACCOUNT_SIZE, periods_per_year: int =
         "hit_rate": float((pnl > 0).mean()),
         "avg_pnl": float(pnl.mean()),
         "avg_return_on_margin": float(ror.mean()) if ror is not None else float("nan"),
-        "sharpe": float(stats.sharpe(daily_return, periods_per_year)),
-        "sortino": float(stats.sortino_ratio(daily_return, periods_per_year)),
+        "sharpe": float(stats.sharpe(daily_return, ppy)),
+        "per_trade_sharpe": float(per_trade_sr),
+        "periods_per_year": float(ppy),
+        "sortino": float(stats.sortino_ratio(daily_return, ppy)),
         "profit_factor": float(stats.profit_factor(pnl)),
         "win_loss_ratio": float(stats.win_loss_ratio(pnl)),
         "max_drawdown": float(drawdown.min()),

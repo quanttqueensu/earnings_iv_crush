@@ -294,3 +294,33 @@ def _close_position(position: pd.Series, open_path: str | Path) -> None:
     )
     df.loc[match, "status"] = "closed"
     df.to_parquet(p, index=False)
+
+
+# ── forward paper test: parallel no-stop / stop books + reconciliation ────────
+
+
+def record_forward_exit(
+    position: pd.Series,
+    nostop_row: dict,
+    stop_row: dict,
+    reconciliation_row: dict,
+    *,
+    nostop_path: str | Path,
+    stop_path: str | Path,
+    reconciliation_path: str | Path,
+    open_path: str | Path = LIVE.open_positions_path,
+) -> None:
+    """Append one forward exit to the two parallel ledgers and the reconciliation
+    store, then flip the open position to ``closed``.
+
+    The no-stop and stop rows are the backtest ``LEDGER_COLUMNS`` schema (so the
+    forward books read with the same tooling as the research ledger); the
+    reconciliation row carries the realised fill vs assumed mid, realised vs
+    assumed exit spread, the stop's gap slippage and the realised round-trip cost
+    against the canonical break-even.
+    """
+    _append(nostop_path, {c: nostop_row.get(c) for c in LEDGER_COLUMNS}, LEDGER_COLUMNS)
+    _append(stop_path, {c: stop_row.get(c) for c in LEDGER_COLUMNS}, LEDGER_COLUMNS)
+    recon_cols = list(reconciliation_row.keys())
+    _append(reconciliation_path, reconciliation_row, recon_cols)
+    _close_position(position, open_path)
