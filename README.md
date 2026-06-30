@@ -29,10 +29,14 @@ improving the Sharpe. A move gate (the option-implied event move rich against a 
 fair move) looked additive in sample but fails its own out-of-sample test, so it is not part of
 the live book. The vehicle is the **naked short straddle**: defined-risk iron-fly (1.5x wings)
 and short-calendar variants were tested on real option chains and are net-negative, so they do
-not replace the straddle. A hard stop near -0.30 of margin is the only tail lever that helps,
-and even it caps the single-name earnings tail without creating edge. The **Agent 0** baseline
-is an unfiltered short ATM straddle, used as the control so the gate is tested against
-participation rather than against zero.
+not replace the straddle. The single-name earnings tail cannot be capped by a live stop: the
+book holds one overnight, so there is a single post-entry mark and it already sits on the far
+side of the earnings gap, leaving a stop order no intraday mark to fire against, so it fills at
+the post-gap close rather than the stop level. A pre-paid protective wing, the only structure
+that genuinely caps the jump, is fairly priced and costs more than the tail it removes, so the
+tail is handled by position sizing rather than hedging. The **Agent 0** baseline is an
+unfiltered short ATM straddle, used as the control so the gate is tested against participation
+rather than against zero.
 
 ## Research status
 
@@ -63,6 +67,18 @@ bias that otherwise penalises a selective filter for trading fewer events.
   about **3.07% of premium at entry and about 8.55% at exit**, an **11.6% round-trip break-even**.
   The exit leg is the wider one, not a symmetric 5.9% on both sides. Crossing the full quoted
   spread takes the edge to zero; only patient mid-seeking exits preserve it.
+- **The exit cross is the binding constraint, and a conditional exit attacks it.** Holding the
+  straddle to its weekly expiry instead of buying it back the next session removes the exit cross
+  entirely, at the cost of a few days of post-event directional exposure. Doing this selectively,
+  holding to expiry on the lower part of the implied-move distribution and taking the next-session
+  exit on the highest-implied-move quartile where the post-event drift is most dangerous, gives the
+  highest per-trade Sharpe in the study and survives a clean 2019-2022 to 2023-2024 hold-out. The
+  gain is contingent on the realistic measured exit cost and its magnitude is indicative, so it is
+  a candidate refinement for the forward test rather than an established result.
+- **The point estimate is robust to earnings-week clustering.** Resampling whole earnings weeks
+  rather than individual trades widens the bootstrap interval only marginally, to [-0.029, +0.321],
+  and does not change the not-yet-significant verdict; sample size, not serial dependence, is the
+  binding limit.
 - **The skew gate is rejected**, and the move gate is dropped on its out-of-sample failure, so the
   live book is the larger, simpler term-only structure.
 

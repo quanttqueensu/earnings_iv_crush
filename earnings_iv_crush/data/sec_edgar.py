@@ -93,8 +93,8 @@ def earnings_8ks(ticker: str) -> pd.DataFrame:
     """Recent earnings 8-Ks (Item 2.02) with acceptance time and session.
 
     Note: the submissions ``recent`` block only covers roughly the last year /
-    ~1000 filings. For the 2020-2025 backtest, page through the older shards
-    under ``filings.files`` (TODO when WRDS/backtest data lands).
+    ~1000 filings. For a multi-year backtest, page through the older shards under
+    ``filings.files``; the deeper history is sourced from WRDS where available.
 
     Parameters
     ----------
