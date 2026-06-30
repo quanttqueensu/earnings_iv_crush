@@ -287,6 +287,7 @@ def reconciliation_row(
     nostop_fill_ps: float,
     stop_fill_ps: float | None,
     stop_was_triggered: bool,
+    filled_at_limit: bool = True,
     assumed_entry_spread: float = ASSUMED_ENTRY_SPREAD,
     assumed_exit_spread: float = ASSUMED_EXIT_SPREAD,
 ) -> dict:
@@ -298,6 +299,10 @@ def reconciliation_row(
     on the gap versus the no-stop managed exit (the quantity only the live test can
     pin down). The round-trip is the realised exit spread half-crossed plus the
     assumed entry half-cross, flagged over/under break-even.
+
+    ``filled_at_limit`` records whether the no-stop managed exit rested at its
+    mid-seeking limit (dry-run: assumed ``True``; transmitted: the broker's flag,
+    ``False`` when the buy-back had to cross fully to the touch).
     """
     mid = quote.mid
     realised_exit_spread = quote.relative_spread
@@ -313,6 +318,7 @@ def reconciliation_row(
         "exit_date": position.get("exit_date"),
         "assumed_mid_mark_ps": float(mid),
         "nostop_fill_ps": float(nostop_fill_ps),
+        "filled_at_limit": bool(filled_at_limit),
         "slippage_vs_mid_ps": float(nostop_fill_ps - mid),
         "assumed_exit_spread": float(assumed_exit_spread),
         "realised_exit_spread": float(realised_exit_spread),
@@ -335,6 +341,7 @@ def build_forward_exit(
     t_exit: float,
     config: ForwardTestConfig = FORWARD,
     filled_at_limit: bool = True,
+    transmitted_fill_ps: float | None = None,
     stop_fill_ps: float | None = None,
 ) -> tuple[dict, dict, dict]:
     """Assemble the no-stop row, the stop-book row and the reconciliation row.
@@ -355,6 +362,12 @@ def build_forward_exit(
     filled_at_limit : bool
         Whether the managed limit filled (live: the broker flag; dry-run: assumed
         ``True``).
+    transmitted_fill_ps : float, optional
+        The realised per-share buy-back fill from a transmitted managed exit. When
+        given it is booked as the no-stop fill instead of the modelled
+        :func:`realised_exit_price`, so the recorded exit price and the
+        reconciliation reflect the broker fill rather than the assumed mid mark.
+        ``None`` (the default) keeps the dry-run assume-fill behaviour.
     stop_fill_ps : float, optional
         The realised stop fill per share if the stop triggered live. ``None`` uses
         the full-cross touch as the conservative dry-run stop fill.
@@ -368,12 +381,15 @@ def build_forward_exit(
     credit_ps = float(position["entry_credit"]) / (CONTRACT_MULTIPLIER * contracts)
     margin = float(position["margin"])
 
-    nostop_fill = realised_exit_price(
-        quote,
-        config.exit_limit_cross_frac,
-        filled_at_limit=filled_at_limit,
-        fallback_full_cross=config.exit_fallback_full_cross,
-    )
+    if transmitted_fill_ps is not None:
+        nostop_fill = float(transmitted_fill_ps)
+    else:
+        nostop_fill = realised_exit_price(
+            quote,
+            config.exit_limit_cross_frac,
+            filled_at_limit=filled_at_limit,
+            fallback_full_cross=config.exit_fallback_full_cross,
+        )
 
     # Stop book: evaluate the stop on the post-print-open mid mark (the gap mark).
     triggered = stop_triggered(credit_ps, quote.mid, margin, contracts, config.stop_loss_rom)
@@ -404,6 +420,7 @@ def build_forward_exit(
         nostop_fill_ps=nostop_fill,
         stop_fill_ps=stop_fill if triggered else None,
         stop_was_triggered=triggered,
+        filled_at_limit=filled_at_limit,
     )
     return nostop_row, stop_row, recon
 

@@ -30,6 +30,7 @@ from ..data.features import nearest_strike
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from ib_async import IB, Contract, Trade
 
+    from .forward_test import StraddleQuote
     from .ib_market import UnderlyingQuote
 
 
@@ -179,7 +180,106 @@ def place_short_straddle(
     return trades
 
 
+# ── managed buy-back (transmitting exit) ─────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class ManagedExitFill:
+    """Realised outcome of a transmitted managed buy-back.
+
+    Attributes
+    ----------
+    fill_price_ps : float
+        Per-share straddle buy-back price actually paid (the two leg average
+        fills summed), or the modelled touch when the ladder never filled.
+    filled_at_limit : bool
+        ``True`` if the close rested inside the touch (filled at a mid-seeking
+        rung); ``False`` if it had to cross fully to the touch (or never filled).
+    """
+
+    fill_price_ps: float
+    filled_at_limit: bool
+
+
+def place_managed_buyback(
+    ib: IB,
+    call: Contract,
+    put: Contract,
+    contracts: int,
+    quote: StraddleQuote,
+    *,
+    transmit: bool,
+    cross_frac: float = LIVE.limit_cross_frac,
+    reprice_steps: int = LIVE.exit_reprice_steps,
+    step_wait_s: float = LIVE.exit_step_wait_s,
+) -> ManagedExitFill:
+    """Place the mid-seeking straddle buy-back and read the realised broker fill.
+
+    Both legs are bought to close with a limit priced ``cross_frac`` of the way
+    from mid toward the touch, then the limit is walked toward the touch over
+    ``reprice_steps`` rungs (resting ``step_wait_s`` seconds at each). The first
+    rung that fills is taken; if nothing fills before the final full-cross rung
+    the modelled touch is booked as the conservative fill. The returned price and
+    ``filled_at_limit`` come from the broker, not from an assumed mid mark.
+
+    Reading a fill requires ``transmit=True`` (and a connected gateway); with
+    ``transmit=False`` the legs are staged in TWS but never fill, so the touch is
+    booked. ``contracts`` is the per-leg quantity (matching the opened lot).
+
+    Raises
+    ------
+    ValueError
+        If ``contracts <= 0``.
+    """
+    from ib_async import LimitOrder
+
+    if contracts <= 0:
+        raise ValueError("contracts must be positive to close a straddle.")
+
+    steps = max(0, int(reprice_steps))
+    call_order = LimitOrder("BUY", contracts, 0.0)
+    put_order = LimitOrder("BUY", contracts, 0.0)
+    call_order.transmit = bool(transmit)
+    put_order.transmit = bool(transmit)
+    call_trade = put_trade = None
+
+    for i in range(steps + 1):
+        frac = cross_frac if steps == 0 else cross_frac + (1.0 - cross_frac) * (i / steps)
+        call_order.lmtPrice = round(_leg_buy_limit(quote.call_bid, quote.call_ask, frac), 2)
+        put_order.lmtPrice = round(_leg_buy_limit(quote.put_bid, quote.put_ask, frac), 2)
+        call_trade = ib.placeOrder(call, call_order)
+        put_trade = ib.placeOrder(put, put_order)
+        ib.sleep(step_wait_s)
+        if _is_filled(call_trade) and _is_filled(put_trade):
+            return ManagedExitFill(
+                fill_price_ps=_avg_fill(call_trade) + _avg_fill(put_trade),
+                filled_at_limit=frac < 1.0,
+            )
+
+    # Never filled across the ladder: book the touch as the conservative close.
+    return ManagedExitFill(fill_price_ps=float(quote.touch_buy), filled_at_limit=False)
+
+
 # ── helpers ──────────────────────────────────────────────────────────────────
+
+
+def _leg_buy_limit(bid: float, ask: float, frac: float) -> float:
+    """Buy-to-close limit for one leg, ``frac`` of the way from mid to the ask."""
+    mid = 0.5 * (bid + ask)
+    half = 0.5 * (ask - bid)
+    return float(mid + max(0.0, frac) * half)
+
+
+def _is_filled(trade: Trade | None) -> bool:
+    """Whether a placed trade has reported a complete fill."""
+    status = getattr(getattr(trade, "orderStatus", None), "status", "")
+    return status == "Filled"
+
+
+def _avg_fill(trade: Trade | None) -> float:
+    """Average fill price reported on a trade (0.0 when none yet)."""
+    px = getattr(getattr(trade, "orderStatus", None), "avgFillPrice", 0.0)
+    return float(px) if px is not None else 0.0
 
 
 def _sell_price(rows: pd.DataFrame, right: str) -> float:

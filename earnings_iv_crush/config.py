@@ -261,6 +261,13 @@ class LiveConfig:
         For a limit order, the fraction of the bid-ask spread to give up to be
         marketable (0 = sit on the near touch, 1 = cross fully). Defaults to
         ``0.5``.
+    exit_reprice_steps : int
+        Number of reprice steps the transmitting managed buy-back walks from its
+        initial mid-seeking limit toward the touch before crossing fully. ``0``
+        posts once and never reprices. Defaults to ``2``.
+    exit_step_wait_s : float
+        Seconds the managed buy-back rests at each price step waiting for a fill
+        before repricing. Defaults to ``10.0``.
     """
 
     ib_host: str = "127.0.0.1"
@@ -284,6 +291,8 @@ class LiveConfig:
 
     order_type: str = "LMT"
     limit_cross_frac: float = 0.5
+    exit_reprice_steps: int = 2
+    exit_step_wait_s: float = 10.0
 
 
 # Canonical singletons. Domain modules import these and re-export the individual

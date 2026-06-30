@@ -30,6 +30,7 @@ from ..config import LIVE
 from ..engine.costs import CostModel
 from ..engine.pnl import LEDGER_COLUMNS, build_trade
 from ..strategy.filters import passes_term_filter_panel
+from .forward_test import FORWARD, ForwardTestConfig, StraddleQuote, build_forward_exit
 
 OPEN_COLUMNS = [
     "ticker",
@@ -324,3 +325,62 @@ def record_forward_exit(
     recon_cols = list(reconciliation_row.keys())
     _append(reconciliation_path, reconciliation_row, recon_cols)
     _close_position(position, open_path)
+
+
+def forward_exit_from_quote(
+    position: pd.Series,
+    quote: StraddleQuote,
+    *,
+    spot_exit: float,
+    iv_exit: float,
+    exit_date: pd.Timestamp,
+    t_exit: float,
+    config: ForwardTestConfig = FORWARD,
+    filled_at_limit: bool = True,
+    transmitted_fill_ps: float | None = None,
+    stop_fill_ps: float | None = None,
+    nostop_path: str | Path = FORWARD.nostop_ledger_path,
+    stop_path: str | Path = FORWARD.stop_ledger_path,
+    reconciliation_path: str | Path = FORWARD.reconciliation_path,
+    open_path: str | Path = LIVE.open_positions_path,
+) -> tuple[dict, dict, dict]:
+    """Book one forward exit from an injected quote, end to end.
+
+    The single entry point both the dry/offline path and the transmitting path go
+    through: it assembles the no-stop, stop and reconciliation rows with
+    :func:`~earnings_iv_crush.live.forward_test.build_forward_exit` and persists
+    them with :func:`record_forward_exit`. No broker or network call happens here,
+    so the whole forward-exit booking is exercisable from injected prices.
+
+    Pass ``transmitted_fill_ps`` (and the broker ``filled_at_limit`` flag) to book
+    a realised managed buy-back; leave them at the defaults for the dry-run
+    assume-fill mark.
+
+    Returns
+    -------
+    (nostop_row, stop_row, recon_row)
+        The two ledger rows and the reconciliation row that were persisted.
+    """
+    nostop_row, stop_row, recon = build_forward_exit(
+        dict(position),
+        quote,
+        spot_exit=spot_exit,
+        iv_exit=iv_exit,
+        exit_date=exit_date,
+        t_exit=t_exit,
+        config=config,
+        filled_at_limit=filled_at_limit,
+        transmitted_fill_ps=transmitted_fill_ps,
+        stop_fill_ps=stop_fill_ps,
+    )
+    record_forward_exit(
+        position,
+        nostop_row,
+        stop_row,
+        recon,
+        nostop_path=nostop_path,
+        stop_path=stop_path,
+        reconciliation_path=reconciliation_path,
+        open_path=open_path,
+    )
+    return nostop_row, stop_row, recon

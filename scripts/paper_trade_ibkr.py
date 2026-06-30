@@ -19,13 +19,16 @@ with the move and low-skew gates OFF (term-only selection). Three sub-commands:
   marketable limit (``exit_limit_cross_frac`` toward the touch, full-cross
   fallback) and run a PARALLEL hard-stop book alongside the no-stop book, logging
   both in the ledger schema plus a fill/spread reconciliation keyed to the
-  canonical break-even (see ``earnings_iv_crush.live.forward_test``).
+  canonical break-even (see ``earnings_iv_crush.live.forward_test``). By default it
+  marks on the live quote and assumes the managed limit fills; ``--transmit``
+  actually places the managed buy-back and books the realised broker fill, and
+  ``--offline`` runs the booking from an injected quote with no gateway.
 
 Safety: ``--dry-run`` is the default; transmitting requires ``--transmit``; the
 connection refuses any live-account port; the kill-switch file blocks new
-entries; and ``forward-exit`` marks on the live quote without transmitting any
-order. Intended to run daily from Windows Task Scheduler with TWS / IB Gateway
-logged into the paper account.
+entries; and ``forward-exit`` transmits an order only under ``--transmit``.
+Intended to run daily from Windows Task Scheduler with TWS / IB Gateway logged
+into the paper account.
 
 Usage
 -----
@@ -33,6 +36,10 @@ Usage
     python scripts/paper_trade_ibkr.py enter --names NVDA --announce 2026-06-22 --transmit
     python scripts/paper_trade_ibkr.py exit --dry-run
     python scripts/paper_trade_ibkr.py forward-exit
+    python scripts/paper_trade_ibkr.py forward-exit --transmit
+    python scripts/paper_trade_ibkr.py forward-exit --offline \
+        --call-bid 1.0 --call-ask 1.2 --put-bid 0.9 --put-ask 1.1 \
+        --spot-exit 101 --iv-exit 0.30
 """
 
 from __future__ import annotations
@@ -59,7 +66,7 @@ from earnings_iv_crush.engine.pnl import (
     regt_straddle_margin,
     size_contracts,
 )
-from earnings_iv_crush.live import forward_test, ib_market, ib_orders, paper_book
+from earnings_iv_crush.live import ib_market, ib_orders, paper_book
 from earnings_iv_crush.live.forward_test import FORWARD, StraddleQuote
 from earnings_iv_crush.live.ib_connection import (
     connect_paper,
@@ -350,12 +357,13 @@ def run_forward_exit(args: argparse.Namespace) -> None:
     """Mark open positions out under the managed exit, logging the no-stop and
     parallel hard-stop books plus the cost reconciliation.
 
-    Paper-only: no order is transmitted here (the books are marked on the live
-    quote). The managed exit places a marketable limit ``exit_limit_cross_frac``
-    of the way to the touch; in this dry-mark it is assumed to fill at the limit,
-    and the stop book crosses fully to the touch when the post-print-open mark has
-    breached ``stop_loss_rom`` - the conservative slippage upper bound the live
-    book then replaces with its realised gapped fill.
+    Default (no flags): marks on the live quote and assumes the managed limit
+    fills ``exit_limit_cross_frac`` of the way to the touch. ``--transmit`` instead
+    places the managed buy-back and books the realised broker fill. ``--offline``
+    runs the booking from an injected quote with no gateway. The stop book crosses
+    fully to the touch when the post-print-open mark has breached ``stop_loss_rom``
+    - the conservative slippage upper bound the live book replaces with its
+    realised gapped fill.
     """
     asof = pd.Timestamp(args.asof).normalize() if args.asof else pd.Timestamp.today().normalize()
     book = paper_book.load_open_positions()
@@ -367,21 +375,70 @@ def run_forward_exit(args: argparse.Namespace) -> None:
         print(f"No positions due to exit on {asof.date()}.")
         return
 
+    if args.offline:
+        _run_forward_exit_offline(args, asof, due)
+        return
+
+    transmit = bool(args.transmit)
     ib = connect_paper()
     print(
         f"Connected to paper IB. Forward-marking {len(due)} position(s); "
-        f"exit_limit_cross_frac={FORWARD.exit_limit_cross_frac}, stop_rom={FORWARD.stop_loss_rom}."
+        f"exit_limit_cross_frac={FORWARD.exit_limit_cross_frac}, stop_rom={FORWARD.stop_loss_rom}. "
+        f"Mode: {'TRANSMIT (managed buy-back)' if transmit else 'DRY-MARK (assume fill)'}"
     )
     try:
         for _, pos in due.iterrows():
-            _process_forward_exit(ib, pos, asof)
+            _process_forward_exit(ib, pos, asof, transmit)
     finally:
         if ib.isConnected():
             ib.disconnect()
 
 
-def _process_forward_exit(ib, pos: pd.Series, asof: pd.Timestamp) -> None:
-    """Re-snapshot one name at the post-print open and book both parallel exits."""
+def _run_forward_exit_offline(
+    args: argparse.Namespace, asof: pd.Timestamp, due: pd.DataFrame
+) -> None:
+    """Book each due position from an injected quote, with no gateway.
+
+    The four touch prices (and the post-event spot / IV) are supplied on the
+    command line, so the whole forward-exit decision and persistence path runs
+    without IB. Intended as a single-name manual test of the booking logic.
+    """
+    if None in (args.call_bid, args.call_ask, args.put_bid, args.put_ask):
+        raise SystemExit("--offline requires --call-bid/--call-ask/--put-bid/--put-ask.")
+    quote = StraddleQuote(
+        call_bid=float(args.call_bid),
+        call_ask=float(args.call_ask),
+        put_bid=float(args.put_bid),
+        put_ask=float(args.put_ask),
+    )
+    print(
+        f"Offline forward-mark of {len(due)} position(s) from injected quote "
+        f"(mid {quote.mid:.2f}, spread {quote.relative_spread:.1%}); no gateway."
+    )
+    for _, pos in due.iterrows():
+        spot_exit = (
+            float(args.spot_exit) if args.spot_exit is not None else float(pos["spot_entry"])
+        )
+        iv_exit = float(args.iv_exit) if args.iv_exit is not None else float(pos["iv_entry"])
+        t_exit = max((pd.Timestamp(pos["front_expiry"]) - asof).days / 365.0, 0.0)
+        nostop_row, stop_row, recon = paper_book.forward_exit_from_quote(
+            pos,
+            quote,
+            spot_exit=spot_exit,
+            iv_exit=iv_exit,
+            exit_date=asof,
+            t_exit=t_exit,
+        )
+        _print_forward_exit(pos["ticker"], nostop_row, stop_row, recon)
+
+
+def _process_forward_exit(ib, pos: pd.Series, asof: pd.Timestamp, transmit: bool) -> None:
+    """Re-snapshot one name at the post-print open and book both parallel exits.
+
+    With ``transmit`` set, the managed mid-seeking buy-back is actually placed and
+    the realised broker fill (price and ``filled_at_limit`` flag) is booked;
+    otherwise the managed limit is assumed to fill at its posted price.
+    """
     ticker = pos["ticker"]
     try:
         underlying = ib_market.qualify_underlying(ib, ticker)
@@ -398,23 +455,44 @@ def _process_forward_exit(ib, pos: pd.Series, asof: pd.Timestamp) -> None:
     iv_exit = atm_iv(chain, front, nearest_strike(chain, front, underlying.spot))
     t_exit = max((front - asof).days / 365.0, 0.0)
 
-    nostop_row, stop_row, recon = forward_test.build_forward_exit(
-        pos.to_dict(),
+    filled_at_limit = True
+    transmitted_fill_ps: float | None = None
+    if transmit:
+        legs = ib_orders.build_straddle_legs(ib, underlying, chain, front)
+        fill = ib_orders.place_managed_buyback(
+            ib,
+            legs.call,
+            legs.put,
+            int(pos["contracts"]),
+            quote,
+            transmit=True,
+            cross_frac=FORWARD.exit_limit_cross_frac,
+        )
+        transmitted_fill_ps = fill.fill_price_ps
+        filled_at_limit = fill.filled_at_limit
+        print(
+            f"    {ticker}: managed buy-back filled {transmitted_fill_ps:.2f}/sh "
+            f"({'at limit' if filled_at_limit else 'crossed to touch'})."
+        )
+
+    nostop_row, stop_row, recon = paper_book.forward_exit_from_quote(
+        pos,
         quote,
         spot_exit=float(underlying.spot),
         iv_exit=float(iv_exit) if iv_exit == iv_exit else float("nan"),
         exit_date=asof,
         t_exit=t_exit,
-    )
-    paper_book.record_forward_exit(
-        pos,
-        nostop_row,
-        stop_row,
-        recon,
+        filled_at_limit=filled_at_limit,
+        transmitted_fill_ps=transmitted_fill_ps,
         nostop_path=FORWARD.nostop_ledger_path,
         stop_path=FORWARD.stop_ledger_path,
         reconciliation_path=FORWARD.reconciliation_path,
     )
+    _print_forward_exit(ticker, nostop_row, stop_row, recon)
+
+
+def _print_forward_exit(ticker: str, nostop_row: dict, stop_row: dict, recon: dict) -> None:
+    """One-line summary of a booked forward exit."""
     flag = "STOP-HIT" if recon["stop_was_triggered"] else "held"
     print(
         f"  {ticker}: no-stop P&L ${nostop_row['pnl']:,.0f} "
@@ -455,6 +533,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="managed mid-seeking exit + parallel hard-stop book, with cost reconciliation",
     )
     fex.add_argument("--asof", default=None, help="exit date YYYY-MM-DD (default today)")
+    fex.add_argument(
+        "--transmit", action="store_true", help="place the managed buy-back and book the real fill"
+    )
+    fex.add_argument(
+        "--offline", action="store_true", help="book from an injected quote, no gateway"
+    )
+    fex.add_argument("--call-bid", type=float, default=None, help="offline: ATM call bid")
+    fex.add_argument("--call-ask", type=float, default=None, help="offline: ATM call ask")
+    fex.add_argument("--put-bid", type=float, default=None, help="offline: ATM put bid")
+    fex.add_argument("--put-ask", type=float, default=None, help="offline: ATM put ask")
+    fex.add_argument("--spot-exit", type=float, default=None, help="offline: post-event spot")
+    fex.add_argument("--iv-exit", type=float, default=None, help="offline: post-event ATM IV")
     fex.set_defaults(func=run_forward_exit)
     return p
 
