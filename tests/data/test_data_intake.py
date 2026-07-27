@@ -35,12 +35,15 @@ def test_facade_reexports_working_adapters():
 def test_all_lists_the_public_surface():
     expected = {
         "fetch_earnings_calendar",
+        "fetch_earnings_calendar_wrds",
         "fetch_equity_ohlcv",
+        "fetch_equity_ohlcv_crsp",
         "fetch_index_vol",
         "fetch_option_chain",
         "fetch_historical_option_chain",
         "fetch_dolthub_option_chain",
         "fetch_databento_option_chain",
+        "fetch_lse_option_chain",
         "fetch_historical_equity_ohlcv",
         "fetch_analyst_dispersion",
     }

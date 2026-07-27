@@ -67,7 +67,8 @@ def filter_chain(
     bid = pd.to_numeric(df["bid"], errors="coerce")
     ask = pd.to_numeric(df["ask"], errors="coerce")
     mid = (bid + ask) / 2
-    oi = pd.to_numeric(df.get("open_interest"), errors="coerce")
+    oi_raw = df["open_interest"] if "open_interest" in df else pd.Series(index=df.index)
+    oi = pd.to_numeric(oi_raw, errors="coerce")
     strike = pd.to_numeric(df["strike"], errors="coerce")
 
     bad_price = ~(mid > 0)
@@ -121,7 +122,7 @@ def exclusion_table(events: pd.DataFrame) -> pd.DataFrame:
     """
     if events is None or events.empty:
         return pd.DataFrame(columns=["reason", "n"])
-    reasons = events.apply(event_quality, axis=1).fillna("ok")
+    reasons = events.apply(event_quality, axis=1).fillna("ok")  # type: ignore[call-overload]
     if "cohort" in events.columns:
         out = (
             pd.DataFrame({"reason": reasons, "cohort": events["cohort"]})

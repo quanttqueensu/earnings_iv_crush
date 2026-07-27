@@ -162,7 +162,8 @@ def build_event_dataset(
             chain, spot, announce, asof, prices, r=r, rv_window=rv_window
         )
         row = {"ticker": ticker, "announce_date": announce, **feats}
-        row["prior_surprise"] = float(prior.loc[idx]) if pd.notna(prior.loc[idx]) else float("nan")
+        prior_val = prior.loc[idx]  # type: ignore[call-overload]
+        row["prior_surprise"] = float(prior_val) if pd.notna(prior_val) else float("nan")
         row["eps_dispersion"] = dispersion.get(ticker, float("nan"))
         row["oi_growth"] = (
             features.oi_snapshot_proxy(chain, prices) if use_oi_proxy else float("nan")

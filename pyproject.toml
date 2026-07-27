@@ -13,6 +13,7 @@ keywords = ["quant", "options", "volatility", "earnings", "backtest"]
 dependencies = [
     "numpy>=1.26",
     "pandas>=2.0",
+    "pyarrow>=14.0",
     "scipy>=1.11",
     "statsmodels>=0.14",
     "scikit-learn>=1.3",
@@ -21,6 +22,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "yfinance>=0.2",
     "databento>=0.80",
+    "lse-data>=0.14",
     "ib_async>=2.0",
 ]
 

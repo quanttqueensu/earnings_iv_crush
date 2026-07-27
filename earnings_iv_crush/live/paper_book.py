@@ -189,6 +189,12 @@ def passes_term_gate(
     Thin wrapper over ``filters.passes_term_filter_panel`` so the live gate is
     byte-for-byte the backtest gate. Returns ``False`` when the panel lacks
     enough trailing history for the name.
+
+    Definitional caveat: the panel distribution is built from NEAREST-expiry
+    spreads. Pass a spread measured with the same nearest-expiry rule here; a
+    spread measured on the executed (exit-surviving) expiry runs systematically
+    above the panel and inflates the live pass rate (see
+    ``filters.passes_term_filter_panel``).
     """
     panel = _read(panel_path, ["ticker", "date", "iv_term_spread"])
     if panel.empty:
@@ -384,3 +390,60 @@ def forward_exit_from_quote(
         open_path=open_path,
     )
     return nostop_row, stop_row, recon
+
+
+# ── entry-pass heartbeat ─────────────────────────────────────────────────────
+
+HEARTBEAT_COLUMNS = ["asof", "n_candidates", "n_priced", "n_gated", "n_entered"]
+
+
+def record_heartbeat(
+    asof: pd.Timestamp,
+    n_candidates: int,
+    n_priced: int,
+    n_gated: int,
+    n_entered: int,
+    path: str | Path = LIVE.heartbeat_path,
+) -> None:
+    """Record what one entry pass actually saw, so silence can be diagnosed.
+
+    The forward harness spent six weeks reporting "book is empty" while every
+    candidate was being dropped on a market-data entitlement error. That message
+    is also what a healthy harness prints between earnings seasons, so the report
+    had no way to tell waiting from broken. These four counts separate them:
+    ``n_candidates`` positive with ``n_priced`` zero is a data or connection
+    fault, whereas both zero is simply a day with no scheduled announcements.
+
+    Parameters
+    ----------
+    asof : pandas.Timestamp
+        Session the pass ran for.
+    n_candidates : int
+        Names whose announcement fell on the entry target date, after the
+        validated-universe filter.
+    n_priced : int
+        Candidates for which a usable spot and chain were obtained.
+    n_gated : int
+        Priced candidates that passed the term gate.
+    n_entered : int
+        Gated candidates actually opened (differs from ``n_gated`` under dry-run,
+        the kill switch, or a sizing floor of zero contracts).
+    path : str or pathlib.Path, optional
+        Heartbeat store. Defaults to ``LiveConfig.heartbeat_path``.
+    """
+    _append(
+        path,
+        {
+            "asof": pd.Timestamp(asof).normalize(),
+            "n_candidates": int(n_candidates),
+            "n_priced": int(n_priced),
+            "n_gated": int(n_gated),
+            "n_entered": int(n_entered),
+        },
+        HEARTBEAT_COLUMNS,
+    )
+
+
+def load_heartbeat(path: str | Path = LIVE.heartbeat_path) -> pd.DataFrame:
+    """Return the entry-pass heartbeat log, empty-framed when absent."""
+    return _read(path, HEARTBEAT_COLUMNS)

@@ -25,9 +25,10 @@ From the project root::
 
 Outputs
 -------
-A tearsheet and metrics CSV under ``outputs/research/``. Real-mode event and
-panel caches make subsequent runs instant. Runtime: seconds (synthetic) /
-minutes (real, network-bound).
+A tearsheet and metrics CSV under ``outputs/research/real/`` or
+``outputs/research/synthetic/`` (per mode, so one never clobbers the other).
+Real-mode event and panel caches make subsequent runs instant. Runtime:
+seconds (synthetic) / minutes (real, network-bound).
 """
 
 from __future__ import annotations
@@ -44,9 +45,8 @@ warnings.filterwarnings("ignore")
 
 from earnings_iv_crush.baseline.agent0 import run_agent0  # noqa: E402
 from earnings_iv_crush.config import GLOBAL, STRATEGY  # noqa: E402
+from earnings_iv_crush.data import providers  # noqa: E402
 from earnings_iv_crush.data.chain_cache import cached_chain_fetcher  # noqa: E402
-from earnings_iv_crush.data.data_intake import fetch_historical_equity_ohlcv  # noqa: E402
-from earnings_iv_crush.data.earnings import fetch_earnings_dates  # noqa: E402
 from earnings_iv_crush.data.quality import exclusion_table  # noqa: E402
 from earnings_iv_crush.data.real_events import build_execution_events  # noqa: E402
 from earnings_iv_crush.data.term_panel import build_term_panel  # noqa: E402
@@ -62,6 +62,7 @@ from earnings_iv_crush.engine.simulate import simulate_events  # noqa: E402
 from earnings_iv_crush.strategy.fair_move_model import FairMoveModel  # noqa: E402
 from earnings_iv_crush.strategy.filters import (  # noqa: E402
     IMPLIED_FAIR_RATIO,
+    TERM_SPREAD_PCTL,
     TRAILING_WINDOW,
     passes_move_filter,
     passes_term_filter,
@@ -73,30 +74,8 @@ from earnings_iv_crush.strategy.strategy import run_strategy  # noqa: E402
 
 OUTPUT_DIR = Path(__file__).resolve().parents[1] / "outputs" / "research"
 
-# Liquid large-caps with dense Alpaca option history since 2024 - the default
-# --real universe. Override with --tickers.
-DEFAULT_UNIVERSE = [
-    "AAPL",
-    "MSFT",
-    "NVDA",
-    "AMZN",
-    "META",
-    "GOOGL",
-    "TSLA",
-    "AMD",
-    "NFLX",
-    "JPM",
-    "BAC",
-    "XOM",
-    "WMT",
-    "DIS",
-    "INTC",
-    "CRM",
-    "QCOM",
-    "MU",
-]
-# Alpaca free option history starts ~Feb 2024; default to the full config window.
-DEFAULT_START = GLOBAL.start_date
+# Per-market universes and coverage start now live in data/providers.py; the
+# default window end stays the config value.
 DEFAULT_END = GLOBAL.end_date
 N_FILTER_TRIALS = 20  # filter-threshold grid points effectively tried
 # Per-period (daily) Sharpe dispersion across those trials. A daily Sharpe of
@@ -145,7 +124,52 @@ def _load_frame(path: Path):
     return None
 
 
-def _cache_only_chain_fetcher(variant: str = "entry"):
+def _provenance_path(path: Path) -> Path:
+    return path.with_suffix(path.suffix + ".provenance.json")
+
+
+def _write_provenance(path: Path, stamp: dict) -> None:
+    """Record the config that produced a cache file next to it."""
+    import json
+
+    _provenance_path(path).write_text(json.dumps(stamp, indent=2, default=str))
+
+
+def _check_provenance(path: Path, stamp: dict, allow_stale: bool) -> None:
+    """Refuse a cache produced under a different config unless overridden.
+
+    A cache file loaded purely on existence silently mixes stale events or
+    panel rows into a run whose --start/--end/--universe/--min-exit-dte or
+    chain source has changed. Every mismatch is printed; without
+    ``--allow-stale-cache`` a mismatch is fatal.
+    """
+    import json
+
+    prov = _provenance_path(path)
+    if not prov.exists():
+        print(
+            f"WARNING: {path.name} has no provenance stamp (predates cache "
+            "provenance); cannot verify it matches the current config. "
+            "Rebuild the cache (delete the file) to clear this warning."
+        )
+        return
+    recorded = json.loads(prov.read_text())
+    mismatches = {
+        k: (recorded.get(k), v) for k, v in stamp.items() if str(recorded.get(k)) != str(v)
+    }
+    if not mismatches:
+        return
+    for k, (old, new) in mismatches.items():
+        print(f"CACHE MISMATCH {path.name}: {k} was {old!r}, run wants {new!r}")
+    if not allow_stale:
+        raise SystemExit(
+            f"{path} was built under a different config (see mismatches above). "
+            "Rebuild it (delete the file) or pass --allow-stale-cache to force."
+        )
+    print("--allow-stale-cache: proceeding with the mismatched cache anyway.")
+
+
+def _cache_only_chain_fetcher(variant: str = "entry", source: str = "alpaca"):
     """A ``fetch_chain(ticker, asof)`` that reads the disk cache and never the API.
 
     Returns the cached snapshot when present, else an empty frame (so the event
@@ -157,7 +181,7 @@ def _cache_only_chain_fetcher(variant: str = "entry"):
     from earnings_iv_crush.data.options import CHAIN_COLUMNS
 
     def fetch_chain(ticker: str, asof: str) -> pd.DataFrame:
-        key = chain_key(ticker, asof, variant)
+        key = chain_key(ticker, asof, variant, source)
         if cache.has_frame(key):
             df = cache.read_frame(key)
             if not df.empty:
@@ -176,11 +200,33 @@ def _load_real_events(args) -> pd.DataFrame:
     is given and the file exists, events are loaded from it (skipping the slow
     network assembly); otherwise they are assembled and saved there.
     """
+    stamp = {
+        "kind": "events",
+        "start": args.start,
+        "end": args.end,
+        "universe": args.universe,
+        "tickers": None if args.universe else sorted(set(args.tickers)),
+        "min_exit_dte": args.min_exit_dte,
+        "market": args.market,
+        "chain_source": args.mkt.chain_source,
+        # Without these two a quote-marked events cache and a close-marked one are
+        # indistinguishable to the staleness check, so the wrong book could be served
+        # silently under an identical start/end/universe key.
+        "option_source": GLOBAL.option_source,
+        "mark_basis": GLOBAL.mark_basis,
+    }
     cache = Path(args.cache) if args.cache else None
     if cache:
         cached = _load_frame(cache)
         if cached is not None:
+            _check_provenance(cache, stamp, args.allow_stale_cache)
             print(f"Loaded {len(cached)} cached real events from {cache}")
+            if "iv_term_spread_nearest" not in cached.columns:
+                print(
+                    "WARNING: events cache predates the nearest-expiry term statistic; "
+                    "the panel gate will fall back to the executed-expiry spread, which "
+                    "runs high against the panel distribution. Rebuild the events cache."
+                )
             return cached
 
     if args.universe:
@@ -197,16 +243,31 @@ def _load_real_events(args) -> pd.DataFrame:
         # an early read can run against a partially-warm cache without cold
         # fetches (events with any uncached chain are skipped). Used while a
         # parallel scripts/fetch_chains.py warm is still in flight.
+        mkt = args.mkt
         entry_fetch = (
-            _cache_only_chain_fetcher("entry") if args.cache_only else cached_chain_fetcher("entry")
+            _cache_only_chain_fetcher("entry", source=mkt.chain_source)
+            if args.cache_only
+            else cached_chain_fetcher(
+                "entry",
+                source=mkt.chain_source,
+                fetch=mkt.fetch_chain,
+                refresh_empty=args.refresh_empty_chains,
+            )
         )
         events = build_execution_events(
             cal,
             fetch_chain=entry_fetch,
-            fetch_prices=fetch_historical_equity_ohlcv,  # Alpaca bars: fast, keyed
+            fetch_prices=mkt.fetch_prices,
             min_exit_dte_days=args.min_exit_dte,
             progress=True,
         )
+        n_empty = getattr(entry_fetch, "empty_served", 0)
+        if n_empty:
+            print(
+                f"NOTE: {n_empty} chain request(s) were served a cached EMPTY sentinel; "
+                "if any were written during a provider outage they are silent data loss. "
+                "Re-run once with --refresh-empty-chains to refetch them."
+            )
         if args.cache_only and len(events):
             # A cold (uncached) exit chain makes the assembler fall back to
             # iv_exit = iv_entry (no crush). Drop those so the early read is not
@@ -225,16 +286,19 @@ def _load_real_events(args) -> pd.DataFrame:
             print("\nEvent exclusion table (pre-filter data quality):")
             print(excl.to_string(index=False))
     else:
-        cal = fetch_earnings_dates(args.tickers, args.start, args.end)
+        mkt = args.mkt
+        cal = mkt.fetch_earnings(args.tickers, args.start, args.end)
         if cal is None or cal.empty:
             raise SystemExit(
                 f"No historical earnings dates for {sorted(set(args.tickers))} "
                 f"in [{args.start}, {args.end}]."
             )
         print(f"Earnings events in window: {len(cal)}  (assembling entry+exit chains)…")
+        entry_fetch = cached_chain_fetcher("entry", source=mkt.chain_source, fetch=mkt.fetch_chain)
         events = build_execution_events(
             cal,
-            fetch_prices=fetch_historical_equity_ohlcv,  # Alpaca bars: fast, keyed
+            fetch_chain=entry_fetch,
+            fetch_prices=mkt.fetch_prices,
             min_exit_dte_days=args.min_exit_dte,
             progress=True,
         )
@@ -257,29 +321,51 @@ def _load_real_events(args) -> pd.DataFrame:
         )
     if cache:
         written = _save_frame(events, cache)
+        _write_provenance(written, stamp)
         print(f"Cached {len(events)} real events to {written}")
     return events
 
 
 def _load_term_panel(args, events):
     """Build (or load) the per-name daily term-spread panel for the events."""
+    stamp = {
+        "kind": "term_panel",
+        "start": args.start,
+        "end": args.end,
+        "universe": args.universe,
+        "window_days": TRAILING_WINDOW,
+        "market": args.market,
+        "chain_source": args.mkt.chain_source,
+    }
     cache = Path(args.term_panel_cache) if args.term_panel_cache else None
     if cache:
         cached = _load_frame(cache)
         if cached is not None:
+            _check_provenance(cache, stamp, args.allow_stale_cache)
             print(f"Loaded term-spread panel ({len(cached)} daily rows) from {cache}")
             return cached
     print(
         f"Building per-name daily term-spread panel for {events['ticker'].nunique()} "
         f"names x trailing {TRAILING_WINDOW} days (network-bound)…"
     )
-    fetch_chain = cached_chain_fetcher("panel") if args.universe else None
+    mkt = args.mkt
+    fetch_chain = cached_chain_fetcher(
+        "panel",
+        source=mkt.chain_source,
+        fetch=mkt.fetch_chain,
+        refresh_empty=args.refresh_empty_chains,
+    )
     panel = build_term_panel(
-        events, fetch_chain=fetch_chain, window_days=TRAILING_WINDOW, progress=True
+        events,
+        fetch_chain=fetch_chain,
+        fetch_prices=mkt.fetch_prices,
+        window_days=TRAILING_WINDOW,
+        progress=True,
     )
     print(f"Term-spread panel: {len(panel)} daily rows.")
     if cache and not panel.empty:
         written = _save_frame(panel, cache)
+        _write_provenance(written, stamp)
         print(f"Cached term-spread panel to {written}")
     return panel
 
@@ -288,8 +374,9 @@ def _filter_funnel(events, model, term_panel=None) -> None:
     """Print how many events clear each gate - diagnoses an empty selection."""
     fair = pd.Series(list(model.predict(events)), index=events.index)
     move_ok = passes_move_filter(events["implied_move"], fair).fillna(False)
+    gate_stats: dict = {}
     if term_panel is not None:
-        term_ok = passes_term_filter_panel(events, term_panel).fillna(False)
+        term_ok = passes_term_filter_panel(events, term_panel, stats_out=gate_stats).fillna(False)
         gate_desc = "per-name trailing 30-day"
     else:
         term_ok = passes_term_filter(events).fillna(False)
@@ -298,7 +385,14 @@ def _filter_funnel(events, model, term_panel=None) -> None:
     print(f"\nFilter funnel (term gate: {gate_desc}):")
     print(f"  events                              {len(events)}")
     print(f"  pass move gate (>= {IMPLIED_FAIR_RATIO}x fair move)   {int(move_ok.sum())}")
-    print(f"  pass term gate (> trailing 75th pct) {int(term_ok.sum())}")
+    print(f"  pass term gate (> trailing {TERM_SPREAD_PCTL:.0%} pctl) {int(term_ok.sum())}")
+    if gate_stats:
+        print(
+            f"    term-gate attrition: no panel history {gate_stats['no_panel_history']}, "
+            f"window < {STRATEGY.term_min_periods} obs {gate_stats['below_min_periods']}, "
+            f"no event statistic {gate_stats['no_event_stat']}, "
+            f"below threshold {gate_stats['below_threshold']}"
+        )
     print(f"  pass BOTH (traded)                  {int(both.sum())}")
     if term_panel is None and int(term_ok.sum()) == 0 and len(events) <= TRAILING_WINDOW:
         print(
@@ -313,9 +407,33 @@ def main() -> None:
     ap.add_argument(
         "--real", action="store_true", help="Use real Alpaca surfaces instead of synthetic events."
     )
-    ap.add_argument("--start", default=DEFAULT_START)
+    ap.add_argument(
+        "--market",
+        choices=["us", "india", "brazil"],
+        default=GLOBAL.market,
+        help="Market bundle (calendar/spot/chain). 'india' routes to the free "
+        "NSE UDiFF F&O bhavcopy, 'brazil' to the free B3 COTAHIST file; see "
+        "data/providers.py.",
+    )
+    ap.add_argument(
+        "--chain-source",
+        choices=["alpaca", "dolthub", "nse", "b3"],
+        default=GLOBAL.chain_source,
+        help="Override the market's default chain provider. None keeps the "
+        "market default (us -> dolthub, india -> nse, brazil -> b3).",
+    )
+    ap.add_argument(
+        "--start",
+        default=None,
+        help="Start date (YYYY-MM-DD); defaults to the market's coverage start.",
+    )
     ap.add_argument("--end", default=DEFAULT_END)
-    ap.add_argument("--tickers", nargs="+", default=DEFAULT_UNIVERSE)
+    ap.add_argument(
+        "--tickers",
+        nargs="+",
+        default=None,
+        help="Ticker set; defaults to the market's universe.",
+    )
     ap.add_argument(
         "--universe",
         choices=["megacap", "broad"],
@@ -346,9 +464,24 @@ def main() -> None:
     ap.add_argument(
         "--term-gate",
         choices=["events", "panel"],
-        default="events",
-        help="Term filter: 'panel' = per-name trailing 30-day "
-        "percentile (real mode); 'events' = legacy rolling.",
+        default="panel",
+        help="Term filter: 'panel' = per-name trailing 30-day percentile "
+        "(default; the point-in-time gate used for every reported figure); "
+        "'events' = legacy rolling form, kept for the synthetic path only — "
+        "its rolling window includes the current row, so it is in-sample "
+        "contaminated on real data.",
+    )
+    ap.add_argument(
+        "--refresh-empty-chains",
+        action="store_true",
+        help="Refetch chain snapshots whose cache entry is an empty sentinel "
+        "(heals entries written during a transient provider outage).",
+    )
+    ap.add_argument(
+        "--allow-stale-cache",
+        action="store_true",
+        help="Proceed even when a cached events/panel file was built under a "
+        "different config (default: refuse, listing every mismatch).",
     )
     ap.add_argument(
         "--term-panel-cache",
@@ -362,6 +495,14 @@ def main() -> None:
         "uncached chain are skipped. For an early read against a partial cache.",
     )
     args = ap.parse_args()
+    # Resolve the market bundle and fill market-defaulted args (start/universe).
+    args.mkt = providers.resolve(args.market, args.chain_source)
+    if args.start is None:
+        args.start = args.mkt.default_start
+    if args.tickers is None:
+        args.tickers = (
+            providers.india_full_universe() if args.market == "india" else args.mkt.universe
+        )
     if args.holding_days is not None:
         print(
             "NOTE: --holding-days is deprecated and ignored; exit timing is now "
@@ -402,7 +543,9 @@ def main() -> None:
         "n_trades",
         "total_return",
         "hit_rate",
+        "per_trade_sharpe",
         "sharpe",
+        "periods_per_year",
         "sortino",
         "profit_factor",
         "win_loss_ratio",
@@ -426,12 +569,14 @@ def main() -> None:
         seed=1,
     )
     _show(
-        "Filter significance — daily-Sharpe (zero-fills flat days; frequency-confounded)",
+        "Filter significance — daily-Sharpe, annualised at the book's own cadence "
+        "(zero-fills flat days; frequency-confounded)",
         cmp,
         (
             "sharpe_strategy",
             "sharpe_agent0",
             "sharpe_delta",
+            "periods_per_year",
             "sharpe_delta_ci_low",
             "sharpe_delta_ci_high",
             "spread_tstat",
@@ -487,12 +632,15 @@ def main() -> None:
     for k, v in attrib.items():
         print(f"  {k:12s} {v:,.0f}")
 
+    # Synthetic and real runs write to separate directories so a synthetic
+    # smoke run can never silently overwrite the real tearsheet/metrics.
+    tearsheet_dir = OUTPUT_DIR / ("real" if args.real else "synthetic")
     png = build_tearsheet(
         net_strat_ledger,
         net_agent0_ledger,
         cmp,
         account=net_strat["final_equity"] - net_strat["total_pnl"],
-        outdir=OUTPUT_DIR,
+        outdir=tearsheet_dir,
         structure_counts=structure_counts,
     )
 

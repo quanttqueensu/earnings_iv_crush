@@ -26,6 +26,7 @@ import pandas as pd
 
 from ..config import GLOBAL
 from ..engine.greeks import bs_delta
+from ..engine.quotes import add_quote_columns
 
 # Sourced from the central config (see ``earnings_iv_crush/config.py``).
 TRADING_DAYS = GLOBAL.trading_days_per_year
@@ -54,16 +55,15 @@ FEATURE_KEYS = [
 
 
 def _with_mid(chain: pd.DataFrame) -> pd.DataFrame:
-    """Return a copy of the chain with a ``mid`` column from bid/ask.
+    """Return a copy of the chain with ``mid``, ``spread`` and ``rel_spread`` attached.
 
-    Falls back to whichever side is present when one is missing.
+    Delegates to ``engine.quotes.add_quote_columns`` so every consumer in the project
+    derives the mid the same way; the arithmetic is unchanged (falls back to whichever
+    side is present when one is missing), but the quoted width now travels with it,
+    which is what the cost layer needs once the marks are quote-based rather than
+    trade-based.
     """
-    out = chain.copy()
-    bid = pd.to_numeric(out["bid"], errors="coerce")
-    ask = pd.to_numeric(out["ask"], errors="coerce")
-    mid = (bid + ask) / 2
-    out["mid"] = mid.where(mid.notna(), ask.fillna(bid))
-    return out
+    return add_quote_columns(chain)
 
 
 def atm_strike(chain: pd.DataFrame, spot: float) -> float:
@@ -138,6 +138,7 @@ def nearest_expiries(
         return None, None
     front = pd.Timestamp(after[0])
     later = exps[exps >= front + pd.Timedelta(days=back_gap_days)]
+    back: pd.Timestamp | None
     if later.size:
         back = pd.Timestamp(later[0])
     else:
@@ -199,6 +200,7 @@ def select_execution_expiry(
         return None, None
     front = pd.Timestamp(eligible[0])
     later = exps[exps >= front + pd.Timedelta(days=back_gap_days)]
+    back: pd.Timestamp | None
     if later.size:
         back = pd.Timestamp(later[0])
     else:
@@ -241,7 +243,7 @@ def realised_vol(
 ) -> float:
     """Annualised trailing realised vol from close-to-close log returns."""
     close = pd.to_numeric(price_history["close"], errors="coerce").dropna()
-    rets = np.log(close / close.shift(1)).dropna()
+    rets = pd.Series(np.log(close / close.shift(1))).dropna()
     if rets.size >= window:
         rets = rets.iloc[-window:]
     if rets.size < 2:

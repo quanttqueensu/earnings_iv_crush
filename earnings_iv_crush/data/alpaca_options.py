@@ -211,11 +211,14 @@ def _daily_close(symbols: list[str], asof: str, lookback_days: int = 5) -> dict[
     for i in range(0, len(symbols), _BAR_CHUNK):
         bars_map = _bars_batch(symbols[i : i + _BAR_CHUNK], start, end)
         for sym, bars in bars_map.items():
-            usable = [
-                b
-                for b in bars
-                if pd.Timestamp(b["t"]).tz_localize(None) <= asof_ts + pd.Timedelta(days=1)
-            ]
+            usable = sorted(
+                (
+                    b
+                    for b in bars
+                    if pd.Timestamp(b["t"]).tz_localize(None) <= asof_ts + pd.Timedelta(days=1)
+                ),
+                key=lambda b: pd.Timestamp(b["t"]),
+            )
             if usable:
                 out[sym] = float(usable[-1]["c"])
     return out
@@ -247,6 +250,7 @@ def _underlying_close(ticker: str, asof: str, lookback_days: int = 7) -> float:
     bars = (body.get("bars") or {}).get(ticker) or []
     if not bars:
         return float("nan")
+    bars = sorted(bars, key=lambda b: pd.Timestamp(b["t"]))
     return float(bars[-1]["c"])
 
 
@@ -362,16 +366,18 @@ def fetch_option_chain(
     asof_ts = pd.Timestamp(asof)
     rows = []
     for c in contracts.itertuples(index=False):
-        price = closes.get(c.symbol)
+        price = closes.get(str(c.symbol))
         if price is None or price <= 0:
             continue
-        t = (c.expiry - asof_ts).days / 365.0
-        iv = implied_vol(price, spot, c.strike, t, r, c.right)
+        expiry = pd.Timestamp(c.expiry)  # type: ignore[arg-type]
+        strike, right = float(c.strike), str(c.right)  # type: ignore[arg-type]
+        t = (expiry - asof_ts).days / 365.0
+        iv = implied_vol(price, spot, strike, t, r, right)
         rows.append(
             {
-                "expiry": c.expiry,
-                "strike": c.strike,
-                "right": c.right,
+                "expiry": expiry,
+                "strike": strike,
+                "right": right,
                 "bid": price,
                 "ask": price,
                 "iv": iv,

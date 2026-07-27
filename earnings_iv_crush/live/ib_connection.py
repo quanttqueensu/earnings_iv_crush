@@ -71,12 +71,19 @@ def connect_paper(
     *,
     live_ports: tuple[int, ...] = LIVE.ib_live_ports,
     timeout: float = 8.0,
+    market_data_type: int = LIVE.ib_market_data_type,
 ) -> IB:
     """Connect to TWS / IB Gateway on a **paper** port and return the ``IB`` handle.
 
     Refuses to connect to any port in ``live_ports`` (the paper-port guard).
     ``readonly=False`` is set so orders can be transmitted; the caller still
     decides per-order whether to actually transmit.
+
+    The market-data mode is requested on the session rather than per call, because
+    an unsubscribed paper account answers real-time requests with NaN on every
+    field. That failure is silent at the tick level and surfaces only as "no
+    usable price", so the whole candidate list is skipped and the book never
+    accrues a trade.
 
     Parameters
     ----------
@@ -90,6 +97,9 @@ def connect_paper(
         Ports treated as live accounts and therefore refused.
     timeout : float, optional
         Connection timeout in seconds. Defaults to ``8.0``.
+    market_data_type : int, optional
+        IB market-data mode (1 live, 2 frozen, 3 delayed, 4 delayed-frozen).
+        Defaults to ``LiveConfig.ib_market_data_type``.
 
     Returns
     -------
@@ -110,6 +120,7 @@ def connect_paper(
     ib_async = _require_ib()
     ib = ib_async.IB()
     ib.connect(host, port, clientId=client_id, readonly=False, timeout=timeout)
+    ib.reqMarketDataType(market_data_type)
     return ib
 
 

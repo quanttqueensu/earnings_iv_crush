@@ -32,7 +32,12 @@ import numpy as np
 import pandas as pd
 
 from ..config import GLOBAL
+from . import stats
 
+# 252 is the correct base HERE because every series in this module is laid onto
+# a full trading calendar with zero-filled flat days (see ``ledger_daily_pnl``);
+# it is NOT correct for sparse exit-date series, which must use
+# ``stats.infer_periods_per_year`` (see ``backtester``).
 ANN = GLOBAL.trading_days_per_year
 
 
@@ -189,7 +194,7 @@ def risk_metrics(
     total = float(equity.iloc[-1] / equity.iloc[0] - 1.0)
     cagr = float((equity.iloc[-1] / equity.iloc[0]) ** (1 / years) - 1.0) if years > 0 else np.nan
     vol = float(sd * np.sqrt(ann))
-    sharpe = float(returns.mean() / sd * np.sqrt(ann)) if sd > 0 else np.nan
+    sharpe = float(stats.sharpe(returns, ann)) if sd > 0 else np.nan
     max_dd = float(drawdown(equity).min())
 
     beta = corr = np.nan

@@ -158,7 +158,12 @@ def build_trade(
             "slippage_cost": breakdown.slippage_cost,
             "total_cost": breakdown.total_cost,
         }
-    total_deducted = commissions + sum(extra.get(c, 0.0) for c in COST_COLUMNS[:-1])
+    # Sum the component costs by NAME, excluding the total_cost aggregate;
+    # slicing COST_COLUMNS by position would silently double-count if the
+    # column order ever changed.
+    total_deducted = commissions + sum(
+        v for c, v in extra.items() if c in COST_COLUMNS and c != "total_cost"
+    )
     pnl = entry_credit - exit_value - total_deducted
 
     row = {
@@ -215,12 +220,14 @@ def build_ledger(
     carries ``COST_COLUMNS`` and every ``pnl`` is net of spread and slippage.
     """
     rows = []
+    n_zero_size = 0
     for _, e in events.iterrows():
         iv_entry = float(e["iv_entry"] if "iv_entry" in e else e["front_atm_iv"])
         spot, strike, t_entry = float(e["spot_entry"]), float(e["strike"]), float(e["t_entry"])
         credit_ps = _straddle_value(spot, strike, t_entry, r, iv_entry)
         contracts = size_contracts(account, spot, strike, credit_ps, fraction)
         if contracts <= 0:
+            n_zero_size += 1
             continue
         rows.append(
             build_trade(
@@ -238,6 +245,11 @@ def build_ledger(
                 r=r,
                 costs=costs,
             )
+        )
+    if n_zero_size:
+        print(
+            f"build_ledger: {n_zero_size} of {len(events)} event(s) sized to zero contracts "
+            "and were dropped (margin fraction too small for the name's notional)."
         )
     columns = LEDGER_COLUMNS + (COST_COLUMNS if costs is not None else [])
     return pd.DataFrame(rows, columns=columns)

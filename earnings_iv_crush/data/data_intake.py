@@ -6,10 +6,12 @@ Provider choices follow a free-first stack. Each public function delegates to a
 provider module so swapping a provider is a
 one-line change here. Provider modules:
     vix.py        -> FRED VIX (no key)
-    equities.py   -> yfinance OHLCV (no key)
+    equities.py   -> yfinance OHLCV (no key); CRSP dsf via the WRDS mirror (no key)
     options.py    -> yfinance option chains (no key, current snapshot)
     sec_edgar.py  -> SEC EDGAR filings (no key, needs SEC_USER_AGENT)
-    earnings.py   -> Finnhub earnings calendar (needs FINNHUB_API_KEY)
+    earnings.py   -> Finnhub earnings calendar (needs FINNHUB_API_KEY); WRDS
+                     Compustat rdq + IBES session via the mirror (no key)
+    wrds_r2.py    -> read-only WRDS parquet mirror on Cloudflare R2 (needs R2_* in .env)
 
 fetch_option_chain is the keyless yfinance fallback (current snapshot only), used
 for live/development work. fetch_historical_option_chain is the Alpaca-backed
@@ -26,6 +28,10 @@ DATABENTO_API_KEY) backed by OPRA daily bars and definitions to 2013, with the
 full weekly/monthly expiry ladder. It is the one to inject as `fetch_chain` for
 the pre-2024 out-of-sample backtest; it marks off the daily close with locally
 inverted IV (no NBBO pre-2023) and no open interest (see databento_options).
+
+fetch_lse_option_chain is the free historical provider backed by London
+Strategic Edge daily option bars (back to 2014, 3100+ underlyings). Like
+Databento, it uses close-as-bid/ask with locally inverted IV. See lse_options.
 
 fetch_analyst_dispersion follows the same free-first stack: Finnhub's
 eps-estimate endpoint when the plan allows it (403 on the free tier), then a
@@ -49,20 +55,24 @@ from .alpaca_options import fetch_underlying_ohlcv as fetch_historical_equity_oh
 from .config import FINNHUB_API_KEY
 from .databento_options import fetch_option_chain as fetch_databento_option_chain
 from .dolthub_options import fetch_option_chain as fetch_dolthub_option_chain
-from .earnings import fetch_earnings_calendar
-from .equities import fetch_equity_ohlcv
+from .earnings import fetch_earnings_calendar, fetch_earnings_calendar_wrds
+from .equities import fetch_equity_ohlcv, fetch_equity_ohlcv_crsp
+from .lse_options import fetch_option_chain as fetch_lse_option_chain
 from .options import fetch_option_chain
 from .vix import fetch_index_vol
 
 __all__ = [
     "fetch_earnings_calendar",
+    "fetch_earnings_calendar_wrds",
     "fetch_equity_ohlcv",
+    "fetch_equity_ohlcv_crsp",
     "fetch_historical_equity_ohlcv",
     "fetch_index_vol",
     "fetch_option_chain",
     "fetch_historical_option_chain",
     "fetch_dolthub_option_chain",
     "fetch_databento_option_chain",
+    "fetch_lse_option_chain",
     "fetch_analyst_dispersion",
 ]
 

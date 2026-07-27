@@ -58,3 +58,40 @@ def test_variants_use_distinct_keys_and_params(tmp_path):
     assert len(calls) == 2  # different keys, both fetched
     assert calls[0][2:] == (0.20, 90)
     assert calls[1][2:] == (0.06, 70)
+
+
+def test_refresh_empty_refetches_only_empty_sentinels(tmp_path):
+    calls = []
+    fetcher = cached_chain_fetcher("entry", cache_dir=tmp_path, fetch=_fake_fetch(calls))
+    fetcher("EMPTY", "2026-05-01")
+    fetcher("AAPL", "2026-05-01")
+    healer = cached_chain_fetcher(
+        "entry", cache_dir=tmp_path, fetch=_fake_fetch(calls), refresh_empty=True
+    )
+    healer("EMPTY", "2026-05-01")  # empty sentinel -> refetched
+    healer("AAPL", "2026-05-01")  # populated snapshot -> still served from disk
+    assert [c[0] for c in calls] == ["EMPTY", "AAPL", "EMPTY"]
+
+
+def test_empty_served_counter_tracks_sentinel_hits(tmp_path):
+    calls = []
+    fetcher = cached_chain_fetcher("entry", cache_dir=tmp_path, fetch=_fake_fetch(calls))
+    fetcher("EMPTY", "2026-05-01")
+    assert fetcher.empty_served == 0  # first miss fetched, not served from cache
+    fetcher("EMPTY", "2026-05-01")
+    fetcher("EMPTY", "2026-05-01")
+    assert fetcher.empty_served == 2
+
+
+def test_changed_variant_geometry_changes_the_key(tmp_path, monkeypatch):
+    from earnings_iv_crush.data import chain_cache
+
+    calls = []
+    fetcher = cached_chain_fetcher("entry", cache_dir=tmp_path, fetch=_fake_fetch(calls))
+    fetcher("AAPL", "2026-05-01")
+    monkeypatch.setitem(chain_cache.VARIANTS, "entry", (0.30, 120))
+    drifted = cached_chain_fetcher("entry", cache_dir=tmp_path, fetch=_fake_fetch(calls))
+    drifted("AAPL", "2026-05-01")
+    # The geometry drift must miss the old cache entry and refetch.
+    assert len(calls) == 2
+    assert calls[1][2:] == (0.30, 120)

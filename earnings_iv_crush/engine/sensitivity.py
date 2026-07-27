@@ -36,6 +36,7 @@ SWEEP_COLUMNS = [
     "pctl",
     "n_trades",
     "sharpe",
+    "periods_per_year",
     "sharpe_delta",
     "total_return",
     "hit_rate",
@@ -104,6 +105,7 @@ def threshold_sweep(
                     "pctl": float(pctl),
                     "n_trades": stats["n_trades"],
                     "sharpe": stats["sharpe"],
+                    "periods_per_year": stats["periods_per_year"],
                     "sharpe_delta": stats["sharpe"] - agent0_sharpe,
                     "total_return": stats["total_return"],
                     "hit_rate": stats["hit_rate"],
@@ -122,13 +124,20 @@ def sweep_dsr_params(sweep: pd.DataFrame, periods_per_year: int = 252) -> tuple[
     """
     Derive Deflated-Sharpe inputs from a threshold sweep.
 
+    Each cell's annualised Sharpe is converted back to per-period units by the
+    same factor that annualised it: the cell's own ``periods_per_year`` column
+    when the sweep carries one (``threshold_sweep`` records the inferred base
+    per cell), else the ``periods_per_year`` argument. Dividing an
+    inferred-cadence Sharpe by ``sqrt(252)`` would mis-scale the dispersion fed
+    to the DSR.
+
     Parameters
     ----------
     sweep : pd.DataFrame
         Output of ``threshold_sweep``.
     periods_per_year : int
-        Annualisation factor used to convert the annualised cell Sharpes to the
-        per-period units the DSR expects. Defaults to ``252``.
+        Fallback annualisation factor for sweeps without a ``periods_per_year``
+        column. Defaults to ``252``.
 
     Returns
     -------
@@ -137,6 +146,10 @@ def sweep_dsr_params(sweep: pd.DataFrame, periods_per_year: int = 252) -> tuple[
         deviation of the cells' per-period Sharpe ratios.
     """
     n_trials = int(len(sweep))
-    per_period = sweep["sharpe"].to_numpy() / np.sqrt(periods_per_year)
+    if "periods_per_year" in sweep.columns:
+        base = sweep["periods_per_year"].to_numpy(dtype=float)
+    else:
+        base = np.full(n_trials, float(periods_per_year))
+    per_period = sweep["sharpe"].to_numpy() / np.sqrt(base)
     sr_trials_std = float(np.std(per_period, ddof=1)) if n_trials > 1 else 0.0
     return n_trials, sr_trials_std

@@ -50,6 +50,7 @@ EVENT_COLUMNS = [
     "front_atm_iv",
     "back_atm_iv",
     "iv_term_spread",
+    "iv_term_spread_nearest",
     "implied_move",
     "trailing_rv",
     "skew_25d",
@@ -72,6 +73,29 @@ def _last_close_on_or_before(prices: pd.DataFrame, asof: pd.Timestamp) -> float:
         return float("nan")
     close = pd.to_numeric(p["close"], errors="coerce").dropna()
     return float(close.iloc[-1]) if not close.empty else float("nan")
+
+
+def _resolve_session(raw, default_session: str) -> tuple[str, bool]:
+    """Normalise a calendar session value to ``amc``/``bmo``/``dmh``.
+
+    ``None``, NaN, empty strings and the string ``"nan"`` all fall back to
+    ``default_session``. NaN must be handled explicitly: it is truthy, so the
+    old ``raw or default`` idiom let it through and ``entry_exit_dates`` then
+    silently routed the event down the non-amc (bmo) branch — one day early.
+
+    Returns
+    -------
+    tuple of (str, bool)
+        The resolved session and whether the default was applied.
+    """
+    if raw is None or (isinstance(raw, float) and raw != raw):
+        return default_session, True
+    text = str(raw).strip().lower()
+    # "ambiguous" is the EDGAR cross-check's unknown marker; anything not
+    # explicitly amc/bmo/dmh must take the default, not the bmo branch.
+    if text in ("", "nan", "none", "nat", "ambiguous"):
+        return default_session, True
+    return text, False
 
 
 def entry_exit_dates(announce, session: str = "amc"):
@@ -119,6 +143,7 @@ def build_execution_events(
     lookback_days: int = 60,
     rv_window: int = 20,
     r: float = 0.0,
+    max_overnight_move: float = 0.40,
     progress: bool = False,
 ) -> pd.DataFrame:
     """One execution-ready row per earnings event, from real entry/exit data.
@@ -159,6 +184,13 @@ def build_execution_events(
         ``20``.
     r : float, optional
         Risk-free rate passed to the feature maths. Defaults to ``0.0``.
+    max_overnight_move : float, optional
+        Events whose absolute entry->exit underlying move exceeds this fraction
+        are dropped as corporate actions rather than earnings gaps: the smallest
+        common bonus/split halves the raw price (~50%), far above any real
+        overnight earnings move on an F&O-eligible name. Defaults to ``0.40``.
+        Only bites on raw-price feeds (e.g. the NSE bhavcopy); split-adjusted
+        feeds never trip it.
     progress : bool, optional
         Whether to render a progress bar over events. Defaults to ``False``.
 
@@ -175,15 +207,27 @@ def build_execution_events(
         return pd.DataFrame(columns=EVENT_COLUMNS)
 
     rows = []
+    drops = {
+        "session_defaulted": 0,  # not a drop; counted so the funnel shows it
+        "no_entry_chain": 0,
+        "no_entry_spot": 0,
+        "no_executable_expiry": 0,
+        "no_exit_spot": 0,
+        "iv_exit_fallback": 0,  # not a drop; exit marked at entry IV (no crush)
+        "corp_action_move": 0,
+    }
     records = [ev for _, ev in calendar.iterrows()]
     for ev in progress_iter(records, total=len(records), label="events", enabled=progress):
         ticker = ev["ticker"]
         announce = pd.Timestamp(pd.to_datetime(ev["announce_date"]))
-        session = ev.get("session", ev.get("hour")) or default_session
+        session, defaulted = _resolve_session(ev.get("session", ev.get("hour")), default_session)
+        if defaulted:
+            drops["session_defaulted"] += 1
         entry, exit_ = entry_exit_dates(announce, session)
 
         entry_chain = fetch_chain(ticker, entry.strftime("%Y-%m-%d"))
         if entry_chain is None or len(entry_chain) == 0:
+            drops["no_entry_chain"] += 1
             continue
 
         entry_prices = fetch_prices(
@@ -193,6 +237,7 @@ def build_execution_events(
         )
         spot_entry = _last_close_on_or_before(entry_prices, entry)
         if not (spot_entry and spot_entry == spot_entry):
+            drops["no_entry_spot"] += 1
             continue
 
         # Executed expiry: the nearest one that brackets the event AND still has
@@ -204,10 +249,27 @@ def build_execution_events(
             entry_chain, announce, exit_, min_dte_days=min_exit_dte_days
         )
         if front is None:
+            drops["no_executable_expiry"] += 1
             continue
         strike = features.nearest_strike(entry_chain, front, spot_entry)
         t_entry = (front - entry).days / 365.0
         iv_entry = features.atm_iv(entry_chain, front, strike)
+
+        # Panel-definition spread at entry: nearest expiries as-of the entry day,
+        # the same rule ``historical_surfaces.build_surface_panel`` applies to
+        # every trailing day. The executed-expiry spread below is what the trade
+        # actually carries, but gating it against a nearest-expiry distribution
+        # compares different definitions (measured ~0.22 vol pts apart), so the
+        # panel gate must use THIS column.
+        n_front, n_back = features.nearest_expiries(entry_chain, entry)
+        spread_nearest = float("nan")
+        if n_front is not None and n_back is not None:
+            k_f = features.nearest_strike(entry_chain, n_front, spot_entry)
+            k_b = features.nearest_strike(entry_chain, n_back, spot_entry)
+            iv_f = features.atm_iv(entry_chain, n_front, k_f)
+            iv_b = features.atm_iv(entry_chain, n_back, k_b)
+            if iv_f == iv_f and iv_b == iv_b:
+                spread_nearest = iv_f - iv_b
 
         feats = features.event_features(
             entry_chain,
@@ -227,6 +289,7 @@ def build_execution_events(
         )
         spot_exit = _last_close_on_or_before(exit_prices, exit_)
         if not (spot_exit and spot_exit == spot_exit):
+            drops["no_exit_spot"] += 1
             continue
         t_exit = (front - exit_).days / 365.0
         exit_chain = fetch_chain(ticker, exit_.strftime("%Y-%m-%d"))
@@ -243,9 +306,13 @@ def build_execution_events(
         else:
             iv_exit = float("nan")
         if iv_exit != iv_exit:
+            drops["iv_exit_fallback"] += 1
             iv_exit = iv_entry
 
         realised_move = abs(spot_exit - spot_entry) / spot_entry
+        if realised_move > max_overnight_move:
+            drops["corp_action_move"] += 1  # bonus/split between entry and exit
+            continue
 
         rows.append(
             {
@@ -263,6 +330,7 @@ def build_execution_events(
                 "front_atm_iv": feats["front_atm_iv"],
                 "back_atm_iv": feats["back_atm_iv"],
                 "iv_term_spread": feats["iv_term_spread"],
+                "iv_term_spread_nearest": spread_nearest,
                 "implied_move": feats["implied_move"],
                 "trailing_rv": feats["trailing_rv"],
                 "skew_25d": feats["skew_25d"],
@@ -274,4 +342,26 @@ def build_execution_events(
             }
         )
 
+    # Exclusion funnel: every event in the calendar must be accounted for, so a
+    # silently shrinking sample is visible in the run log (calendar N -> usable N).
+    n_dropped = sum(
+        v for k, v in drops.items() if k not in ("session_defaulted", "iv_exit_fallback")
+    )
+    print(
+        f"real_events funnel: calendar {len(records)} -> usable {len(rows)} "
+        f"(dropped {n_dropped})"
+    )
+    for reason, count in drops.items():
+        if count:
+            print(f"  {reason:22s} {count}")
+    if drops["session_defaulted"]:
+        print(
+            f"  note: {drops['session_defaulted']} event(s) had no BMO/AMC stamp and used "
+            f"the '{default_session}' default; their entry/exit window is an assumption."
+        )
+    if drops["iv_exit_fallback"]:
+        print(
+            f"  note: {drops['iv_exit_fallback']} event(s) could not invert an exit IV and "
+            f"were marked at ENTRY IV (no crush booked); their P&L is conservative/wrong."
+        )
     return pd.DataFrame(rows, columns=EVENT_COLUMNS)

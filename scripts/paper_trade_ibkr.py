@@ -46,12 +46,13 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 from pandas.tseries.offsets import BDay
 
 from earnings_iv_crush.config import GLOBAL, LIVE, STRATEGY
-from earnings_iv_crush.data.earnings import fetch_earnings_calendar
+from earnings_iv_crush.data.earnings import fetch_earnings_calendar, trade_dates_for_session
 from earnings_iv_crush.data.features import (
     atm_iv,
     implied_move,
@@ -85,6 +86,7 @@ class EntrySignal:
     t_entry: float
     front_atm_iv: float
     iv_term_spread: float
+    iv_term_spread_nearest: float
     skew_25d: float
     implied_move: float
 
@@ -114,12 +116,28 @@ def compute_entry_signal(
     if not (front_iv == front_iv):
         return None
     spread = front_iv - back_iv if back_iv == back_iv else float("nan")
+
+    # Panel-definition spread: nearest expiries as-of the entry day, the same rule
+    # `historical_surfaces.build_surface_panel` applies to every trailing day and
+    # that `sweep_term_panel.py` applies live. The executed-expiry spread above is
+    # what the trade actually carries, but the two definitions sit ~0.22 vol pts
+    # apart (see `real_events.py`), so gating one against a distribution built
+    # from the other compares different quantities. The gate must use this column.
+    n_front, n_back = nearest_expiries(chain, asof)
+    spread_nearest = float("nan")
+    if n_front is not None and n_back is not None:
+        n_front_iv = atm_iv(chain, n_front, nearest_strike(chain, n_front, spot))
+        n_back_iv = atm_iv(chain, n_back, nearest_strike(chain, n_back, spot))
+        if n_front_iv == n_front_iv and n_back_iv == n_back_iv:
+            spread_nearest = float(n_front_iv - n_back_iv)
+
     return EntrySignal(
         front_expiry=pd.Timestamp(front),
         strike=float(strike),
         t_entry=float(t_entry),
         front_atm_iv=float(front_iv),
         iv_term_spread=float(spread),
+        iv_term_spread_nearest=spread_nearest,
         skew_25d=float(skew_25d(chain, front, spot, t_entry, R)),
         implied_move=float(implied_move(chain, spot, front, strike)),
     )
@@ -131,24 +149,94 @@ def compute_entry_signal(
 def candidate_events(
     asof: pd.Timestamp, names: list[str] | None, announce: pd.Timestamp | None
 ) -> pd.DataFrame:
-    """Names whose announcement is the entry target (the next business day).
+    """Names to enter today, with the exit date their announcement implies.
 
     With ``--names`` the calendar is bypassed for a manual test (an explicit
     ``--announce`` date is required). Otherwise the Finnhub calendar is queried
-    and filtered to announcements ``entry_offset_days`` business days ahead.
+    and restricted to the validated universe.
+
+    Which announcements are due depends on ``LiveConfig.session_aware_timing``.
+    When set, each row's reporting session decides its bracket via
+    ``trade_dates_for_session`` and a name is a candidate when that entry date is
+    today, which is the one-session hold the backtest measures. When unset, the
+    legacy fixed offset applies: announcements ``entry_offset_days`` business
+    days ahead, exiting one business day after the print. The two agree only for
+    ``bmo`` names on the entry leg and ``amc`` names on the exit leg, so the
+    legacy path holds two sessions in every case.
+
+    The universe restriction is not a convenience filter. The Finnhub calendar is
+    the whole US tape, so an unrestricted pass evaluates micro-caps and OTC names
+    (AEHR, ANGO, BRLL) whose option microstructure has nothing in common with the
+    mega-cap cross-section the gate was fitted and costed on. A forward book built
+    from those names measures a different strategy than the one under test.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``ticker``, ``announce_date`` and ``exit_date``.
     """
-    target = (asof + BDay(LIVE.entry_offset_days)).normalize()
     if names:
         if announce is None:
             raise SystemExit("--names requires --announce YYYY-MM-DD")
+        day = pd.Timestamp(announce).normalize()
         return pd.DataFrame(
-            {"ticker": names, "announce_date": [pd.Timestamp(announce)] * len(names)}
+            {
+                "ticker": names,
+                "announce_date": [day] * len(names),
+                "exit_date": [(day + BDay(1)).normalize()] * len(names),
+            }
         )
     cal = fetch_earnings_calendar(asof.strftime("%Y-%m-%d"), (asof + BDay(5)).strftime("%Y-%m-%d"))
     if cal.empty:
         return cal
     cal["announce_date"] = pd.to_datetime(cal["announce_date"]).dt.normalize()
-    return cal[cal["announce_date"] == target][["ticker", "announce_date"]].reset_index(drop=True)
+    universe = validated_universe()
+    if universe:
+        cal = cal[cal["ticker"].isin(universe)]
+
+    if not LIVE.session_aware_timing:
+        target = (asof + BDay(LIVE.entry_offset_days)).normalize()
+        cal = cal[cal["announce_date"] == target][["ticker", "announce_date"]].copy()
+        cal["exit_date"] = (cal["announce_date"] + BDay(1)).map(lambda d: d.normalize())
+        return cal.reset_index(drop=True)
+
+    sessions = cal["hour"] if "hour" in cal.columns else pd.Series(index=cal.index, dtype=object)
+    rows: list[dict[str, object]] = []
+    skipped: list[str] = []
+    for ticker, announce_day, session in zip(
+        cal["ticker"], cal["announce_date"], sessions, strict=True
+    ):
+        day = pd.Timestamp(announce_day)
+        bracket = trade_dates_for_session(day, session)
+        if bracket is None:
+            skipped.append(str(ticker))
+            continue
+        entry_date, exit_date = bracket
+        if entry_date == asof.normalize():
+            rows.append({"ticker": ticker, "announce_date": day, "exit_date": exit_date})
+    # A universe name with no session is a candidate the pass silently dropped.
+    # Guessing the bracket can open the position after the print or close it
+    # before, so the name is skipped, but never quietly.
+    if skipped:
+        print(
+            f"  warning: no reporting session for {sorted(set(skipped))}; "
+            f"skipped (cannot bracket the print without it)."
+        )
+    return pd.DataFrame(rows, columns=["ticker", "announce_date", "exit_date"])
+
+
+def validated_universe() -> set[str]:
+    """Tickers the backtest actually validated, read from the research seed.
+
+    Returns an empty set if the seed is missing, in which case the caller does not
+    filter - a missing seed should not silently halt the loop, but the unfiltered
+    pass is then off-spec and the log says so.
+    """
+    seed = Path(LIVE.skew_seed_path)
+    if not seed.exists():
+        print(f"  warning: universe seed {seed} not found; entry pass is UNFILTERED (off-spec).")
+        return set()
+    return set(pd.read_parquet(seed, columns=["ticker"])["ticker"].unique())
 
 
 # ── enter ────────────────────────────────────────────────────────────────────
@@ -165,8 +253,12 @@ def run_enter(args: argparse.Namespace) -> None:
     events = candidate_events(asof, args.names, args.announce)
     if events.empty:
         print(
-            f"No earnings candidates for entry on {asof.date()} (target {(asof + BDay(1)).date()})."
+            f"No earnings candidates for entry on {asof.date()} "
+            f"({'session-aware' if LIVE.session_aware_timing else 'fixed-offset'} timing)."
         )
+        # Still recorded: a zero-candidate day and a day the task never fired are
+        # otherwise the same absence of evidence in the heartbeat log.
+        paper_book.record_heartbeat(asof, 0, 0, 0, 0)
         return
 
     costs = CostModel()
@@ -176,63 +268,104 @@ def run_enter(args: argparse.Namespace) -> None:
         f"Connected to paper IB on {LIVE.ib_host}:{LIVE.ib_paper_port}. "
         f"Mode: {'TRANSMIT' if transmit else 'DRY-RUN (no orders)'}"
     )
+    outcomes: list[str] = []
     try:
-        for ev in events.itertuples(index=False):
-            _process_entry(
-                ib, ev.ticker, pd.Timestamp(ev.announce_date), asof, prior_skews, costs, transmit
+        for ticker, announce_day, exit_day in zip(
+            events["ticker"], events["announce_date"], events["exit_date"], strict=True
+        ):
+            outcomes.append(
+                _process_entry(
+                    ib,
+                    ticker,
+                    pd.Timestamp(announce_day),
+                    pd.Timestamp(exit_day),
+                    asof,
+                    prior_skews,
+                    costs,
+                    transmit,
+                )
             )
     finally:
         if ib.isConnected():
             ib.disconnect()
 
+    n_priced = sum(o != "unpriced" for o in outcomes)
+    n_gated = sum(o in ("sized_zero", "entered") for o in outcomes)
+    n_entered = sum(o == "entered" for o in outcomes)
+    paper_book.record_heartbeat(asof, len(outcomes), n_priced, n_gated, n_entered)
+    print(
+        f"  pass summary: {len(outcomes)} candidates, {n_priced} priced, "
+        f"{n_gated} gated, {n_entered} entered."
+    )
+    if outcomes and n_priced == 0:
+        print(
+            "  ALARM: every candidate failed to price. This is a data or connection "
+            "fault, not a quiet market. Check the IB market-data entitlement "
+            "(LiveConfig.ib_market_data_type) before trusting the next report."
+        )
 
-def _process_entry(ib, ticker, announce_date, asof, prior_skews, costs, transmit) -> None:
-    """Evaluate and (optionally) place one candidate; log every decision."""
+
+def _process_entry(ib, ticker, announce_date, exit_date, asof, prior_skews, costs, transmit) -> str:
+    """Evaluate and (optionally) place one candidate; log every decision.
+
+    Returns the outcome as one of ``"unpriced"``, ``"gated_out"``,
+    ``"sized_zero"`` or ``"entered"``, which ``run_enter`` tallies into the
+    heartbeat. The distinction that matters is ``"unpriced"``: a pass where every
+    candidate lands there is a broken harness, not a quiet market.
+    """
     try:
         underlying = ib_market.qualify_underlying(ib, ticker)
         chain = ib_market.snapshot_chain(ib, underlying)
     except (ValueError, RuntimeError) as exc:
         print(f"  {ticker}: skipped ({exc}).")
-        return
+        return "unpriced"
     if chain.empty:
         print(f"  {ticker}: skipped (no chain).")
-        return
+        return "unpriced"
 
     sig = compute_entry_signal(chain, underlying.spot, announce_date, asof)
     if sig is None:
         print(f"  {ticker}: skipped (no front IV / strike).")
-        return
+        return "unpriced"
 
-    # Record the trailing-panel and skew observations *before* gating, so the
-    # histories accumulate even on names that do not pass.
-    paper_book.record_term_observation(ticker, asof, sig.iv_term_spread)
+    # Record the skew observation *before* gating, so the history accumulates
+    # even on names that do not pass.
+    #
+    # The term panel is deliberately NOT written here. It is owned by
+    # sweep_term_panel.py, which measures every universe name daily on an
+    # asof-relative nearest-expiry basis. Writing this event's spread would both
+    # double-count the day and mix bases: `sig.iv_term_spread` is measured
+    # announcement-relative on the eve of the print, when the term spread is at
+    # its cyclical peak, so it lands in the upper tail of the distribution the
+    # gate quantiles over and pushes the threshold against the strategy.
     paper_book.record_skew_observation(ticker, announce_date, sig.skew_25d)
 
     # Locked baseline: term-only at q=0.80, skew and move gates OFF. The skew
     # observation is still recorded above so the history keeps accumulating, but
     # the gate only binds when the forward config re-enables it.
-    term_ok = paper_book.passes_term_gate(ticker, announce_date, sig.iv_term_spread)
+    # Gated on the nearest-expiry (panel-definition) spread, not the executed one:
+    # the panel it is quantiled against is built that way.
+    term_ok = paper_book.passes_term_gate(ticker, announce_date, sig.iv_term_spread_nearest)
     skew_ok = (
         paper_book.passes_skew_gate(sig.skew_25d, prior_skews) if FORWARD.use_skew_gate else True
     )
     if not (term_ok and skew_ok):
         print(
             f"  {ticker}: no trade (term={term_ok}, skew={skew_ok}; "
-            f"term_spread={sig.iv_term_spread:+.3f}, skew={sig.skew_25d:+.3f})."
+            f"term_spread_nearest={sig.iv_term_spread_nearest:+.3f} [gated], "
+            f"term_spread_executed={sig.iv_term_spread:+.3f}, skew={sig.skew_25d:+.3f})."
         )
-        return
+        return "gated_out"
 
     credit_ps = _straddle_value(underlying.spot, sig.strike, sig.t_entry, R, sig.front_atm_iv)
     contracts = size_contracts(ACCOUNT_SIZE, underlying.spot, sig.strike, credit_ps)
     if contracts <= 0:
         print(f"  {ticker}: no trade (sizes to zero contracts).")
-        return
+        return "sized_zero"
 
     mult = GLOBAL.contract_multiplier
     entry_credit = credit_ps * mult * contracts
     margin = regt_straddle_margin(underlying.spot, sig.strike, credit_ps, contracts)
-    exit_date = (announce_date + BDay(1)).normalize()
-
     print(
         f"  {ticker}: TRADE {contracts}x straddle @ {sig.strike} exp {sig.front_expiry.date()} "
         f"credit~${entry_credit:,.0f} margin~${margin:,.0f} "
@@ -262,6 +395,7 @@ def _process_entry(ib, ticker, announce_date, asof, prior_skews, costs, transmit
             "iv_term_spread": sig.iv_term_spread,
         }
     )
+    return "entered"
 
 
 # ── exit ─────────────────────────────────────────────────────────────────────

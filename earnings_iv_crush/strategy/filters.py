@@ -65,14 +65,18 @@ def passes_term_filter_panel(
     window_days=TRAILING_WINDOW,
     min_periods=TERM_MIN_PERIODS,
     asof_offset_days=1,
+    stats_out: dict | None = None,
+    stat_col: str | None = None,
 ) -> pd.Series:
     """Per-name trailing-DAY percentile gate over a 30-day distribution.
 
     For each event the threshold is the `pctl` quantile of that ticker's daily
-    `iv_term_spread` over the `window_days` trading days strictly before entry
-    (entry = announce_date - `asof_offset_days` business days). The event passes
-    when its own `iv_term_spread` exceeds that threshold. Events with fewer than
-    `min_periods` daily observations in the window are rejected.
+    `iv_term_spread` over the `window_days` TRADING DAYS strictly before entry
+    (entry = announce_date - `asof_offset_days` business days). The window is
+    calendar-bounded, not row-bounded: a panel with gaps contributes fewer
+    observations rather than silently reaching further back in time. The event
+    passes when its own `iv_term_spread` exceeds that threshold. Events with
+    fewer than `min_periods` daily observations in the window are rejected.
 
     Unlike the legacy form, each event carries its own trailing window, so there
     is no global warm-up and names are never mixed.
@@ -81,8 +85,35 @@ def passes_term_filter_panel(
     ----------
     panel : DataFrame with `ticker`, `date`, `iv_term_spread` (one row per
         ticker per trading day).
+    stats_out : dict, optional
+        When supplied, filled with rejection accounting: ``no_panel_history``
+        (ticker absent from the panel), ``below_min_periods`` (window too
+        sparse), ``below_threshold`` and ``passed`` — so gate attrition is
+        visible rather than silently folded into "did not pass".
+    stat_col : str, optional
+        Events column holding the statistic to gate. Defaults to
+        ``iv_term_spread_nearest`` when present, else ``iv_term_spread``. The
+        panel distribution is built from nearest-expiry spreads, so the event
+        statistic must use the same definition; the executed-expiry spread runs
+        systematically above it and inflates the pass rate.
     """
+    if stat_col is None:
+        stat_col = (
+            "iv_term_spread_nearest"
+            if "iv_term_spread_nearest" in events.columns
+            else "iv_term_spread"
+        )
+    counts = {
+        "no_panel_history": 0,
+        "below_min_periods": 0,
+        "no_event_stat": 0,
+        "below_threshold": 0,
+        "passed": 0,
+    }
     if panel is None or len(panel) == 0:
+        if stats_out is not None:
+            counts["no_panel_history"] = len(events)
+            stats_out.update(counts)
         return pd.Series(False, index=events.index)
     p = panel.copy()
     p["date"] = pd.to_datetime(p["date"])
@@ -94,14 +125,26 @@ def passes_term_filter_panel(
         entry = pd.Timestamp(pd.to_datetime(ev["announce_date"])) - BDay(asof_offset_days)
         g = by_ticker.get(ev["ticker"])
         if g is None:
+            counts["no_panel_history"] += 1
             flags.append(False)
             continue
-        hist = g[g["date"] < entry].tail(window_days)
+        window_start = entry - BDay(window_days)
+        hist = g[(g["date"] < entry) & (g["date"] >= window_start)]
         if len(hist) < min_periods:
+            counts["below_min_periods"] += 1
+            flags.append(False)
+            continue
+        stat = ev.get(stat_col)
+        if stat is None or stat != stat:
+            counts["no_event_stat"] += 1
             flags.append(False)
             continue
         threshold = hist["iv_term_spread"].quantile(pctl)
-        flags.append(bool(ev["iv_term_spread"] > threshold))
+        passed = bool(stat > threshold)
+        counts["passed" if passed else "below_threshold"] += 1
+        flags.append(passed)
+    if stats_out is not None:
+        stats_out.update(counts)
     return pd.Series(flags, index=events.index)
 
 

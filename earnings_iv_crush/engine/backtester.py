@@ -91,7 +91,7 @@ def daily_return_series(trades: pd.DataFrame, account: float = ACCOUNT_SIZE) -> 
 
 
 def backtest(
-    trades: pd.DataFrame, account=ACCOUNT_SIZE, periods_per_year: int | str = "auto"
+    trades: pd.DataFrame, account=ACCOUNT_SIZE, periods_per_year: float | str = "auto"
 ) -> dict:
     """
     Score a trade ledger and return performance statistics.
@@ -179,7 +179,7 @@ def frequency_neutral_stats(
     strategy_trades: pd.DataFrame,
     agent0_trades: pd.DataFrame,
     account: float = ACCOUNT_SIZE,
-    periods_per_year: int = 252,
+    periods_per_year: float | str = "auto",
     n_boot: int = 2000,
     ci: float = 0.95,
     seed: int = 0,
@@ -214,7 +214,13 @@ def frequency_neutral_stats(
 
     n_s = 0 if strategy_trades is None else len(strategy_trades)
     n_a = 0 if agent0_trades is None else len(agent0_trades)
-    sr_s_own = stats.sharpe(daily_return_series(strategy_trades, account), periods_per_year)
+    s_own = daily_return_series(strategy_trades, account)
+    ppy = (
+        stats.infer_periods_per_year(s_own.index)
+        if periods_per_year == "auto"
+        else float(periods_per_year)
+    )
+    sr_s_own = stats.sharpe(s_own, ppy)
 
     deltas: list[float] = []
     if 0 < n_s < n_a:
@@ -222,9 +228,7 @@ def frequency_neutral_stats(
         a = agent0_trades.reset_index(drop=True)
         for _ in range(n_boot):
             sub = a.iloc[rng.choice(n_a, size=n_s, replace=False)]
-            deltas.append(
-                sr_s_own - stats.sharpe(daily_return_series(sub, account), periods_per_year)
-            )
+            deltas.append(sr_s_own - stats.sharpe(daily_return_series(sub, account), ppy))
     delta_arr = np.asarray(deltas, dtype=float)
     if delta_arr.size:
         lo, hi = (
@@ -244,6 +248,7 @@ def frequency_neutral_stats(
         "size_matched_delta_ci_low": lo,
         "size_matched_delta_ci_high": hi,
         "size_matched_win_prob": win,
+        "size_matched_periods_per_year": float(ppy),
         "filter_edge_per_trade": bool(pts_s > pts_a),
     }
 
@@ -257,7 +262,7 @@ def compare(
     strategy_trades: pd.DataFrame,
     agent0_trades: pd.DataFrame,
     account: float = ACCOUNT_SIZE,
-    periods_per_year: int = 252,
+    periods_per_year: float | str = "auto",
     n_trials: int = 1,
     sr_trials_std: float = 0.0,
     n_boot: int = 2000,
@@ -279,8 +284,12 @@ def compare(
         Ledgers for the filtered strategy and the control.
     account : float
         Account size for return normalisation.
-    periods_per_year : int
-        Annualisation factor. Defaults to ``252``.
+    periods_per_year : int or str
+        Annualisation factor. Defaults to ``"auto"``, which infers the base from
+        the union calendar's own span (see :func:`stats.infer_periods_per_year`),
+        matching :func:`backtest`. A hard-coded ``252`` on a ~30-trade/yr book
+        inflates every annualised figure ~3x; pass an explicit integer only for
+        a genuinely daily series.
     n_trials : int
         Filter configurations effectively tried, fed to the Deflated Sharpe.
     sr_trials_std : float
@@ -296,6 +305,7 @@ def compare(
     -------
     dict
         ``sharpe_strategy``, ``sharpe_agent0``, ``sharpe_delta``,
+        ``periods_per_year`` (the annualisation base actually applied),
         ``sharpe_delta_ci_low``/``_high``, ``spread_tstat``, ``spread_pvalue``,
         ``psr_strategy``, ``dsr_strategy``, ``filter_gate_pass`` (delta >= 0.5).
     """
@@ -306,8 +316,11 @@ def compare(
     a = a.reindex(idx, fill_value=0.0)
     spread = s - a
 
-    sr_s = stats.sharpe(s, periods_per_year)
-    sr_a = stats.sharpe(a, periods_per_year)
+    ppy = (
+        stats.infer_periods_per_year(idx) if periods_per_year == "auto" else float(periods_per_year)
+    )
+    sr_s = stats.sharpe(s, ppy)
+    sr_a = stats.sharpe(a, ppy)
     delta = sr_s - sr_a
 
     # Paired test on the daily spread (is the strategy reliably above control?).
@@ -320,18 +333,17 @@ def compare(
         t_stat, p_val = float("nan"), float("nan")
 
     # Paired bootstrap CI on the Sharpe spread.
-    lo, hi = _bootstrap_sharpe_delta_ci(
-        s.to_numpy(), a.to_numpy(), periods_per_year, n_boot, ci, seed
-    )
+    lo, hi = _bootstrap_sharpe_delta_ci(s.to_numpy(), a.to_numpy(), ppy, n_boot, ci, seed)
 
     freq_neutral = frequency_neutral_stats(
-        strategy_trades, agent0_trades, account, periods_per_year, n_boot, ci, seed
+        strategy_trades, agent0_trades, account, ppy, n_boot, ci, seed
     )
 
     return {
         "sharpe_strategy": float(sr_s),
         "sharpe_agent0": float(sr_a),
         "sharpe_delta": float(delta),
+        "periods_per_year": float(ppy),
         "sharpe_delta_ci_low": lo,
         "sharpe_delta_ci_high": hi,
         "spread_tstat": t_stat,
@@ -348,7 +360,7 @@ def compare(
 
 
 def _bootstrap_sharpe_delta_ci(
-    s: np.ndarray, a: np.ndarray, periods_per_year: int, n_boot: int, ci: float, seed: int
+    s: np.ndarray, a: np.ndarray, periods_per_year: float, n_boot: int, ci: float, seed: int
 ) -> tuple[float, float]:
     """Percentile CI for the paired Sharpe spread (strategy minus control)."""
     n = len(s)

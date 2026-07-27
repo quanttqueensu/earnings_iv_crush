@@ -10,11 +10,23 @@ statistics go back to 2013-04-01, and the full weekly + monthly expiry ladder is
 present - so an event-timed straddle can be bracketed on the precise entry and
 exit sessions, which the sparse free sources could not do.
 
-NBBO quotes on OPRA only begin 2023-03-28, so pre-2023 there is no bid/ask mid;
-``bid`` and ``ask`` therefore both carry the close (the spread lives in
-``engine.costs``), matching the Alpaca convention. ``open_interest`` is not pulled
-(it would need the ``statistics`` schema); it is left NaN, so any feature that
-needs OI must source it elsewhere for this provider.
+``bid`` and ``ask`` both carry the close on this path, matching the Alpaca convention,
+so the spread is an assumption living in ``engine.costs`` rather than a measurement.
+``open_interest`` is not pulled (it would need the ``statistics`` schema); it is left
+NaN, so any feature that needs OI must source it elsewhere for this provider.
+
+A correction worth recording, because the claim it replaces shaped the design above.
+This module previously stated that "NBBO quotes on OPRA only begin 2023-03-28, so
+pre-2023 there is no bid/ask mid". That holds for ``cmbp-1`` and ``tcbbo`` but **not**
+for the dataset as a whole: ``cbbo-1m``, the consolidated one-minute best bid and
+offer, begins 2013-04-01, as ``metadata.get_dataset_range`` confirms. Two-sided quotes
+covered the entire sample the whole time, and they cost less than these daily bars,
+because ``ohlcv-1d`` bills one row per participating venue per symbol-day - which is
+why ``_consolidate`` below has to exist - while the consolidated feed is a single
+stream. Measured on real filtered symbol lists: $0.0124 per event against $0.0590.
+The quote-marked path is ``data.databento_quotes``; this module is kept so the book it
+produced stays reproducible and the two can be compared rather than one silently
+replacing the other.
 
 Cost discipline (the account runs on metered credits):
 * Every call is scoped to a handful of expiries and an ATM strike band, never the
@@ -58,13 +70,39 @@ _HORIZON_DAYS = 75  # hard cap on how far out any pulled expiry may sit
 _client_cache: Any = None
 
 
-def _opra_root(ticker: str) -> str:
-    """Map a yfinance ticker to its OPRA underlying root.
+# Tickers whose present-day symbol did not exist for part of the historical sample. OPRA
+# lists contracts under the root that traded at the time, so requesting the modern symbol
+# for an earlier date returns a symbology error rather than an empty result. Each entry is
+# (effective date of the modern symbol, the root used before it).
+#
+# Only names in the current universe that actually changed are listed. Getting this wrong is
+# silent: the request simply fails, the event is dropped, and the sample shrinks in a way
+# that correlates with corporate history rather than with anything economic.
+_TICKER_HISTORY: dict[str, tuple[pd.Timestamp, str]] = {
+    # Facebook renamed to Meta Platforms, 2022-06-09.
+    "META": (pd.Timestamp("2022-06-09"), "FB"),
+    # Praxair and Linde AG merged to form Linde plc; LIN began trading 2018-10-31.
+    "LIN": (pd.Timestamp("2018-10-31"), "PX"),
+    # Google's 2014 reclassification created the GOOGL line; before it the listing was GOOG.
+    "GOOGL": (pd.Timestamp("2014-04-03"), "GOOG"),
+}
+
+
+def _opra_root(ticker: str, asof: pd.Timestamp | None = None) -> str:
+    """Map a yfinance ticker to its OPRA underlying root, as of a date.
 
     OPRA concatenates share-class suffixes that yfinance hyphenates: ``BRK-B`` ->
     ``BRKB``. The equity/split lookups keep the yfinance form; only the OPRA parent
     symbol uses this root. Plain tickers pass through unchanged.
+
+    When ``asof`` precedes a known ticker change, the historical root is returned, so a
+    2014 request for Meta asks OPRA for ``FB`` rather than a symbol that did not yet exist.
+    Omitting ``asof`` keeps the present-day behaviour.
     """
+    if asof is not None:
+        change = _TICKER_HISTORY.get(ticker.upper())
+        if change is not None and pd.Timestamp(asof) < change[0]:
+            ticker = change[1]
     return ticker.replace("-", "").replace(".", "").upper()
 
 
@@ -156,7 +194,12 @@ def _split_factor(ticker: str, asof: pd.Timestamp) -> float:
 
         try:
             splits = yf.Ticker(ticker).splits
-        except Exception:
+        except Exception as exc:
+            # Failing open with factor 1.0 on a name that HAS split centres the
+            # strike band orders of magnitude off and selects nothing — which
+            # is then cached as a permanently empty chain. Make the failure
+            # visible instead of silent.
+            print(f"databento_options: splits fetch failed for {ticker} ({exc}); assuming none.")
             splits = pd.Series(dtype=float)
         if splits is not None and len(splits):
             splits = splits.copy()
@@ -189,7 +232,7 @@ def _spot_on_or_before(ticker: str, asof: pd.Timestamp, lookback_days: int = 7) 
     if prices is None or prices.empty:
         return float("nan")
     dates = pd.to_datetime(prices["date"])
-    usable = prices[dates <= asof]
+    usable = prices.assign(_d=dates)[dates <= asof].sort_values("_d")
     if usable.empty:
         return float("nan")
     return float(usable["close"].iloc[-1]) * _split_factor(ticker, asof)

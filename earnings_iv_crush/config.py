@@ -75,6 +75,14 @@ class GlobalConfig:
         Whether the fair-move model may use the current-snapshot open-interest
         proxy. The proxy is not point-in-time, so it defaults to ``False`` and
         should only be enabled for robustness appendices.
+    earnings_source : str
+        Provider for the earnings calendar (announce date + bmo/amc session).
+        ``"finnhub"`` (default) is the live free-tier calendar; ``"wrds"`` sources
+        the date from Compustat ``fundq.rdq`` and the session from I/B/E/S
+        announcement times via the WRDS R2 mirror (``data/wrds_r2.py``).
+    spot_source : str
+        Provider for equity spot / OHLCV. ``"yfinance"`` (default) or ``"crsp"``
+        (CRSP daily stock file on the WRDS mirror, split-factor aware).
     """
 
     # ── Account ──────────────────────────────────────────────────────────────
@@ -103,6 +111,26 @@ class GlobalConfig:
     min_volume: int = 10
     max_rel_spread: float = 0.10
     use_oi_proxy: bool = False
+
+    # ── Data providers ───────────────────────────────────────────────────────
+    earnings_source: str = "finnhub"
+    spot_source: str = "yfinance"
+    option_source: str = "databento"  # "databento", "databento_quotes", "lse", "alpaca"
+    # What the bid/ask columns of a chain actually contain. "close" means the
+    # adapter wrote the daily closing *trade* on both sides (bid == ask == close),
+    # which is what every trade-based provider here does; "quote" means a genuine
+    # two-sided market. This is not cosmetic: a book marked on closes and one marked
+    # on quotes are different books with different Sharpes, and without this key a
+    # cached events file gives no way to tell which one it is. It travels in the
+    # provenance stamp so a re-marked cache can never be loaded as a close-marked
+    # one, or the reverse.
+    mark_basis: str = "close"  # "close" or "quote"
+    # Market bundle and chain provider (see data/providers.py). ``market``
+    # selects the calendar/spot/chain trio ("us" or "india"); ``chain_source``
+    # overrides just the chain provider ("alpaca", "dolthub", "nse") or takes the
+    # market default when None. India routes to the free NSE UDiFF F&O bhavcopy.
+    market: str = "us"
+    chain_source: str | None = None
 
 
 @dataclass(frozen=True)
@@ -224,6 +252,15 @@ class LiveConfig:
     ib_client_id : int
         API client id for this session. Any integer unique among connected API
         clients. Defaults to ``17``.
+    ib_market_data_type : int
+        IB market-data mode requested once per session: ``1`` live, ``2`` frozen,
+        ``3`` delayed, ``4`` delayed-frozen. A paper account with no OPRA/network
+        subscription returns NaN on every field under ``1``, which silently skips
+        every candidate; ``4`` serves delayed quotes during the session and the
+        last delayed snapshot after the close, so the harness accrues a book on an
+        unsubscribed account. Defaults to ``4``. Set to ``1`` once real-time
+        entitlements are in place - delayed quotes are adequate for the signal but
+        not for the fill-quality study.
     kill_switch_file : str
         Path to a sentinel file; when it exists the loop places no new orders
         (existing positions are untouched). Lets you halt entries without killing
@@ -231,6 +268,13 @@ class LiveConfig:
     open_positions_path, paper_ledger_path : str
         Parquet stores for open paper positions (entry leg, no exit yet) and the
         completed-trade ledger (the backtest's ``LEDGER_COLUMNS`` schema).
+    heartbeat_path : str
+        Parquet store recording, per entry pass, how many candidates were seen,
+        priced and gated. An empty book is the expected state of a healthy harness
+        waiting for earnings season and also the state of a harness that has been
+        failing on every candidate for weeks; without a per-pass count the two are
+        the same string in the report. ``forward_report`` reads this to distinguish
+        them and raises an alarm when candidates are seen but none price.
     skew_history_path, term_panel_path : str
         Parquet stores for the accumulating per-event skew history (the skew
         gate's expanding cross-section) and the per-name daily term-spread panel
@@ -246,7 +290,20 @@ class LiveConfig:
         snapshotting the chain. Defaults to ``90``.
     entry_offset_days : int
         Business days before the announcement at which the position is entered.
-        Defaults to ``1`` (enter the session before the report).
+        Defaults to ``1`` (enter the session before the report). Ignored when
+        ``session_aware_timing`` is set.
+    session_aware_timing : bool
+        Derive entry and exit from the announcement's reporting session rather
+        than a fixed offset. The backtest brackets each print by the closes
+        either side of it, a one-session hold: an ``amc`` name is entered on the
+        announcement day and exited the next, a ``bmo`` name the reverse. The
+        fixed offset applies the ``bmo`` entry and the ``amc`` exit to every
+        name, so both cases hold two sessions instead of one, doubling exposure
+        to post-print drift and to the day of decay the crush does not pay for.
+        Defaults to ``False`` to preserve the deployed behaviour; set it to
+        ``True`` to match the backtest. Names whose session is unknown are
+        skipped rather than guessed, so enabling this can reduce the candidate
+        count.
     skew_keep_frac : float
         Keep an event only if its ``skew_25d`` is at or below this quantile of the
         prior skew cross-section (the validated low-skew gate). Defaults to
@@ -274,10 +331,12 @@ class LiveConfig:
     ib_paper_port: int = 7497
     ib_live_ports: tuple[int, ...] = (7496, 4001)
     ib_client_id: int = 17
+    ib_market_data_type: int = 4
 
     kill_switch_file: str = "outputs/live/STOP"
     open_positions_path: str = "outputs/live/open_positions.parquet"
     paper_ledger_path: str = "outputs/live/paper_ledger.parquet"
+    heartbeat_path: str = "outputs/live/entry_heartbeat.parquet"
     skew_history_path: str = "outputs/live/skew_history.parquet"
     term_panel_path: str = "outputs/live/term_panel_live.parquet"
     skew_seed_path: str = "outputs/research/events_megacap_v2.parquet"
@@ -285,6 +344,7 @@ class LiveConfig:
     strike_window: float = 0.20
     horizon_days: int = 90
     entry_offset_days: int = 1
+    session_aware_timing: bool = False
 
     skew_keep_frac: float = 0.67
     term_pctl: float = 0.80

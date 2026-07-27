@@ -22,6 +22,7 @@ import logging
 import pandas as pd
 
 from .sec_edgar import earnings_8ks, infer_session
+from .session_overrides import apply_session_overrides
 from .universe import cohort_labels
 
 _logger = logging.getLogger(__name__)
@@ -59,7 +60,10 @@ def yahoo_events(ticker: str, start: str, end: str, limit: int = 24) -> pd.DataF
     for ts, row in ed.iterrows():
         ts = pd.Timestamp(ts)
         if ts.tzinfo is not None:
-            ts = ts.tz_localize(None)  # keep Eastern wall-clock digits
+            # Convert to Eastern BEFORE stripping the tz: yfinance has returned
+            # both ET- and UTC-based stamps across versions, and stripping a UTC
+            # stamp keeps UTC digits -> wrong BMO/AMC classification.
+            ts = ts.tz_convert("America/New_York").tz_localize(None)
         day = ts.normalize()
         if not (s <= day <= e):
             continue
@@ -167,6 +171,7 @@ def build_calendar(
     cal["announce_date"] = pd.to_datetime(cal["announce_date"])  # cached CSV round-trips as str
     if crosscheck:
         cal = crosscheck_sessions(cal, fetch_8ks=fetch_8ks)
+    cal = apply_session_overrides(cal)
     labels = cohort_labels()
     cal["cohort"] = cal["ticker"].map(labels)
     return cal.sort_values(["announce_date", "ticker"]).reset_index(drop=True)[CALENDAR_COLUMNS]

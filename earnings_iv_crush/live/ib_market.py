@@ -77,7 +77,10 @@ def qualify_underlying(ib: IB, ticker: str) -> UnderlyingQuote:
     from ib_async import Stock
 
     symbol = ticker.replace("-", " ")
-    qualified = ib.qualifyContracts(Stock(symbol, "SMART", "USD"))
+    # A symbol IB does not recognise comes back as a [None] slot rather than an
+    # empty list, so the falsy check alone lets a None contract through and the
+    # AttributeError surfaces deep inside reqTickers, killing the whole pass.
+    qualified = [c for c in ib.qualifyContracts(Stock(symbol, "SMART", "USD")) if c is not None]
     if not qualified:
         raise ValueError(f"Could not qualify underlying {ticker!r} on IB.")
     contract = qualified[0]

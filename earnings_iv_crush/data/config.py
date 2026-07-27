@@ -61,6 +61,16 @@ ALPACA_KEY = os.getenv("ALPACA_KEY", "")
 ALPACA_SECRET = os.getenv("ALPACA_SECRET", "")
 SEC_USER_AGENT = os.getenv("SEC_USER_AGENT", "")
 
+# QUANTT WRDS mirror on Cloudflare R2 (S3-compatible, read-only). The data layer
+# reads parquet directly from the bucket; see data/wrds_r2.py.
+R2_ENDPOINT_URL = os.getenv("R2_ENDPOINT_URL", "")
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "")
+R2_BUCKET = os.getenv("R2_BUCKET", "quantt-historical-market-data")
+
+# London Strategic Edge — free historical option chains with IV + Greeks.
+LSE_API_KEY = os.getenv("LSE_API_KEY", "")
+
 
 def require(name: str) -> str:
     """Return an env var, or raise a clear error telling the user to set it."""

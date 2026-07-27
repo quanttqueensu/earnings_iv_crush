@@ -40,7 +40,24 @@ earnings announcements. *SSRN Working Paper 4832160*.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
+
+
+def _resolve_width(measured: float | None, assumed: float) -> float:
+    """The observed quoted width when there is one, else the modelled assumption.
+
+    A NaN measurement counts as absent rather than as zero. Treating it as zero would
+    silently charge no spread on exactly the events whose quotes were too poor to
+    measure, which are the events most likely to be expensive to trade.
+    """
+    if measured is None:
+        return assumed
+    value = float(measured)
+    if not math.isfinite(value) or value < 0.0:
+        return assumed
+    return value
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Cost breakdown container
@@ -139,6 +156,8 @@ class CostModel:
         entry_premium_per_share: float,
         exit_premium_per_share: float,
         contracts: int,
+        entry_rel_spread: float | None = None,
+        exit_rel_spread: float | None = None,
     ) -> CostBreakdown:
         """
         Cost of opening and closing one short straddle position.
@@ -151,6 +170,21 @@ class CostModel:
             Straddle mid per share paid to close at exit (USD).
         contracts : int
             Number of straddles (each ``contract_multiplier`` shares).
+        entry_rel_spread, exit_rel_spread : float or None, optional
+            *Observed* full quoted width at each crossing, as a fraction of the mid.
+            When supplied these replace ``bid_ask_pct`` on that side.
+
+            This exists because ``bid_ask_pct`` is an assumption, and once a book is
+            marked on real quotes the width is a measurement. Charging the assumed
+            spread on top of a quote-derived mid double-counts. The two sides are
+            separate because the real widths are strongly asymmetric on this
+            strategy: the measured entry half-cross is 3.07% of premium against 8.55%
+            at exit, since the exit lands the session after an earnings gap when the
+            traded strike has been pushed away from the money and its quotes widen.
+            A single symmetric number cannot represent both.
+
+            NaN is treated as "not supplied", so a partially quoted book falls back
+            per-side rather than silently charging zero spread.
 
         Returns
         -------
@@ -167,11 +201,16 @@ class CostModel:
         commission = self.commission_per_contract * contracts * self.n_fills
         exchange_fee = self.exchange_fee_per_fill * self.n_fills
 
-        # Full quoted spread paid on the premium traded at each crossing.
-        per_crossing = self.bid_ask_pct * self.cross_fraction
+        # Full quoted spread paid on the premium traded at each crossing. Measured
+        # widths win over the modelled default wherever they are available.
+        entry_width = _resolve_width(entry_rel_spread, self.bid_ask_pct)
+        exit_width = _resolve_width(exit_rel_spread, self.bid_ask_pct)
         spread_cost = (
-            per_crossing
-            * (max(entry_premium_per_share, 0.0) + max(exit_premium_per_share, 0.0))
+            self.cross_fraction
+            * (
+                entry_width * max(entry_premium_per_share, 0.0)
+                + exit_width * max(exit_premium_per_share, 0.0)
+            )
             * notional
         )
 

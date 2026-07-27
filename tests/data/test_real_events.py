@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from earnings_iv_crush.data import real_events as re
 from earnings_iv_crush.engine.greeks import bs_price
@@ -133,6 +134,42 @@ def test_thin_or_missing_chain_is_skipped():
         cal, fetch_chain=fetch_chain, fetch_prices=lambda t, s, e: _prices(t, s, e)
     )
     assert set(df["ticker"]) == {"AAA"}
+
+
+def test_corporate_action_overnight_move_dropped():
+    # A raw-price feed (e.g. NSE bhavcopy) shows a 1:1 bonus as the price halving
+    # overnight. That ~45% move is a corporate action, not an earnings gap, and
+    # must be dropped so it never enters realised_move.
+    cal = pd.DataFrame({"ticker": ["AAA"], "announce_date": ["2024-06-10"]})
+
+    def fetch_chain(t, d):
+        pre = pd.Timestamp(d) <= pd.Timestamp("2024-06-10")
+        return _chain(d, 100.0, sigma=0.4, front_extra_iv=0.5 if pre else 0.0)
+
+    def fetch_prices(t, s, e):
+        # The exit-window pull starts on the entry date; halve the level there.
+        level = 55.0 if s == "2024-06-10" else 100.0
+        return _prices(t, s, e, level)
+
+    df = re.build_execution_events(cal, fetch_chain=fetch_chain, fetch_prices=fetch_prices)
+    assert df.empty  # the sole event is a ~45% overnight move -> dropped
+
+
+def test_large_but_valid_earnings_move_kept():
+    # A 30% overnight move is a large but real earnings gap; it stays.
+    cal = pd.DataFrame({"ticker": ["AAA"], "announce_date": ["2024-06-10"]})
+
+    def fetch_chain(t, d):
+        pre = pd.Timestamp(d) <= pd.Timestamp("2024-06-10")
+        return _chain(d, 100.0, sigma=0.4, front_extra_iv=0.5 if pre else 0.0)
+
+    def fetch_prices(t, s, e):
+        level = 70.0 if s == "2024-06-10" else 100.0
+        return _prices(t, s, e, level)
+
+    df = re.build_execution_events(cal, fetch_chain=fetch_chain, fetch_prices=fetch_prices)
+    assert len(df) == 1
+    assert df.iloc[0]["realised_move"] == pytest.approx(0.30)
 
 
 def test_empty_calendar_returns_typed_frame():

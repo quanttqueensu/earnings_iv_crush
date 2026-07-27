@@ -47,10 +47,18 @@ from ..engine.pnl import (
 # Canonical break-even (Task A)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Measured entry/exit-split MEAN relative spreads (full quoted width / mid) from
-# the closing-NBBO sample (scripts/measure_spread.py -> measured_spread.csv).
-ASSUMED_ENTRY_SPREAD = 0.0613
-ASSUMED_EXIT_SPREAD = 0.1647
+# Measured entry/exit-split MEAN relative spreads of the straddle *package* (total
+# quoted width / total mid across the two legs) from the closing-NBBO sample
+# (scripts/measure_spread.py -> measured_spread.csv, 39 events each side).
+#
+# The prior values (6.13% / 16.47%) came from averaging the two legs' *relative*
+# spreads with equal weight. That estimator is unbiased only when the legs are worth
+# about the same, which holds at entry and fails at exit: after an earnings gap one
+# leg is intrinsic-heavy and the other a near-worthless tail, so equal weighting
+# loads the average onto the leg closed for pennies. The entry figure is therefore
+# almost unchanged (6.13 -> 6.07) while the exit figure more than halves.
+ASSUMED_ENTRY_SPREAD = 0.0607
+ASSUMED_EXIT_SPREAD = 0.0778
 
 
 def round_trip_cost_frac(entry_spread: float, exit_spread: float) -> float:
