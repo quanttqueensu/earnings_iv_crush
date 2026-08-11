@@ -16,8 +16,16 @@ data/raw/
 data/processed/
 *.parquet
 
-# Generated research artefacts (tearsheets, metric dumps)
-outputs/
+# Generated research artefacts (tearsheets, metric dumps).
+# Ignore the CONTENTS, not the directory: git does not descend into an excluded
+# directory, so a negation under `outputs/` would never be reached.
+outputs/*
+# The forward paper book is the record itself and must persist. The cloud recorder
+# commits it back after every run; while it was ignored, `git add` failed and the job
+# pushed nothing whilst still reporting success.
+!outputs/paper/
+outputs/paper/*
+!outputs/paper/*.csv
 
 # Python
 __pycache__/
@@ -47,5 +55,7 @@ Thumbs.db
 # Office temp/lock files
 ~$*
 
-# Research paper drafts: kept local, not published
-paper/
+# Research paper drafts: kept local, not published.
+# Root-anchored: an unanchored `paper/` matches at any depth and would also swallow
+# outputs/paper/, the forward book.
+/paper/

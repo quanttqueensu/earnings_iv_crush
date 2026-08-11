@@ -1,0 +1,71 @@
+name: paper-radar
+
+# Forward paper recorder for the earnings short-straddle book with the
+# name-persistence overlay. Runs after the US close on weekdays, on GitHub's
+# servers, so the book keeps accruing with the local machine off. Books are
+# committed back to the repo and are the record itself.
+#
+# Setup (one-time):
+#   1. Enable Actions on the repo.
+#   2. Add repository secret FINNHUB_API_KEY (Settings -> Secrets -> Actions).
+#      Chains and spot come from yfinance and need no key.
+#
+# The job fails rather than commits an empty book when events were due and none
+# could be snapshotted: yfinance is sometimes rate-limited from datacenter IPs, and
+# a green run that persists nothing is indistinguishable from a quiet calendar.
+# If that starts happening daily, run scripts/paper_radar.py locally on a schedule.
+
+on:
+  schedule:
+    # 21:15 UTC Mon-Fri: after the 16:00 ET close year-round (17:15 ET under EDT,
+    # 16:15 ET under EST), so the entry snapshot is the final end-of-day chain.
+    - cron: "15 21 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+# Never let two runs write the book at once.
+concurrency:
+  group: paper-radar
+  cancel-in-progress: false
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pandas numpy scipy pyarrow requests yfinance
+
+      - name: Confirm the richness seed is present
+        # Without it the radar records every name with rich status "unknown", which
+        # is an unconditional book, not the overlay. Better to know on day one.
+        run: |
+          test -f data/rich_set.csv || { echo "::error::data/rich_set.csv missing - rebuild with scripts/build_rich_seed.py"; exit 1; }
+          echo "seed rows: $(( $(wc -l < data/rich_set.csv) - 1 ))"
+
+      - name: Run paper radar
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: python scripts/paper_radar.py
+
+      - name: Commit updated books
+        run: |
+          git config user.name "paper-radar[bot]"
+          git config user.email "paper-radar@users.noreply.github.com"
+          git add outputs/paper/radar_open_positions.csv outputs/paper/radar_ledger.csv
+          if git diff --cached --quiet; then
+            echo "book unchanged today"
+            exit 0
+          fi
+          git commit -m "paper radar: book update $(date -u +%Y-%m-%d)"
+          # Rebase onto any commit that landed while this run was working, so a
+          # concurrent push does not drop a day of the book.
+          git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
