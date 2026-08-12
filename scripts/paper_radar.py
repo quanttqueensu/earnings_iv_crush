@@ -4,10 +4,12 @@ Free, full-universe forward paper recorder for the name-persistence overlay.
 
 Each run does two things for the S&P universe (``universe.BROAD_300``):
 
-  exits    for open paper positions whose exit session is today, fetch the spot,
-           compute the realised move, book the short-straddle return on premium
-           ``ret = 1 - |realised_move| / implied_move`` net of the 11.6% cost, and
-           close the position into the ledger.
+  exits    for open paper positions whose exit session is today, re-fetch the chain and
+           mark the *same* strike and expiry that was sold, so the buy-back is charged
+           intrinsic plus the premium still left in the contract. P&L is reported on
+           both the premium basis and return on margin, the latter matching
+           ``pnl.build_trade`` so the live book is comparable to the settled backtest.
+           A position that cannot be quote-marked stays open and is retried.
   entries  find names with earnings in the next few sessions (free Finnhub
            calendar), and for any whose session-aware entry is today, snapshot the
            ATM straddle (free yfinance chain, real bid/ask) for the implied move and
@@ -53,6 +55,7 @@ from earnings_iv_crush.data import (  # noqa: E402
     options,
     universe,
 )
+from earnings_iv_crush.engine.pnl import regt_straddle_margin  # noqa: E402
 
 BOOK_DIR = Path("outputs/paper")
 OPEN_CSV = BOOK_DIR / "radar_open_positions.csv"
@@ -82,13 +85,36 @@ LEDGER_COLS = [
     "exit_date",
     "spot_entry",
     "spot_exit",
+    "strike",
+    "expiry",
+    "straddle_entry",
+    "straddle_exit",
     "implied_move",
     "realised_move",
     "ret",
     "net_ret",
+    "ret_on_margin",
+    "net_ret_on_margin",
+    "ret_intrinsic_proxy",
+    "mark_source",
     "in_rich_set",
     "source",
 ]
+
+# How the buy-back was priced. "quote" marks the same strike and expiry off the exit
+# session's own chain, which is what the settled engine does (pnl.build_trade values the
+# exit leg at its remaining maturity and post-event vol). "intrinsic_fallback" prices it
+# at |S - K|, i.e. as though the option expired at the exit date, and is recorded only so
+# an unmarkable position eventually leaves the open book. It is never headline-eligible:
+# on the 912-event canonical panel the intrinsic assumption leaves 55.1% of the entry
+# credit uncharged and turns a mean return on margin of -0.1142 into +0.1928.
+MARK_QUOTE = "quote"
+MARK_FALLBACK = "intrinsic_fallback"
+
+# A position that cannot be quote-marked stays open this many calendar days before it is
+# booked on the fallback and flagged, so a permanently unquotable name cannot wedge the
+# open book forever.
+FALLBACK_AFTER_DAYS = 5
 
 # Every ledger row carries how it came to exist. "live" means this recorder opened the
 # position before the announcement and booked its exit afterwards, so the entry decision
@@ -186,6 +212,31 @@ def _snapshot(ticker: str, asof: pd.Timestamp, announce: pd.Timestamp):
     return (spot, float(strike), expiry.strftime("%Y-%m-%d"), float(straddle), float(im)), "ok"
 
 
+def _exit_mark(ticker: str, asof: pd.Timestamp, expiry: str, strike: float) -> float | None:
+    """Mid of the *same* straddle that was sold, priced off the exit session's chain.
+
+    Closing a short straddle before expiry costs intrinsic plus whatever premium is
+    still in the contract, so the buy-back has to be marked rather than assumed. The
+    strike and expiry come from the entry snapshot, so this prices the position that
+    was actually opened and not a fresh ATM straddle at the new spot.
+    """
+    try:
+        chain = options.fetch_option_chain(ticker, asof.strftime("%Y-%m-%d"))
+    except Exception:
+        return None
+    if chain is None or chain.empty:
+        return None
+    if not ((chain["bid"] > 0) | (chain["ask"] > 0)).any():
+        return None
+    try:
+        mid = features.atm_straddle_mid(chain, pd.Timestamp(expiry), float(strike))
+    except Exception:
+        return None
+    if mid is None or not float(mid) > 0:
+        return None
+    return float(mid)
+
+
 def run_exits(today: pd.Timestamp, dry: bool) -> int:
     openpos = _load(OPEN_CSV, OPEN_COLS)
     if openpos.empty:
@@ -218,7 +269,38 @@ def run_exits(today: pd.Timestamp, dry: bool) -> int:
                 )
                 spot_entry = spot_entry_now
         rm = abs(spot_exit / spot_entry - 1.0)
-        ret = 1.0 - rm / float(r["implied_move"])
+        credit_ps = float(r["straddle_mid"])
+        strike = float(r["strike"])
+        expiry = str(r["expiry"])
+
+        # Price the buy-back off the exit chain. Falling back to intrinsic is a last
+        # resort, flagged, and excluded from every reported statistic, because pricing
+        # the close at |S - K| hands the book the whole remaining premium for free.
+        exit_ps = _exit_mark(str(r["ticker"]), exit_on, expiry, strike)
+        mark_source = MARK_QUOTE
+        if exit_ps is None:
+            overdue = (today - exit_on).days
+            if overdue < FALLBACK_AFTER_DAYS:
+                print(
+                    f"  [unmarked] {r['ticker']}: no exit chain for {expiry} @ {strike:g}; "
+                    f"leaving open, retry next run ({overdue}d past exit)"
+                )
+                continue
+            exit_ps = abs(spot_exit - strike)
+            mark_source = MARK_FALLBACK
+            print(
+                f"  [fallback] {r['ticker']}: unquotable {overdue}d past exit, booked at "
+                f"intrinsic and excluded from the reported book"
+            )
+
+        # Premium basis, matching the forward-report convention, and margin basis,
+        # matching pnl.build_trade so the live book is comparable to the settled one.
+        pnl_ps = credit_ps - exit_ps
+        cost_ps = COST * credit_ps
+        margin_ps = regt_straddle_margin(spot_entry, strike, credit_ps, 1) / 100.0
+        ret = pnl_ps / credit_ps if credit_ps else float("nan")
+        rom = pnl_ps / margin_ps if margin_ps else float("nan")
+
         ledger.loc[len(ledger)] = {
             "ticker": r["ticker"],
             "announce_date": r["announce_date"],
@@ -226,10 +308,20 @@ def run_exits(today: pd.Timestamp, dry: bool) -> int:
             "exit_date": r["exit_date"],
             "spot_entry": spot_entry,
             "spot_exit": spot_exit,
+            "strike": strike,
+            "expiry": expiry,
+            "straddle_entry": credit_ps,
+            "straddle_exit": exit_ps,
             "implied_move": r["implied_move"],
             "realised_move": rm,
             "ret": ret,
             "net_ret": ret - COST,
+            "ret_on_margin": rom,
+            "net_ret_on_margin": (pnl_ps - cost_ps) / margin_ps if margin_ps else float("nan"),
+            # Kept only so the old estimator stays visible next to the marked one. It
+            # assumes the straddle expired at the exit date and is not a return.
+            "ret_intrinsic_proxy": 1.0 - rm / float(r["implied_move"]),
+            "mark_source": mark_source,
             "in_rich_set": r["in_rich_set"],
             "source": LIVE,
         }
@@ -247,12 +339,16 @@ def run_entries(
     end = (today + timedelta(days=LOOKAHEAD_DAYS)).strftime("%Y-%m-%d")
     cal = earnings.fetch_earnings_calendar(today.strftime("%Y-%m-%d"), end)
     if cal.empty:
-        return 0, 0
+        return 0, 0, 0, []
     cal = cal[cal["ticker"].isin(names)].copy()
     openpos = _load(OPEN_CSV, OPEN_COLS)
     held = set(zip(openpos["ticker"], openpos["announce_date"].astype(str), strict=False))
     session_col = "session" if "session" in cal.columns else "hour"
-    seen, opened = 0, 0
+    # ``seen`` is every event whose entry is today; ``attempted`` drops the ones already
+    # in the book. Only the latter can fail to open, so only the latter may drive the
+    # empty-book alarm. Alarming on ``seen`` makes a re-run of a fully booked day look
+    # like a dead feed, exits green as a failure, and skips the commit that saves the day.
+    seen, attempted, opened = 0, 0, 0
     skips: list[str] = []
     for _, e in cal.iterrows():
         announce = pd.Timestamp(e["announce_date"])
@@ -265,6 +361,7 @@ def run_entries(
         seen += 1
         if (e["ticker"], str(announce.date())) in held:
             continue
+        attempted += 1
         # Record every event and label it, rather than hard-filtering to the rich
         # set. The book stays re-analysable if the seed is later revised, and the
         # unconditional arm is the comparison the overlay is judged against. An
@@ -293,7 +390,7 @@ def run_entries(
         opened += 1
     if not dry:
         _write(openpos, OPEN_CSV)
-    return seen, opened, skips
+    return seen, attempted, opened, skips
 
 
 def main() -> None:
@@ -313,7 +410,7 @@ def main() -> None:
     )
 
     booked = run_exits(today, args.dry_run)
-    seen, opened, skips = run_entries(today, names, rich, args.dry_run)
+    seen, attempted, opened, skips = run_entries(today, names, rich, args.dry_run)
 
     ledger = _load(LEDGER_CSV, LEDGER_COLS)
     print(
@@ -333,6 +430,13 @@ def main() -> None:
                 f"figure below. They are not forward evidence."
             )
         live = ledger[src == LIVE]
+        n_fallback = int((live["mark_source"].astype(str) != MARK_QUOTE).sum())
+        if n_fallback:
+            print(
+                f"  WARNING: {n_fallback} trade(s) booked at intrinsic because no exit "
+                f"chain was available - excluded from every figure below"
+            )
+        live = live[live["mark_source"].astype(str) == MARK_QUOTE]
         flag = live["in_rich_set"].astype(str).str.lower()
         books = [("all booked", live), ("rich only", live[flag == "true"])]
         if (flag == "unknown").any():
@@ -341,12 +445,18 @@ def main() -> None:
         for lbl, book in books:
             if len(book):
                 x = book["net_ret"].astype(float)
+                m = book["net_ret_on_margin"].astype(float)
                 print(
-                    f"  {lbl:10s} N={len(book):4d} netMean={x.mean():+.4f} hit={(x>0).mean():.3f} "
-                    f"cum={x.sum():+.3f}"
+                    f"  {lbl:10s} N={len(book):4d} netPrem={x.mean():+.4f} "
+                    f"netRoM={m.mean():+.5f} hit={(m>0).mean():.3f}"
                 )
         if not len(live):
             print("  live book is empty - no completed forward trade yet, so no inference")
+        elif len(live) < 30:
+            print(
+                f"  N={len(live)} is far too small for inference. The settled verdict rests "
+                f"on N=391 and its CI still contains zero; nothing here revises it."
+            )
     if args.dry_run:
         print("(dry-run: books not written)")
 
@@ -355,11 +465,11 @@ def main() -> None:
     # rate-limited from datacenter IPs), not that the calendar was empty. A job that
     # exits green on this would accrue an empty book for weeks - the exact failure
     # that produced the current one.
-    if seen > 0 and opened == 0:
+    if attempted > 0 and opened == 0:
         tally = pd.Series(skips).value_counts().to_dict() if skips else {}
         detail = ", ".join(f"{k} x{v}" for k, v in tally.items()) or "no reason recorded"
         print(
-            f"ERROR: {seen} event(s) had their entry today and none could be "
+            f"ERROR: {attempted} unheld event(s) had their entry today and none could be "
             f"snapshotted ({detail}). Not booking a silent zero.",
             file=sys.stderr,
         )
