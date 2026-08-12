@@ -26,6 +26,11 @@ Books (CSV, git-friendly):
     outputs/paper/radar_open_positions.csv
     outputs/paper/radar_ledger.csv
 
+Every ledger row is stamped ``source``. This recorder only ever writes ``live``: the
+position was opened before the announcement and booked after it, so no entry decision
+could see its own outcome. Trades scored after the fact live in
+``outputs/research/backfill_ledger.csv`` and are never merged into this file.
+
 Usage:
     python scripts/paper_radar.py [--date YYYY-MM-DD] [--universe broad|megacap] [--dry-run]
 """
@@ -82,13 +87,30 @@ LEDGER_COLS = [
     "ret",
     "net_ret",
     "in_rich_set",
+    "source",
 ]
+
+# Every ledger row carries how it came to exist. "live" means this recorder opened the
+# position before the announcement and booked its exit afterwards, so the entry decision
+# could not see the outcome. Anything scored after the fact belongs in the backfill
+# ledger (outputs/research/) and is inadmissible as forward evidence. Without the column
+# the two are indistinguishable once they share a file, which is how a backtest ends up
+# quoted as a paper record.
+LIVE = "live"
 
 
 def _load(path: Path, cols: list[str]) -> pd.DataFrame:
-    if path.exists():
-        return pd.read_csv(path)
-    return pd.DataFrame(columns=cols)
+    if not path.exists():
+        return pd.DataFrame(columns=cols)
+    df = pd.read_csv(path)
+    if cols is LEDGER_COLS and len(df) and "source" not in df.columns:
+        raise SystemExit(
+            f"ERROR: {path} has {len(df)} rows and no 'source' column, so live trades "
+            f"cannot be told from backfilled ones. Refusing to append to an "
+            f"unattributable book. Move the existing rows to outputs/research/ and "
+            f"restart the live ledger, or stamp the column by hand."
+        )
+    return df
 
 
 def _write(df: pd.DataFrame, path: Path) -> None:
@@ -209,6 +231,7 @@ def run_exits(today: pd.Timestamp, dry: bool) -> int:
             "ret": ret,
             "net_ret": ret - COST,
             "in_rich_set": r["in_rich_set"],
+            "source": LIVE,
         }
         booked += 1
     keep = openpos[pd.to_datetime(openpos["exit_date"]) > today]
@@ -298,9 +321,20 @@ def main() -> None:
     )
     print(f"exits booked today: {booked}   entries: {opened} opened of {seen} whose entry is today")
     print(f"open positions: {len(_load(OPEN_CSV, OPEN_COLS))}   ledger trades: {len(ledger)}")
+    # Report the live book only. Rows scored after the fact are excluded from every
+    # statistic printed here rather than pooled and footnoted, because the pooled number
+    # is the one that gets quoted.
     if len(ledger):
-        flag = ledger["in_rich_set"].astype(str).str.lower()
-        books = [("all booked", ledger), ("rich only", ledger[flag == "true"])]
+        src = ledger["source"].astype(str).str.lower()
+        n_other = int((src != LIVE).sum())
+        if n_other:
+            print(
+                f"  WARNING: {n_other} non-live row(s) present and excluded from every "
+                f"figure below. They are not forward evidence."
+            )
+        live = ledger[src == LIVE]
+        flag = live["in_rich_set"].astype(str).str.lower()
+        books = [("all booked", live), ("rich only", live[flag == "true"])]
         if (flag == "unknown").any():
             n_unk = int((flag == "unknown").sum())
             print(f"  WARNING: {n_unk} trades booked unseeded - excluded from the rich arm")
@@ -311,6 +345,8 @@ def main() -> None:
                     f"  {lbl:10s} N={len(book):4d} netMean={x.mean():+.4f} hit={(x>0).mean():.3f} "
                     f"cum={x.sum():+.3f}"
                 )
+        if not len(live):
+            print("  live book is empty - no completed forward trade yet, so no inference")
     if args.dry_run:
         print("(dry-run: books not written)")
 
