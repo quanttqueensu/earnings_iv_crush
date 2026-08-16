@@ -92,3 +92,23 @@ def test_cap_one_per_ticker_and_sector():
     assert (out["ticker"] == "AAPL").sum() == 1
     assert (out["sector"] == "Tech").sum() == 2
     assert "JPM" in set(out["ticker"])
+
+
+def test_missing_sector_column_warns_instead_of_silently_dropping_the_cap():
+    """A risk control that quietly does nothing is the failure mode this guards.
+
+    ``cap_concentration`` skips the sector rule when the column is absent. That
+    is the right behaviour, but a caller who believes the cap applied is worse
+    off than one who knows it did not, so the skip has to be audible.
+    """
+    events = pd.DataFrame(
+        {
+            "ticker": ["AAPL", "MSFT", "NVDA"],
+            "entry_date": ["d"] * 3,
+            "richness": [0.5, 0.4, 0.3],
+        }
+    )
+    with pytest.warns(UserWarning, match="sector concentration cap not applied"):
+        out = risk.cap_concentration(events, rank_col="richness", max_per_sector=1)
+    # The ticker rule still ran; nothing was dropped by a cap that never applied.
+    assert len(out) == 3

@@ -1,12 +1,16 @@
 """regime.py
 Per-event trade-structure selection from the volatility regime.
 
-The strategy switches structure with the regime: defined-risk iron
-flies when index volatility is elevated, calendars when the term-structure
-premium dominates the absolute level mispricing, and the naked short straddle
-otherwise. This module consumes the VIX level fetched by ``data.vix`` and the
-per-event features to label each event with its structure, without yet routing
-the structure economics through the production ledger.
+**Status: closed research arm.** This labels each event with a trade structure
+from the volatility regime: iron flies when index volatility is elevated,
+calendars when the front-versus-back slope dominates the absolute level, and the
+naked short straddle otherwise. The frozen specification does not use it. Both
+alternative structures were tested and dropped on cost (``strategy.structures``
+carries the reasoning), so the selector labels a choice the live book no longer
+makes and never routed its economics through the production ledger. Kept so the
+structure comparison can be rerun.
+
+Consumes the VIX level fetched by ``data.vix`` plus the per-event features.
 
 This module implements:
 

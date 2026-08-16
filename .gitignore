@@ -29,6 +29,17 @@ outputs/*
 outputs/paper/*
 !outputs/paper/*.csv
 
+# One research artefact is published, by name. `fills_rescore.csv` is the three-row
+# cost-basis summary that `tests/test_fills_rescore_attainability.py` reads to stop the
+# selection-biased execution arm being promoted. Without the file the guard skips, which
+# means the single most dangerous number in the project is unguarded in a clone. It holds
+# the project's own computed statistics, not vendor rows, so it is publishable.
+# Name files individually here. A pattern such as `!outputs/research/*.csv` would publish
+# several hundred artefacts, many of them superseded.
+!outputs/research/
+outputs/research/*
+!outputs/research/fills_rescore.csv
+
 # Python
 __pycache__/
 *.py[cod]

@@ -10,12 +10,16 @@ equity spot series. This module registers those bundles and resolves one by name
 so ``run_research`` (and any other entry point) selects a market without scattering
 provider ``if`` branches through the run logic.
 
-US runs on the free DoltHub historical chain (or Alpaca for the 2024+ window) with
-Yahoo earnings dates and yfinance spot. India runs on the free NSE UDiFF F&O
-bhavcopy (``nse_options``) with Yahoo earnings dates and yfinance spot, both keyed
-by the ``.NS`` suffix that ``nse_options`` does not use - so the India wrappers add
-``.NS`` for the Yahoo/price calls and strip it back to the bare bhavcopy symbol the
-chain adapter expects.
+The live universe is US, on the free DoltHub historical chain (or Alpaca for the
+2024+ window) with Yahoo earnings dates and yfinance spot.
+
+The ``india`` and ``brazil`` bundles are a closed research arm. Being able to add
+a market by naming three fetchers is what made the cross-market test cheap enough
+to run at all, and it returned a clean negative: no gross edge in India at any
+threshold, and a genuine Brazilian gross signal sitting entirely inside the
+quoted spread. ``documentation/STRATEGY.md`` Section 7 carries the numbers. The
+bundles stay registered so that result is reproducible, not because either market
+is traded or maintained. Do not add a fourth.
 """
 
 from __future__ import annotations
@@ -250,6 +254,8 @@ _MARKETS: dict[str, Market] = {
         default_start="2019-01-02",
         universe=US_UNIVERSE,
     ),
+    # The two markets below are the closed cross-market arm (see module docstring).
+    # Registered so the negative result stays reproducible; not live.
     "india": Market(
         name="india",
         chain_source="nse",

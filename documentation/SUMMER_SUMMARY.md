@@ -20,7 +20,7 @@ What did not hold up was the original term-structure filter used to choose which
 
 That changes the direction of the project, but in a useful way. Instead of spending the year trying to improve the same filter, the next phase is focused on **execution-aware selection, alternative holding periods, better measures of relative mispricing, and new volatility signals**. Several of those directions are already built far enough to begin testing immediately.
 
-At the same time, the infrastructure is largely in place: **645 automated tests, multiple historical and live data sources behind one interface, US option coverage from 2013 to 2026, a paper-trading connection to Interactive Brokers, and a cloud-based forward recorder designed to build a timestamped live history throughout the year.**
+At the same time, the infrastructure is largely in place: **626 automated tests, multiple historical and live data sources behind one interface, US option coverage from 2013 to 2026, a paper-trading connection to Interactive Brokers, and a cloud-based forward recorder designed to build a timestamped live history throughout the year.**
 
 The summer was about building the platform and figuring out where the opportunity actually is. The goal for the year is to turn that into a strategy we would be comfortable putting forward as a complete systematic options book.
 
@@ -37,15 +37,17 @@ The core system now handles the full process:
 * marks options using real bid/ask quotes rather than closing-price approximations;
 * calculates implied volatility, Greeks, P&L and transaction costs;
 * runs different strategy and selection rules through the same backtesting framework;
-* tests alternative option structures, exits and holding periods;
-* compares results across US and international markets;
+* tests alternative option structures, exits and holding periods, which is how iron flies and calendars were ruled out;
+* extends to another market by naming three data sources, which is how India and Brazil were tested and closed;
 * records every configuration tested so results can be compared properly;
 * connects to Interactive Brokers for paper execution; and
 * runs a scheduled cloud process designed to build a forward paper record.
 
-The codebase has also grown substantially, to roughly 64,000 lines of Python across 307 modules,
-carrying 645 automated tests and 657 result artefacts, with US option coverage from 2013 to 2026.
-The full breakdown is in [`README.md`](../README.md) Section 9.
+The codebase has also grown substantially, to roughly 65,000 lines of Python across 313 modules,
+carrying 626 published automated tests and 661 result artefacts, with US option coverage from 2013 to 2026.
+Rather less than half of that is published: the research scripts and their outputs stay local
+because they depend on vendor-derived caches. [`README.md`](../README.md) Section 9 splits what
+a clone carries from what the wider project has produced.
 
 The main benefit of this is that the project does not need to start over every time the strategy changes. The data, execution, testing and backtesting infrastructure is already there. New ideas can now be plugged into the same system and compared on the same basis.
 

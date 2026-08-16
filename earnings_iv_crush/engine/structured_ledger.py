@@ -1,12 +1,13 @@
 """structured_ledger.py
 Book the regime-selected trade structure, not just the naked straddle.
 
-The iron-fly and calendar variants are priced and regime-selected, but the
-booked economics would otherwise stay the naked straddle. This module closes
-that gap: it dispatches each event to the structure the regime selector picked,
+**Status: closed research arm.** This is what made the structure comparison
+scorable: it dispatches each event to the structure ``strategy.regime`` picked,
 sizes it by worst-case loss (1% of NAV), charges costs, and emits a common
-ledger schema the backtester already scores. The naked-straddle path is the
-default elsewhere.
+ledger schema the backtester already scores. That comparison ran and both
+alternative structures lost on cost, so the frozen specification books the naked
+straddle through ``engine.pnl`` and nothing reaches this path in the live book.
+Use it to rerun the comparison, not to book a trade.
 
 This module implements:
 

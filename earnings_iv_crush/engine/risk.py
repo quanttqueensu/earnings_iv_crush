@@ -19,6 +19,8 @@ This module implements:
 
 from __future__ import annotations
 
+import warnings
+
 import pandas as pd
 
 from ..config import GLOBAL, STRATEGY
@@ -239,6 +241,16 @@ def cap_concentration(
 
     if sector_col in df.columns and day_col in df.columns:
         df = df.groupby([day_col, sector_col], group_keys=False, sort=False).head(max_per_sector)
+    else:
+        # A risk control that quietly does nothing is worse than one that is absent,
+        # because the caller believes it applied. Label the frame with
+        # ``data.sectors.MEGACAP_SECTOR`` before calling if the cap is wanted.
+        missing = [c for c in (sector_col, day_col) if c not in df.columns]
+        warnings.warn(
+            f"sector concentration cap not applied: missing column(s) {missing}. "
+            "Only the one-position-per-ticker rule ran.",
+            stacklevel=2,
+        )
 
     # Restore the original input ordering of the surviving rows.
     keep = set(df.index)

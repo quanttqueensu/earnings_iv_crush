@@ -86,10 +86,10 @@ python -m pytest -q
 ```
 
 The suite runs on synthetic fixtures and needs no network. A correct environment reports
-**612 passed, 5 skipped, 4 deselected** out of 621 collected. The deselected four are marked
-`live` and hit real networks; the five skips need research artefacts that are not carried in
-the repository. Any other number means the environment is wrong, not that the tests are
-flaky.
+**622 passed, 4 deselected** out of 626 collected. The deselected four are marked `live` and
+hit real networks. Nothing skips, and that is deliberate: a test that skips in a clone is a
+guard that is not guarding anything for anyone but the person who has the file locally. Any
+other number means the environment is wrong, not that the tests are flaky.
 
 Then confirm the code meets the standard the continuous integration job enforces:
 
@@ -207,7 +207,7 @@ Installable package, `pip install -e .`, Python 3.10 or later. Continuous integr
 | Part | Files | Lines |
 |---|---:|---:|
 | `earnings_iv_crush/` | 71 | 16,417 |
-| `scripts/` | 16 | |
+| `scripts/` | 17 | |
 | `tests/` | 73 | 8,102 |
 
 Package sub-structure: `data/` 32 modules, `engine/` 20, `strategy/` 6, `live/` 6,
@@ -223,6 +223,32 @@ its own results are believed.
 `data/providers.py` binds a market to its chain, calendar and spot sources as one triple, so
 no provider branching leaks into run logic. The registry is what made the cross-market test in
 Section 5.2 cheap to run and cheap to close; the live universe is US only.
+
+### 4.1 Which modules are the live path
+
+The package carries more strategy surface than the frozen specification uses, because arms that
+were tested and closed keep their code so the result behind them stays reproducible. Reading
+the package without knowing which is which is the fastest way to build the wrong mental model,
+so:
+
+| Live path | |
+|---|---|
+| `strategy/filters.py` | The selector. `expanding_gate_rank` is the frozen gate. |
+| `engine/pnl.py` | The reference valuation. Everything reconciles to `build_trade`. |
+| `engine/marks.py`, `engine/quotes.py` | Marking and quote hygiene. |
+| `engine/costs.py` | The measured cost stack. |
+| `engine/screen.py`, `engine/stats.py` | The reporting contract and the significance tools. |
+| `baseline/agent0.py` | The unconditional control the filtered book has to beat. |
+| `live/` | The broker and paper-execution layer. |
+
+| Closed arm, kept for reproducibility | Why it closed |
+|---|---|
+| `strategy/fair_move_model.py` | Feeds the implied-versus-fair move gate, which failed its own out-of-sample test. `use_move_gate=False`. |
+| `strategy/structures.py`, `strategy/regime.py`, `engine/structured_ledger.py` | Iron flies and calendars. The wings cost more than the whole cost budget. |
+| `data/nse_options.py`, `data/b3_options.py`, the `india` and `brazil` bundles in `data/providers.py` | Geographic expansion. Clean negative in both markets, Section 7 of [`STRATEGY.md`](STRATEGY.md). |
+
+Every module in the second table says so in its own docstring. If you find one that does not,
+that is a defect worth fixing, because the docstring is what a reader meets first.
 
 ## 5. Data sources and APIs
 
@@ -240,7 +266,7 @@ the richness seed and the git-ignored caches.
 |---|---|---|---|
 | Databento OPRA | `data/databento_quotes.py` | The primary historical option source. Consolidated best bid and offer sampled once a minute, available from 2013-04-01, which covers the whole sample. The mark is the last two-sided quote at or before 15:59 ET. | `DATABENTO_API_KEY` |
 | Databento OPRA | `data/databento_options.py` | Daily bars with local Black-Scholes inversion. Retained for comparison; superseded as the marking basis. | same |
-| London Strategic Edge | `data/lse_options.py`, `data/lse_intraday.py` | Daily and one-minute option bars. Trade prices, no bid or ask. Free but keyed and heavily rate-limited. | `LSE_API_KEY` |
+| London Strategic Edge | `data/lse_options.py`, `data/lse_intraday.py` | Daily and one-minute option bars. Evaluated as a replacement for Databento and not adopted: the bars are trade prints with no bid or ask, which is the marking basis that produced this project's first false positive, and the export endpoint rate-limits to roughly one call every twenty seconds. Retained as an independent cross-check on a marked exit, not as a marking basis. | `LSE_API_KEY` |
 | WRDS via Cloudflare R2 mirror | `data/wrds_r2.py`, `data/wrds_panel.py` | Read-only S3 parquet mirror. Compustat and IBES for the earnings calendar, CRSP for equity spot, a point-in-time surprise panel, Fama-French factors. | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT_URL`, `R2_BUCKET` |
 | Interactive Brokers | `live/ib_market.py`, `live/ib_orders.py` | Live chain snapshots, underlying quotes, order placement. Paper account only. | `IBKR_HOST`, `IBKR_ACCOUNT`, `IBKR_CLIENT_ID`, `IBKR_MKT_DATA_TYPE` |
 
@@ -447,6 +473,7 @@ block in its docstring. The ones carried in the repository:
 | `paper_trade_ibkr.py` | The broker harness. See Section 9.3. |
 | `backfill_forward_window.py` | The recent-window backtest twin of the recorder. Metered; takes `--cap`. |
 | `build_rich_seed.py` | Builds the richness seed the recorder depends on. |
+| `build_calendar.py` | Builds the historical earnings calendar from Yahoo, cross-checked against SEC EDGAR 8-K acceptance times. Free sources only, so it runs without a paid key. |
 | `run_backtest.py`, `run_sensitivity.py`, `fetch_chains.py`, `smoke_test.py` | Backtest, sensitivity sweep, chain fetch, and a fast end-to-end smoke check. |
 
 Scripts that depend on research artefacts under `outputs/research/` will not run in a fresh
@@ -455,8 +482,8 @@ suite are what work on day one; the first of those needs no network at all.
 
 ## 11. Testing
 
-621 tests collected across 73 files. Four are marked `live`, hit real networks, and are
-deselected by default.
+626 tests collected across 74 files. Four are marked `live`, hit real networks, and are
+deselected by default. Nothing else skips.
 
 The invariant-pinning suites each name the defect they guard in their own docstring, which is
 the convention to follow when adding one:
@@ -488,8 +515,11 @@ the convention to follow when adding one:
 Stated here so nobody has to rediscover them.
 
 1. **A fresh clone cannot reproduce the research.** Caches and result artefacts are
-   git-ignored. Closing this means publishing the cached inputs or shipping a fixture set, and
-   it is the first onboarding job.
+   git-ignored, because they are large and partly vendor-derived. One exception is published
+   by name, `outputs/research/fills_rescore.csv`, because a test reads it. Closing the rest
+   means either publishing the cached inputs, which needs a redistribution answer, or shipping
+   a fixture set small enough to carry. It is the first onboarding job and the last thing
+   standing between a new member and the real numbers.
 2. **The margin model has never been checked against a broker statement.** A probe suggests
    the broker charges between 2.2 and 2.4 times the modelled figure. Comparisons between books
    are unaffected, since they share the convention, but absolute return levels are research
@@ -530,3 +560,7 @@ document covers how the system is built and how to work in it.
 | 2026-08-16 | 1, 11, 12 | `expanding_gate_rank`, the frozen selector, promoted from the research scripts into `strategy/filters.py`. The adversarial look-ahead invariant now runs in a clone rather than skipping, and the gate is pinned against the quantile convention it reproduces. The limitation this replaced is removed. |
 | 2026-08-16 | 2.2, 10 | `demo_pipeline.py` added so a fresh clone can run the valuation and scoring path end to end with no credentials. Sections 2.2 onward renumbered. |
 | 2026-08-16 | 4, 5.2 | NSE India and B3 Brazil removed from the data-source table. Listing them as available sources presented a closed negative as live infrastructure. The adapters stay in the tree, labelled as not to be built on, and the result that closed them stays in `STRATEGY.md` Section 7. |
+| 2026-08-16 | 4.1 | Added, after a sweep found the same defect in six more places: the move gate, the two alternative structures and the cross-market registry all described themselves in their own docstrings as live capabilities. Each now states that it is a closed arm, and 4.1 maps the live path against the closed ones so the distinction survives without reading every module. |
+| 2026-08-16 | 5.1 | London Strategic Edge restated. It was evaluated as a Databento replacement and not adopted, so listing it as a source implied a marking basis the project deliberately does not use. |
+| 2026-08-16 | 2.1, 11 | Test counts corrected against a clean clone rather than the working tree, which carries untracked test files and a research artefact the suite reads. `fills_rescore.csv` is now published by name so the attainability guard runs in a clone instead of skipping. |
+| 2026-08-16 | 10 | `build_calendar.py` published, so the earnings-calendar module has an entry point that can drive it from free sources. |

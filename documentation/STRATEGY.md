@@ -427,7 +427,7 @@ new result is expected to follow them. Setup and the commands themselves are in
 | `scripts/validate_screen.py` | Rebuilds the settled verdict from cache; the fastest integrity check. |
 | `scripts/agent_comparison.py` | The fifteen-selector comparison in Section 6.4. |
 | `scripts/score_oos_2026.py` | The Section 6.3 re-score. |
-| `outputs/research/` | 657 artefacts. Superseded ones carry a `_SUPERSEDED` suffix rather than being deleted. |
+| `outputs/research/` | 661 artefacts, generated locally and git-ignored. Superseded ones carry a `_SUPERSEDED` suffix rather than being deleted. |
 | `outputs/research/audit/` | Per-event SHA-256 lineage over source data, config, costs, marks, P&L and quotes for 2,062 events, plus an independent reconstruction that imports nothing from the package. |
 
 The two `outputs/research/` rows are generated locally and are git-ignored, so

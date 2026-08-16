@@ -199,15 +199,15 @@ What a clone carries:
 | --- | ---: |
 | Package modules | 71 |
 | Lines of package Python | 16,417 |
-| Research entry points | 16 |
-| Automated tests | 621 |
+| Research entry points | 17 |
+| Automated tests | 626 |
 | Lines of test Python | 8,102 |
 
 What the wider project has produced, most of which is generated locally rather than carried in the repository:
 
 | | |
 | --- | ---: |
-| Research and result artefacts | 657 |
+| Research and result artefacts | 661 |
 | Recorded configurations | 1,476 |
 | Option prints in execution study | 34,672 |
 
@@ -241,7 +241,7 @@ pip install -e ".[dev]"
 python -m pytest -q
 ```
 
-The test suite runs on synthetic fixtures and does not require paid data or network access. A correct environment reports 612 passed, 5 skipped and 4 deselected out of 621 collected.
+The test suite runs on synthetic fixtures and does not require paid data or network access. A correct environment reports 622 passed and 4 deselected out of 626 collected. The four deselected are marked `live` and hit real networks.
 
 Then watch the pipeline actually run, which also needs no credentials:
 

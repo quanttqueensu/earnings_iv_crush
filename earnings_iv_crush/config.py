@@ -126,9 +126,10 @@ class GlobalConfig:
     # one, or the reverse.
     mark_basis: str = "close"  # "close" or "quote"
     # Market bundle and chain provider (see data/providers.py). ``market``
-    # selects the calendar/spot/chain trio ("us" or "india"); ``chain_source``
-    # overrides just the chain provider ("alpaca", "dolthub", "nse") or takes the
-    # market default when None. India routes to the free NSE UDiFF F&O bhavcopy.
+    # selects the calendar/spot/chain trio; ``chain_source`` overrides just the
+    # chain provider ("alpaca" or "dolthub") or takes the market default when
+    # None. The live universe is US: the "india" and "brazil" bundles exist only
+    # to reproduce the closed cross-market result, not to be traded.
     market: str = "us"
     chain_source: str | None = None
 

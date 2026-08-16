@@ -1,15 +1,19 @@
 """structures.py
 Defined-risk and term-structure trade variants around the short straddle.
 
-The naked short ATM straddle is the primary structure, with two variants the
-regime selector switches to:
+**Status: closed research arm.** The frozen specification trades the naked short
+ATM straddle and nothing else, because it is the only structure that survives the
+measured cost stack: the wings cost more than the entire cost budget. Both
+variants below were priced, scored and dropped. The result is in
+``documentation/STRATEGY.md`` Section 7. The code stays because the comparison is
+worth being able to rerun, not because either variant is a live vehicle.
+
+The two variants:
 
 * **Iron fly** - short ATM straddle plus long out-of-the-money call and put
-  wings at ``wing_mult`` times the implied event move. The wings cap the loss,
-  required when VIX is elevated (defined-risk regime).
+  wings at ``wing_mult`` times the implied event move. The wings cap the loss.
 * **Calendar** - short the front-week straddle, long a vega-balanced back-month
-  straddle. Harvests the term-structure premium when the front-vs-back IV slope
-  dominates the absolute level mispricing.
+  straddle. Sells the front-versus-back slope rather than the absolute level.
 
 Each variant exposes a ``*_pnl`` function returning the entry credit, exit value
 and net short P&L per ``contracts`` lot, priced with the Black-Scholes engine.

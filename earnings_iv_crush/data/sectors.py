@@ -10,6 +10,10 @@ it is kept here rather than fetched so the cut is reproducible offline.
 Coverage is the ``MEGACAP_50`` cohort - the liquidity-clean sample on which the
 term+skew edge is validated. Names outside the map resolve to ``"Unknown"`` so a
 broader frame degrades gracefully rather than raising.
+
+Consumer: ``engine.risk.cap_concentration`` caps concurrent positions per sector
+per day and needs a ``sector`` column to do it. Label the candidate frame from
+here first; the cap warns and does nothing when the column is absent.
 """
 
 from __future__ import annotations

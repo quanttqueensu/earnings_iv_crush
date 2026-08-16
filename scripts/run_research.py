@@ -2,11 +2,17 @@
 run_research.py
 Enriched end-to-end research run: filtered strategy vs Agent 0, net of costs.
 
-Runs the full chain: fit the fair-move model, select through both filters, book
+Runs the full chain: fit the fair-move model, select through the filters, book
 the ledger gross (commission-only) and net (full cost stack), score with the
 expanded metric set, run the significance comparison (Sharpe spread, paired
 t-test, bootstrap CI, Deflated Sharpe), report the regime structure mix and the
 Greek P&L attribution, and write a tearsheet.
+
+Two of those stages are inert on the frozen specification and are run only so the
+comparison can be reproduced. The move gate is off (``use_move_gate=False``,
+failed out of sample), so selection is the causal term percentile alone; and the
+vehicle is the naked straddle, so the structure mix reports one structure. Both
+decisions are in ``documentation/STRATEGY.md`` Section 7.
 
 The default run uses a synthetic, planted-edge event set and validates the
 machinery against a known answer. ``--real`` swaps in the live pipeline: Yahoo
@@ -411,9 +417,9 @@ def main() -> None:
         "--market",
         choices=["us", "india", "brazil"],
         default=GLOBAL.market,
-        help="Market bundle (calendar/spot/chain). 'india' routes to the free "
-        "NSE UDiFF F&O bhavcopy, 'brazil' to the free B3 COTAHIST file; see "
-        "data/providers.py.",
+        help="Market bundle (calendar/spot/chain). The live universe is 'us'; "
+        "'india' and 'brazil' reproduce the closed cross-market result and are "
+        "not maintained. See data/providers.py.",
     )
     ap.add_argument(
         "--chain-source",

@@ -2,10 +2,15 @@
 No-look-ahead walk-forward backtest of the filtered strategy.
 
 Validation needs an out-of-sample result, not the in-sample fit. This runs the
-strategy so that every fair-move prediction is made
-from a model fitted only on earlier events (expanding window), and the term-
-structure filter uses its already-causal trailing percentile. The selected,
-out-of-sample events are booked and scored exactly like the live strategy.
+strategy so that every fair-move prediction is made from a model fitted only on
+earlier events (expanding window), and the term-structure filter uses its
+already-causal trailing percentile. The selected, out-of-sample events are booked
+and scored on the same ledger as the live book.
+
+It carries the fair-move arm because it was built when both gates were live. The
+frozen specification runs the term gate alone (``use_move_gate=False``), so on
+that specification the fair-move branch is inert and the causal term percentile
+is the whole selector.
 
 This module implements:
 

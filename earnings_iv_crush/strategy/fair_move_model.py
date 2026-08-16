@@ -2,17 +2,22 @@
 Fair-move regression: the model-implied event move.
 
 An empirical proxy for the Dubinsky-Johannes (2006) event-variance estimator.
-Regresses the realised post-earnings move on up to five pre-event features so
-the filter can compare the market's implied move against a fair benchmark.
+Regresses the realised post-earnings move on up to five pre-event features to
+give the implied move a fair benchmark to be compared against.
+
+**Status: feeds a closed gate.** The move gate this model exists to serve is off
+in the frozen specification (``use_move_gate=False``): it failed its own
+out-of-sample test, and ``config.STRATEGY`` documents the decision. The model is
+kept because the fair-move benchmark is reusable and because the walk-forward
+harness around it is the reference for fitting without look-ahead, not because
+the gate is coming back unchanged.
 
 The model fits on whichever of ``FEATURES`` are actually present and populated,
-so it works today on the two features the pipeline can compute (``trailing_rv``,
-``skew_25d``) and widens automatically as ``eps_dispersion``, ``prior_surprise``
-and ``oi_growth`` come online. An ordinary least-squares fit (statsmodels)
-exposes coefficient t-statistics; a ridge variant (scikit-learn) is available
-for when the full, partly collinear feature set arrives. The walk-forward helper
-never fits on data later than the event it predicts, and ``evaluate_walk_forward``
-reports the out-of-sample skill the validation step needs.
+which in practice is ``trailing_rv`` and ``skew_25d``. An ordinary least-squares
+fit (statsmodels) exposes coefficient t-statistics; a ridge variant
+(scikit-learn) is available for the fuller, partly collinear feature set. The
+walk-forward helper never fits on data later than the event it predicts, and
+``evaluate_walk_forward`` reports out-of-sample skill.
 
 This module implements:
 

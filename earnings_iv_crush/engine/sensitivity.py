@@ -8,6 +8,10 @@ sensitivity analysis and, crucially, for an honest Deflated Sharpe: the number o
 cells is the effective number of trials, which the DSR uses to discount the best
 cell's Sharpe for selection bias.
 
+The implied-vs-fair axis is retained for that trial count even though the frozen
+specification fixes it off: the cells were searched, so they still cost
+deflation whatever was done with them afterwards.
+
 This module implements:
 
 * ``threshold_sweep``    - grid of (ratio, pctl) -> strategy-vs-control metrics.

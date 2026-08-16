@@ -24,7 +24,7 @@ mispricing rather than on magnitude is the pivot the next stage is built around.
 
 | | |
 | --- | --- |
-| Test suite | 645 tests, green, no network or paid data required |
+| Test suite | 626 tests, green, no network or paid data required |
 | Continuous integration | Green on every commit to main |
 | Twelve-year book | Reproducible from cache in one command, N = 391, Sharpe +0.055992 |
 | Clean 2025-26 block | Scored, pre-registered before the first data pull |
