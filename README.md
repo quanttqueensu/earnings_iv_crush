@@ -10,11 +10,15 @@ The current strategy sells short-dated at-the-money straddles around scheduled e
 
 The original summer selector is no longer the final direction of the project. The underlying earnings-volatility effect remains interesting, and the next stage is focused on **finding genuine mispricing, improving execution, and testing better ways to manage the position after earnings.**
 
+**New here?** Read this file first, then [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) for how the project got to this point, then [`STRATEGY.md`](STRATEGY.md) for the exact rules and the full results. Section 11 below defines every term used across all three.
+
 ## 1. Project Overview
 
 The basic trade is simple.
 
-Immediately before a scheduled earnings announcement, the strategy sells a short-dated at-the-money call and put. After the announcement, implied volatility normally falls sharply as the uncertainty around the event disappears.
+Immediately before a scheduled earnings announcement, the strategy sells a short-dated at-the-money call and put. Selling both together is a *straddle*: it makes money if the stock stays still and loses money if it moves a long way in either direction.
+
+After the announcement, *implied volatility*, which is the amount of future movement the option's price implies the market is expecting, normally falls sharply as the uncertainty around the event disappears. That fall is the "crush" in the project name.
 
 Across 989 measured earnings events, implied volatility fell **98.1% of the time**, by an average of **48.65 volatility points**.
 
@@ -55,7 +59,9 @@ On a clean 2025-26 dataset that no configuration was fitted to, the **unconditio
 | Per-trade Sharpe | +0.043 |
 | Date-clustered 95% interval | [-0.027, +0.120] |
 
-The interval contains zero, so this is **not being treated as a finished profitable strategy**.
+Every term in that table is defined in Section 11.
+
+The interval runs from a negative number to a positive one. That means the data cannot rule out that the true result is zero or worse, so this is **not being treated as a finished profitable strategy**.
 
 It is a baseline.
 
@@ -70,7 +76,7 @@ On the same clean block:
 | Unconditional | **+0.49%** | **+3.44%** | [-0.027, +0.120] |
 | Frozen term selector | **-3.12%** | +0.07% | **[-0.347, -0.058]** |
 
-A participation-matched random selector also beat the frozen rule.
+Picking events at random, at the same number of trades, also beat the frozen rule.
 
 That result changed the direction of the project.
 
@@ -80,20 +86,13 @@ The selector was identifying **risk magnitude**, not necessarily **mispricing**.
 
 The next version of the strategy is being built around that distinction.
 
+The full result set, including the twelve-year record and the attribution behind it, is in [`STRATEGY.md`](STRATEGY.md) Section 6.
+
 ## 3. How the Strategy Developed
 
-This was not one model written in May and tuned until August.
+The project went through six distinct stages between May and August, and most of what it now knows came from things that were built and then discarded.
 
-Different parts of the strategy were built, tested, kept, or dropped as the data improved.
-
-| Stage | Design | What Came From It |
-| --- | --- | --- |
-| **1, late May** | Large-cap short earnings straddle using daily option data | Built the original event engine, P&L ledger, margin model and backtester. Also showed that daily closes were not a reliable substitute for executable option marks. |
-| **2, June** | Rebuilt the book using OPRA consolidated bid/ask quotes around a fixed execution time | **Adopted.** Quote-based marking became the standard for the project. |
-| **3, June** | Implied-move filter designed to identify unusually expensive earnings events | **Dropped.** Did not improve out-of-sample performance. |
-| **4, late June** | Term-structure selector based on front-week versus longer-dated implied volatility | Became the main summer specification and was frozen before deeper testing. The 2019-24 block produced +0.117 per-trade Sharpe across 198 trades. |
-| **5, July** | Backward US extension, iron flies, calendars, India, Brazil and execution-cost work | The true 2013-18 holdout returned -0.005 Sharpe across 193 trades. Alternative structures and international versions also narrowed the list of directions worth continuing. |
-| **6, August** | Clean 2025-26 broad-universe test | **Main pivot.** The unconditional premium remained visible while the frozen selector failed against both the baseline and matched random selection. |
+Daily option closing prices turned out to be unusable and were replaced with real bid/ask quotes in June. An implied-move filter was built and dropped. A term-structure selector became the main summer specification in late June and was frozen before deeper testing. July extended the history back to 2013, tested alternative structures and international markets, and measured execution cost directly. August tested everything on a clean, untouched block and produced the pivot described above.
 
 Across the full 2013-24 quote-marked book, the frozen summer strategy produced **391 trades and +0.056 per-trade Sharpe**, with a clustered interval of **[-0.042, +0.180]**.
 
@@ -101,17 +100,19 @@ That is not strong enough to carry forward as the final strategy, particularly a
 
 The useful result is that the project now knows much more precisely **what needs to improve**.
 
+The stage-by-stage account, with what each stage produced and why it was kept or dropped, is in [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) Section 2.
+
 ## 4. Execution Matters
 
 One of the largest pieces of work this summer was measuring what option execution actually looks like.
 
-Rather than assuming trades could be filled at the midpoint, the project matched **34,672 real option market prints** to their prevailing consolidated bid and ask.
+Rather than assuming trades could be filled at the midpoint between the bid and the ask, the project matched **34,672 real option market prints** to their prevailing consolidated bid and ask.
 
 At the fixed execution window studied:
 
 * median price improvement was **0.0%**;
 * only **21.2%** of prints traded at or better than the midpoint;
-* **54.3%** paid the full touch; and
+* **54.3%** paid the full touch, meaning they bought at the ask or sold at the bid; and
 * the measured half-spread was roughly **1.79% per side**.
 
 That changes how the strategy should be designed.
@@ -122,80 +123,27 @@ The next strategy generation will therefore test **liquidity and spread filters 
 
 ## 5. What Comes Next
 
-There are five main directions going into the year.
+Five directions going into the year, in the order they are being prioritised. The full case for each, with the evidence behind it, is in [`STRATEGY.md`](STRATEGY.md) Section 7.
 
-### 5.1 Execution-aware selection
-
-None of the original 1,476 recorded configurations started by asking whether the option itself was cheap enough to trade.
-
-The execution dataset now makes that possible.
-
-The first comparison will be an unconditional earnings book with liquidity and spread requirements against the original term-structure strategy at the same participation rate.
-
-### 5.2 Find mispricing rather than large moves
-
-The original term selector was good at finding large expected moves.
-
-The next selector needs to find situations where the **price of the move looks wrong**.
-
-That includes work around:
-
-* residual volatility value;
-* peer-relative pricing;
-* historical earnings behaviour;
-* earnings surprise information;
-* cross-sectional models; and
-* company and industry context.
-
-### 5.3 Revisit the exit
-
-The current baseline closes the straddle the session after earnings.
-
-That means crossing the option spread twice.
-
-Holding closer to expiry cuts the estimated round-trip break-even from roughly **11.6% of premium to about 5.8%**.
-
-One conditional version tested this summer returned **+17.3% versus -4.4% for the next-session exit** on the later comparison.
-
-The specific cutoff was selected in sample, so this is not a clean holdout result yet. It is a direction to freeze and validate properly.
-
-### 5.4 Separate the signal from earnings
-
-The same type of term-structure signal has been documented away from earnings.
-
-That creates a useful experiment:
-
-**Does the volatility signal work when the overnight earnings gap is removed?**
-
-The basic builder for this test is already written and can run on free data.
-
-### 5.5 Use information from earlier reporters
-
-Companies reporting earnings later in an industry may already have information embedded in the option-market reaction to peers that reported first.
-
-That raises a different type of pricing question:
-
-**Has the market fully updated the next company's earnings volatility after seeing what happened to its peers?**
-
-This is one of the directions intended for a dedicated analyst this year.
+1. **Execution-aware selection.** None of the 1,476 recorded configurations ever started by asking whether the option itself was cheap enough to trade. The execution dataset now makes that possible. The first comparison will be an unconditional earnings book with liquidity and spread requirements against the original term-structure strategy at the same participation rate.
+2. **Find mispricing rather than large moves.** The original selector was good at finding large expected moves. The next one needs to find situations where the price of the move looks wrong, which is a harder measurement problem than it first appears and is the main open research question going into the year.
+3. **Revisit the exit.** The current baseline closes the straddle the session after earnings, which means crossing the option spread twice. Holding closer to expiry cuts the estimated round-trip break-even from roughly **11.6% of premium to about 5.8%**. It also changes what the position is, because it keeps directional exposure after the announcement.
+4. **Separate the signal from earnings.** The same type of term-structure signal has been documented away from earnings by Vasquez (2017). Running it with the announcement removed separates "the signal is empty" from "the earnings event was the problem". The builder is already written and runs on free data.
+5. **Use information from earlier reporters.** Hann, Kim and Zheng (2019) show that option markets react when peer companies in the same industry report first, but test no trading strategy. Whether the market has fully updated the next company's earnings volatility after seeing its peers is an open and largely uncrowded question, and one of the directions intended for a dedicated analyst this year.
 
 ## 6. Multiple Testing
 
-The repository currently records **1,476 tested configurations**.
+The repository records **1,476 tested configurations**.
 
-That number shows the amount of ground covered, but it is also a statistical problem.
+That number shows the amount of ground covered, but it is also a statistical problem: trying hundreds of combinations makes it increasingly likely that something will look good by accident. With a search family this large, the expected best Sharpe from a set of strategies with **no real edge at all is about +0.43**, well above the +0.056 the twelve-year frozen book produced.
 
-Trying hundreds of combinations makes it increasingly likely that something will look good by accident.
+The project therefore keeps a trial ledger that counts abandoned configurations rather than pretending failed branches never existed, and every strategy-level Sharpe is read against that search history.
 
-The project therefore keeps a trial ledger that counts abandoned configurations rather than pretending failed branches never existed, and strategy-level Sharpe results are evaluated using Deflated Sharpe against that search history.
-
-For context, with a search family this large, the expected maximum Sharpe from a collection of strategies with no real edge is approximately **+0.43**, which is well above the +0.056 produced by the twelve-year frozen book.
-
-That is another reason the first selector is not being carried into the year unchanged.
+This is another reason the first selector is not being carried into the year unchanged.
 
 ## 7. Data and Execution Assumptions
 
-The main US historical results use OPRA consolidated bid and ask quotes through Databento.
+The main US historical results use OPRA consolidated bid and ask quotes through Databento. OPRA is the feed that consolidates quotes from every US options exchange, so a quote from it reflects the whole market rather than one venue.
 
 Option marks are taken from the last valid two-sided quote at or before **15:59 ET** on the relevant session.
 
@@ -219,13 +167,13 @@ Credentials live only in a git-ignored `.env`.
 
 Historical option coverage currently reaches back to **2013**, with additional equity and earnings datasets extending much further.
 
+The rules that stop the backtest using information it would not have had at the time are specified in [`STRATEGY.md`](STRATEGY.md) Section 5.
+
 ## 8. Forward Recording and Paper Execution
 
 Historical backtests are only one part of the project.
 
-A GitHub Actions workflow has also been built to create a forward paper record.
-
-After the market close, it can:
+A GitHub Actions workflow has also been built to create a forward paper record. After the market close, it can:
 
 1. pull upcoming earnings announcements;
 2. snapshot the relevant option chains;
@@ -237,18 +185,9 @@ The point of running this in the cloud is that the resulting record is externall
 
 The recorder was deployed in August and is still being hardened. It has been interrupted since 13 August by a schema mismatch between the deployed script and ledger, costing two scheduled runs. Those gaps are documented rather than backfilled.
 
-There is also a separate **Interactive Brokers paper-execution layer**.
+There is also a separate **Interactive Brokers paper-execution layer**, which turns strategy output into paper orders under a set of safety controls: dry-run by default, explicit transmission controls, protection against connecting to live trading ports, a kill switch, account and position checks, and a rule preventing a one-legged straddle from being transmitted.
 
-The IBKR integration includes:
-
-* dry-run by default;
-* explicit transmission controls;
-* protection against connecting to live trading ports;
-* a kill switch;
-* account and position checks; and
-* a rule preventing a one-legged straddle from being transmitted.
-
-The goal throughout the academic year is to build a growing forward paper record alongside the historical work.
+Three workflows are meant to run beside one another through the year: historical research, where new ideas are tested against the existing baseline on the same engine; the cloud forward book, which accumulates a timestamped record as new announcements occur; and IBKR paper execution once a strategy version is ready for it. The goal is to stop treating the backtest as the entire project.
 
 ## 9. Codebase
 
@@ -273,6 +212,8 @@ The package is split broadly into:
 * `tests/`, regression, invariance and integrity tests;
 * `outputs/`, result artefacts; and
 * `.github/workflows/`, CI and forward recording.
+
+A file-level map of the modules that matter most is in [`STRATEGY.md`](STRATEGY.md) Section 10.
 
 ## 10. Running the Project
 
@@ -312,60 +253,51 @@ With the cache present, `validate_screen.py` reproduces:
 * per-trade Sharpe = +0.055992; and
 * clustered interval = [-0.0421, +0.1803].
 
-## 11. Operating Cadence
+Before running a new research question of your own, read [`STRATEGY.md`](STRATEGY.md) Section 9. It sets out the protocol every result in this project is expected to follow.
 
-The project is moving toward three parallel workflows during the year.
+## 11. Glossary
 
-### Historical research
+Terms used across all three documents.
 
-New strategy ideas are specified, tested and compared against the existing baseline using the same P&L and execution engine.
+| Term | Meaning |
+| --- | --- |
+| **At-the-money (ATM)** | The option whose strike price is closest to where the stock is currently trading. |
+| **Straddle** | A call and a put on the same stock, same strike, same expiry. Selling one profits if the stock stays still. |
+| **Implied volatility (IV)** | The amount of future movement an option's price implies the market expects, quoted as an annualised percentage. |
+| **Implied move** | How far the option market expects the stock to move over the announcement, in percent, read off the straddle price. |
+| **Term structure / term spread** | How implied volatility differs across expiry dates. The spread used here is front-week IV minus back-month IV. |
+| **Hit rate** | The share of trades that made money. It says nothing about size, so a high hit rate with a few large losses can still lose overall. |
+| **Premium** | The cash received for selling the options. |
+| **Return on margin (RoM)** | Profit divided by the capital a broker requires to hold the position. The project's standard denominator, because it is what actually ties up money. |
+| **Reg-T margin** | The US regulatory margin formula, approximated here as 20% of the stock price plus the premium received. |
+| **Gross vs net** | Gross is before trading costs. Net is after the bid/ask spread and commissions. On short-dated options the gap between the two is large. |
+| **Mid, touch, half-spread** | The mid is the midpoint of the bid and ask. Paying the touch means buying at the ask or selling at the bid. The half-spread is the distance from mid to either side, and is what a trade costs if it crosses. |
+| **Sharpe ratio** | Average return divided by the standard deviation of returns: how much return was earned per unit of variability. Higher is better; roughly 1.0 is generally considered good for a live strategy. |
+| **Per-trade vs annualised Sharpe** | Per-trade Sharpe uses one trade as the unit. Annualising it requires multiplying by the square root of trades per year, which for this book is √35.2 ≈ 5.93. Using √252, the daily figure, would inflate it more than threefold and is a mistake this project has made once and now tests against. |
+| **Date-clustered 95% interval** | The range the true result plausibly sits in. It is clustered because many earnings land on the same day and are not independent observations, which a naive interval would ignore. An interval containing zero means the result cannot be distinguished from no edge. |
+| **Deflated Sharpe** | A Sharpe ratio adjusted for how many configurations were tested before finding it. It answers the question "would a strategy this good have shown up anyway, by chance, given how much we searched?" |
+| **In-sample, out-of-sample, holdout** | In-sample data is what the strategy was designed on. Out-of-sample data is what it was not. A holdout is data deliberately withheld until the rules were frozen, and it is the only honest test. |
+| **Participation-matched random selector** | A benchmark that picks the same number of events, from the same pool, at random. It is the fair comparison for a selection rule, because it holds everything fixed except the rule itself. |
+| **Vega, theta, spot** | The three sources of profit and loss here. Vega is sensitivity to implied volatility, theta is the value lost to time passing, spot is sensitivity to the stock price itself. |
+| **Pre-registration** | Writing down the hypothesis, the exact test and the criterion for calling it a failure, before running it. It is what stops a result being reinterpreted after the fact. |
 
-### Forward paper book
+## 12. Documents
 
-The cloud recorder snapshots upcoming events and builds a timestamped history as new earnings announcements occur.
+Three documents, three jobs.
 
-### IBKR paper execution
+| Document | Answers |
+| --- | --- |
+| **This README** | What is the project, where does it stand, how do I run it, and what do the terms mean. |
+| [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) | How the project developed over the summer, what each stage taught us, and what success looks like this year. |
+| [`STRATEGY.md`](STRATEGY.md) | The exact trading rules, the data and execution assumptions, the full results, and what still needs validating. |
+| [`HIRING.md`](HIRING.md) | Open project roles and what each one involves. |
 
-Once a strategy version is ready for forward execution, the Interactive Brokers layer can be used to translate selected trades into paper orders under the existing safety controls.
-
-The goal is for the historical backtest, cloud forward book and broker paper record to increasingly run beside one another rather than treating the backtest as the entire project.
-
-## 12. What Success Looks Like This Year
-
-By the end of the academic year, the target is to have:
-
-* a stable and continuously growing forward paper record;
-* an execution-aware baseline strategy;
-* a properly frozen test of alternative exit rules;
-* a rebuilt selector focused on relative mispricing;
-* multiple analyst-owned strategy branches;
-* at least one volatility strategy tested outside the earnings event;
-* more live execution observations around the earnings window; and
-* a final strategy specification tested without repeatedly tuning against the same holdout.
-
-The advantage going into the year is that most of the basic infrastructure is already built.
-
-The next stage is about improving the strategy.
-
-## 13. Documents
-
-* [`STRATEGY.md`](STRATEGY.md), full strategy logic, results, assumptions and open questions.
-* [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md), how the project developed over the summer and where it is going next.
-* [`HIRING.md`](HIRING.md), open project roles and expectations.
+Academic references are collected at the end of [`STRATEGY.md`](STRATEGY.md).
 
 A longer technical research record exists in `docs/research_handoff.md` but is not currently published to this repository.
 
-## 14. GitHub
+## 13. GitHub
 
 **Primary repository:** `github.com/jordanodorico/earnings_iv_crush`
 
 The QUANTT organisation fork should be kept synced with the primary repository before onboarding begins.
-
-## References
-
-* Bakshi, G., Kapadia, N., & Madan, D. (2003). *Stock Return Characteristics, Skew Laws, and the Differential Pricing of Individual Equity Options.* Review of Financial Studies.
-* Dubinsky, A., Johannes, M., Kaeck, A., & Seeger, N. J. (2019). *Option Pricing of Earnings Announcement Risks.* Review of Financial Studies.
-* Goyal, A., & Saretto, A. (2009). *Cross-section of Option Returns and Volatility.* Journal of Financial Economics.
-* Muravyev, D., & Pearson, N. D. (2020). *Options Trading Costs Are Lower Than You Think.* Review of Financial Studies.
-* Vasquez, A. (2017). *Equity Volatility Term Structures and the Cross Section of Option Returns.* Journal of Financial and Quantitative Analysis.
-* Hann, R. N., Kim, H., & Zheng, Y. (2019). *Intra-industry Information Transfers: Evidence from Changes in Implied Volatility Around Earnings Announcements.* Review of Accounting Studies.

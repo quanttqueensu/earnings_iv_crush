@@ -11,8 +11,11 @@ for, and whether anything survives the cost of trading it.
 
 Over the summer the machinery to answer that on real quote data was built, and
 then used: twelve years of OPRA consolidated quotes, nine data sources behind
-one interface, 645 tests, 1,476 recorded configurations. Full detail in
-[`STRATEGY.md`](STRATEGY.md) and [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md).
+one interface, 645 tests, 1,476 recorded configurations.
+
+Start with [`README.md`](README.md) for the project and the terminology, then
+[`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) for how it developed and
+[`STRATEGY.md`](STRATEGY.md) for the rules and the full results.
 
 ## What we found, and why that makes this worth joining
 
@@ -73,8 +76,8 @@ experiment available. The code is written and it runs on free data.
 ## Roles
 
 Three openings, roughly six to eight hours a week. No options background
-assumed for any of them, and there is a primer in the repository written for
-exactly that.
+assumed for any of them; every term used across these documents is defined in
+[`README.md`](README.md) Section 11.
 
 **Quantitative Research Analyst**, one or two positions. Own a direction end to
 end: pre-registration, build, run, report. You state the hypothesis and the

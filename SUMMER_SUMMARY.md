@@ -3,6 +3,11 @@
 **Jordan Odorico**
 **Period:** 25 May to 16 August 2026
 
+This is the narrative account of the summer: what was built, in what order, and what each stage
+taught us. For what the project is and what the terms mean, start with [`README.md`](README.md),
+which carries a glossary in Section 11. For the exact trading rules and the full result set, see
+[`STRATEGY.md`](STRATEGY.md).
+
 ## TL;DR
 
 Over the summer this project grew from a relatively simple earnings-volatility idea into a full options research and execution platform.
@@ -38,17 +43,9 @@ The core system now handles the full process:
 * connects to Interactive Brokers for paper execution; and
 * runs a scheduled cloud process designed to build a forward paper record.
 
-The codebase has also grown substantially:
-
-|                               |           |
-| ----------------------------- | --------: |
-| Python modules                |       307 |
-| Lines of Python               |   64,000+ |
-| Automated tests               |       645 |
-| Research/result files         |       657 |
-| Configurations recorded       |     1,476 |
-| Real execution prints studied |    34,672 |
-| Historical US option coverage | 2013-2026 |
+The codebase has also grown substantially, to roughly 64,000 lines of Python across 307 modules,
+carrying 645 automated tests and 657 result artefacts, with US option coverage from 2013 to 2026.
+The full breakdown is in [`README.md`](README.md) Section 9.
 
 The main benefit of this is that the project does not need to start over every time the strategy changes. The data, execution, testing and backtesting infrastructure is already there. New ideas can now be plugged into the same system and compared on the same basis.
 
@@ -79,17 +76,16 @@ The twelve-year record on the frozen summer strategy is honestly weak. Across 39
 
 The more encouraging result entering the year is actually the simplest version of the strategy.
 
-On the clean 2025-26 dataset, built after the main summer search was already complete, the **unconditional** short earnings straddle produced:
-
-|                        |     Result |
-| ---------------------- | ---------: |
-| Events                 |      1,221 |
-| Hit rate               |  **61.0%** |
-| Gross return on margin | **+3.44%** |
-| Net return on margin   | **+0.49%** |
-| 95% clustered interval | **[-0.027, +0.120]** |
-
-The interval contains zero, so this is not a proven edge and I am not presenting it as one. The point is that there appears to be something worth working with **before adding any sophisticated selection model at all**, on data that no configuration was ever fitted to. For comparison, the frozen term-structure filter applied to the same events returned **-3.12%**, with an interval of [-0.347, -0.058] that excludes zero on the wrong side, and a random selector taking the same number of trades from the same pool beat it.
+On the clean 2025-26 dataset, built after the main summer search was already complete, the
+**unconditional** short earnings straddle produced the figures quoted at the top of this document:
+a 61.0% hit rate and +0.49% net on margin across 1,221 events, with a clustered interval of
+[-0.027, +0.120]. The interval contains zero, so this is not a proven edge and I am not presenting
+it as one. The point is that there appears to be something worth working with **before adding any
+sophisticated selection model at all**, on data that no configuration was ever fitted to. For
+comparison, the frozen term-structure filter applied to the same events returned **-3.12%**, with
+an interval of [-0.347, -0.058] that excludes zero on the wrong side, and a random selector taking
+the same number of trades from the same pool beat it. The side-by-side table is in
+[`STRATEGY.md`](STRATEGY.md) Section 6.3.
 
 That gives us a much better starting point for the year.
 
@@ -137,13 +133,10 @@ That will be one of the main themes of the next phase.
 
 The summer was mainly a research and infrastructure build, so the forward record is only beginning now.
 
-A scheduled process has been deployed through GitHub Actions that can automatically:
-
-1. pull upcoming earnings events;
-2. snapshot the relevant option chains;
-3. record candidate positions;
-4. mark positions when their exit date arrives; and
-5. commit the resulting book back to GitHub.
+A scheduled process has been deployed through GitHub Actions that snapshots option chains around
+upcoming earnings, records candidate positions, marks them when their exit date arrives and commits
+the resulting book back to the repository. [`README.md`](README.md) Section 8 describes the
+mechanism.
 
 The important part is that the forward history is being written by a scheduled cloud job rather than manually on a laptop. That gives the project a dated external record that cannot simply be recreated later after seeing what happened.
 
@@ -151,7 +144,7 @@ The important part is that the forward history is being written by a scheduled c
 
 I am recording that here rather than repairing it quietly, because a forward record with undocumented gaps is not worth much. It is also a fair illustration of why the forward stage is starting now rather than after another semester of research: this class of failure does not appear in a backtest.
 
-There is also a separate **Interactive Brokers paper-trading system** already built with safety controls around order transmission. It can connect the strategy output to TWS and turn target positions into paper orders while preventing accidental transmission to a live account.
+A separate **Interactive Brokers paper-trading system** is also built, with safety controls around order transmission, and can turn strategy output into paper orders without any risk of reaching a live account.
 
 The goal over the year is to move from a project dominated by historical testing to one with a meaningful **forward paper history** sitting beside it.
 
@@ -163,6 +156,9 @@ The summer narrowed the project considerably, and I think that is a good thing.
 
 There are now several directions that can be given to individual analysts and tested in parallel rather than having everyone work on small variations of the same filter.
 
+What follows is why each of these five was chosen and what it is meant to settle. The exact
+specification of each, with the evidence behind it, is in [`STRATEGY.md`](STRATEGY.md) Section 7.
+
 ### 1. Build an execution-aware selector
 
 Every major summer strategy selected trades using market or volatility signals.
@@ -171,9 +167,10 @@ None of the 1,476 recorded configurations started by asking:
 
 > **Is this option cheap enough to trade?**
 
-We now have the execution dataset needed to do exactly that.
-
-The first test will be an unconditional earnings book with liquidity and spread filters, compared against the original term-structure strategy at the same participation rate.
+That is a striking gap given that cost turned out to be the binding constraint, and we now have the
+execution dataset needed to close it. This is the first test of the year because it settles quickly,
+runs on data already on disk, and would tell us whether three months of selection work was pointed
+in the wrong direction.
 
 ### 2. Find mispricing rather than volatility
 
@@ -181,7 +178,7 @@ The original selector largely identified events where a large move was expected.
 
 The next generation of signals should try to identify where the **price of that risk looks wrong**, rather than simply where the risk itself is large.
 
-There is a concrete measurement problem underneath this. When the filtered book's apparent advantage was decomposed in July, roughly **91% of it came from selling a physically larger option** rather than a more expensive one, and the residual term where genuine overpricing would show up moved the wrong way. Any new signal has to be scored on that residual, or it will keep rediscovering that large options are large.
+There is a concrete measurement problem underneath this. When the filtered book's apparent advantage was decomposed in July, roughly **91% of it came from selling a physically larger option** rather than a more expensive one, and the residual term where genuine overpricing would show up moved the wrong way. Any new signal has to be scored on that residual, or it will keep rediscovering that large options are large. That makes this a measurement-design problem before it is a signal problem.
 
 That opens up work around residual volatility value, peer-relative pricing, historical event behaviour, surprise information and cross-sectional models.
 
@@ -189,15 +186,17 @@ That opens up work around residual volatility value, peer-relative pricing, hist
 
 The project currently enters immediately before earnings and closes the following session.
 
-That is only one possible design.
-
-Holding closer to expiry materially reduces execution cost and has already produced one of the more interesting results from the summer, subject to the in-sample caveat in Section 3. Different exit rules, decay windows and post-event structures will be a major research track. Holding through the announcement also changes what the position is, since it carries directional exposure after the event, and that has to be measured rather than assumed away.
+That is only one possible design, and it is the expensive one, because it crosses the option spread
+twice. The hold-to-expiry results in Section 3 are the most interesting thing the summer produced
+outside the main verdict, subject to the in-sample caveat attached to them there. Different exit
+rules, decay windows and post-event structures will be a major research track. Holding through the announcement also changes what the position is, since it carries directional exposure after the event, and that has to be measured rather than assumed away.
 
 ### 4. Separate the volatility signal from earnings
 
-The steep term structure used this summer is related to a broader options anomaly that has been documented outside earnings. Vasquez (2017) reports a long-short of +16.5% per month sorting on the same slope in the same direction away from announcements, held to maturity, and our book was selling his short leg. So the direction was right; what we added was the announcement, and with it the overnight gap.
+The steep term structure used this summer is related to a broader options anomaly that has been documented outside earnings. Vasquez (2017) sorts on the same slope in the same direction away from announcements and reports a large long-short return; our book was selling his short leg. So the direction was right. What we added was the announcement, and with it the overnight gap.
 
-That gives us a clean experiment: run the same type of signal **without the announcement event**.
+That gives us a clean experiment: run the same type of signal **without the announcement event**. If
+it works there and not here, the earnings gap is the problem rather than the signal.
 
 The builder for this is already written and can run on free data.
 
@@ -205,7 +204,7 @@ The builder for this is already written and can run on free data.
 
 Companies do not report earnings in isolation.
 
-Hann, Kim and Zheng (2019) show across 3,030 firms and 217 industries that option markets react when peer companies in the same industry report first. They test no trading strategy at all. That creates an interesting question for this project:
+Hann, Kim and Zheng (2019) show that option markets react when peer companies in the same industry report first. They test no trading strategy at all. That creates an interesting question for this project:
 
 > If one company has already revealed information about its industry, has the option market fully updated the price of the next company's earnings risk?
 
@@ -251,16 +250,7 @@ The GitHub history provides a dated record of how the project developed over the
 | **12 August** | Forward valuation system upgraded and reconciled against the main P&L engine |
 | **15 August** | Clean 2025-26 dataset completed; summer selector retired as the primary direction and next-stage research programme set |
 
-Repository: `github.com/jordanodorico/earnings_iv_crush`. The QUANTT fork at `quanttqueensu/earnings_iv_crush` is currently behind and needs syncing.
-
-Anyone wanting to check the headline numbers can do so without paid data:
-
-```bash
-pip install -e ".[dev]"
-python -m pytest -q                   # 645 tests, no network required
-python scripts/validate_screen.py     # rebuilds the twelve-year book from cache
-python scripts/agent_comparison.py    # fifteen selection rules on one basis
-```
+Repository: `github.com/jordanodorico/earnings_iv_crush`. The QUANTT fork at `quanttqueensu/earnings_iv_crush` is currently behind and needs syncing. Setup and the commands for rebuilding the headline numbers are in [`README.md`](README.md) Section 10.
 
 ## Bottom Line
 

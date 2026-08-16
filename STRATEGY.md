@@ -12,8 +12,14 @@ clean 2025-26 block that nothing was fitted to.
 It covers why the trade should work (Section 3), the exact rules (Section 4),
 the data and execution assumptions behind every number (Section 5), how it
 performed (Section 6), where it goes next (Section 7), what still needs
-validating (Section 8), how to run it (Section 9), and where the code lives
-(Section 10).
+validating (Section 8), the protocol any new result has to follow (Section 9),
+and where the code lives (Section 10).
+
+It assumes you have read [`README.md`](README.md), which introduces the project
+and defines every term used here in its Section 11 glossary. The narrative of
+how the strategy reached this specification is in
+[`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md); setup and run instructions are in the
+README.
 
 ## 2. Executive Summary
 
@@ -358,31 +364,32 @@ In more detail:
 - **Integer sizing** drops the highest-priced names, a selection on price level
   correlated with volatility.
 
-## 9. Operating Cadence
+## 9. Research Protocol
 
-The scheduled recorder needs no intervention: `.github/workflows/paper_radar.yml`
-runs `scripts/paper_radar.py` at 21:15 UTC Monday to Friday and commits its own
-book back to this repository as `paper-radar[bot]`.
+Every result in this document was produced under the following rules, and any
+new result is expected to follow them. Setup and the commands themselves are in
+[`README.md`](README.md) Section 10.
 
-To run research by hand:
-
-1. `python -m pytest -q`, 645 tests, no network required. If this is not green,
-   nothing below is trustworthy.
-2. `python scripts/validate_screen.py`, rebuilds the settled book from cached
-   marks and checks it reproduces N = 391, Sharpe +0.055992 and the interval
-   [-0.0421, +0.1803]. Costs nothing and is the fastest way to confirm the
-   machinery before trusting it on something new.
-3. `python scripts/run_research.py --real`, the main research run.
-4. Any metered pull takes a hard `--cap` in dollars, prices itself with a free
-   metadata call before downloading anything, and reserves against the cap
-   atomically so concurrent workers cannot jointly overshoot.
-
-Before running a new research question: write the pre-registration first
-(hypothesis, exact specification, inference method, success criterion, kill
-criterion), declare the trial in the ledger, reuse `engine/` rather than
-reimplementing valuation, and score through `engine.screen.score_signal`, which
-enforces the reporting contract of N, hit rate, per-trade Sharpe, clustered
-interval and a stated annualisation factor.
+1. **Pre-register first.** Write the hypothesis, the exact specification, the
+   inference method, the success criterion and the kill criterion before the
+   first data request. A test whose criteria are written afterwards can always be
+   reinterpreted into a success.
+2. **Declare the trial in the ledger,** including branches you abandon. Every
+   Sharpe in this project is read against that count, so an undeclared trial
+   flatters everything else.
+3. **Check the machinery before trusting it.** `python -m pytest -q` must be
+   green, and `python scripts/validate_screen.py` must reproduce N = 391,
+   Sharpe +0.055992 and the interval [-0.0421, +0.1803] from cache. Both are free
+   and fast, and neither result is meaningful if they are not.
+4. **Reuse `engine/` rather than reimplementing valuation.** Score through
+   `engine.screen.score_signal`, which enforces the reporting contract of N, hit
+   rate, per-trade Sharpe, clustered interval and a stated annualisation factor.
+   The exit-marking defect in Section 5 came from a separate estimator; that is
+   the failure mode this rule exists to prevent.
+5. **Cap any metered pull.** Metered requests take a hard `--cap` in dollars,
+   price themselves with a free metadata call before downloading anything, and
+   reserve against the cap atomically so concurrent workers cannot jointly
+   overshoot.
 
 ## 10. Code Map
 
