@@ -13,7 +13,8 @@ The volatility premium around earnings is real, survives on data nothing was
 fitted to, and clears cost by a small margin. The term-structure filter built
 to find the best events is a jump-magnitude selector, not a mispricing
 detector, and it loses to picking events at random. A scheduled job on
-GitHub's servers has been recording a forward book since 11 August.
+GitHub's servers records a forward book, though it has been failing since 13
+August on a schema mismatch and is currently down (Section 4.1).
 
 The infrastructure is the part that carries forward: 645 tests, nine data
 sources behind one interface, an execution study of 34,672 real prints, and a
@@ -237,10 +238,17 @@ schema before writing, because appending to a frame read off an older header
 once dropped an exit mark and its provenance from the first live trade while
 still writing a plausible return.
 
-**The live book currently holds zero completed trades.** It was restarted on 11
-August when provenance stamping was added, and two positions are open. Two
-bounded trades are not evidence in either direction and are not presented as
-such. The forward evidence that does exist is a 199-event backtest over late
+**The live book currently holds zero completed trades, and the recorder is
+down.** It was restarted on 11 August when provenance stamping was added, and
+two positions are open. Since 13 August every run has failed: the deployed
+script reads a `mark_source` column that the deployed ledger, still on the
+pre-fix twelve-column schema, does not have. The schema guard described above
+is the thing that should have caught this and it had not been deployed. Two
+scheduled runs were lost. This is logged here rather than quietly repaired
+because a forward record whose gaps are undocumented is not a forward record.
+
+Two bounded trades would not be evidence in either direction in any case, and
+are not presented as such. The forward evidence that does exist is a 199-event backtest over late
 June to mid-August, unconditional across the broad universe, which returns
 +2.96% gross and -0.03% net: the edge exists gross and is consumed almost
 exactly by the 11.6% round trip, on a window nothing was fitted to.
