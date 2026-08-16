@@ -63,10 +63,6 @@ written, smoke-tested and runs on free data.
 The infrastructure does not need to be built again. Time goes into the strategy rather than
 the plumbing, which is the main argument for taking this project forward.
 
-Alongside that, the forward paper record accumulates a timestamped history that cannot be
-reconstructed after the fact. It will not be conclusive within one academic year, and it is
-worth saying so now rather than presenting it later as evidence it cannot yet be.
-
 ## Where to read next
 
 | Time | Read |

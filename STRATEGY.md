@@ -28,8 +28,8 @@ The book has three parts:
 - **The event engine.** Decides which announcements are tradeable, on what
   session, at what strike and expiry.
 - **The selector.** Decides which of those events to take.
-- **The cost floor.** 11.6% of premium round trip, measured from 34,672 real
-  prints rather than assumed.
+- **The cost floor.** 11.6% of premium round trip, measured from roughly 35k
+  option market quotes rather than assumed.
 
 **The underlying earnings-volatility effect is clear, and the simplest
 unconditional implementation is the most useful baseline going into the year.**
@@ -96,7 +96,7 @@ The exact rulebook, pinned in `earnings_iv_crush/frozen.py` and enforced by
    └─────────────────────────────────┴──────────────────────────────────┘
 
     SELECTOR: front-week IV minus back-month IV, ranked against its own
-    strictly-earlier history.  FROZEN AT q = 0.80  ->  RETIRED (6.3)
+    strictly-earlier history.  FROZEN AT q = 0.80  ->  BEING REBUILT (6.3)
     The unconditional book, no selector at all, is the current baseline.
 
     COST FLOOR: 11.6% of premium, round trip. Measured, not assumed.
@@ -427,7 +427,6 @@ new result is expected to follow them. Setup and the commands themselves are in
 | `scripts/validate_screen.py` | Rebuilds the settled verdict from cache; the fastest integrity check. |
 | `scripts/agent_comparison.py` | The fifteen-selector comparison in Section 6.4. |
 | `scripts/score_oos_2026.py` | The Section 6.3 re-score. |
-| `scripts/paper_radar.py` | The scheduled recorder. |
 | `outputs/research/` | 657 artefacts. Superseded ones carry a `_SUPERSEDED` suffix rather than being deleted. |
 | `outputs/research/audit/` | Per-event SHA-256 lineage over source data, config, costs, marks, P&L and quotes for 2,062 events, plus an independent reconstruction that imports nothing from the package. |
 
@@ -437,8 +436,8 @@ deleting post-entry records must not change any entry quantity; halving prices
 and strikes while doubling contracts must give an identical return; scrambling
 outcomes must not change any pre-event selection quantity),
 `test_frozen_constants.py`, `test_annualisation_regressions.py`,
-`test_fills_rescore_attainability.py`, `test_paper_radar_provenance.py`,
-`test_trial_ledger.py`, `test_greeks_reference.py`.
+`test_fills_rescore_attainability.py`, `test_trial_ledger.py`,
+`test_greeks_reference.py`.
 
 ## References
 

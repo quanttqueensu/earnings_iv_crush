@@ -6,7 +6,7 @@ A systematic options project built around one question:
 
 **Does the volatility priced into single-name options before earnings exceed the risk that actually shows up, and can that difference be captured after real trading costs?**
 
-The strategy sells short-dated at-the-money straddles around scheduled earnings announcements. The summer work built the infrastructure to test that idea properly, including quote-level option data, transaction-cost measurement, multiple strategy variants, forward recording, and an Interactive Brokers paper-execution layer.
+The strategy sells short-dated at-the-money straddles around scheduled earnings announcements. The summer work built the infrastructure to test that idea properly, including quote-level option data, transaction-cost measurement, multiple strategy variants, and an Interactive Brokers paper-execution layer.
 
 Two versions of that trade appear throughout these documents, and it is worth separating them at the outset:
 
@@ -133,7 +133,7 @@ Five directions going into the year, in the order they are being prioritised. Th
 2. **Find mispricing rather than large moves.** The original selector was good at finding large expected moves. The next one needs to find situations where the price of the move looks wrong, which is a harder measurement problem than it first appears and is the main open research question going into the year.
 3. **Revisit the exit.** The current baseline closes the straddle the session after earnings, which means crossing the option spread twice. Holding closer to expiry cuts the estimated round-trip break-even from roughly **11.6% of premium to about 5.8%**. It also changes what the position is, because it keeps directional exposure after the announcement.
 4. **Separate the signal from earnings.** The same type of term-structure signal has been documented away from earnings by Vasquez (2017). Running it with the announcement removed separates "the signal is empty" from "the earnings event was the problem". The builder is already written and runs on free data.
-5. **Use information from earlier reporters.** Hann, Kim and Zheng (2019) show that option markets react when peer companies in the same industry report first, but test no trading strategy. Whether the market has fully updated the next company's earnings volatility after seeing its peers is an open and largely uncrowded question, and one of the directions intended for a dedicated analyst this year.
+5. **Use information from earlier reporters.** Hann, Kim and Zheng (2019) show that option markets react when peer companies in the same industry report first, but test no trading strategy. Whether the market has fully updated the next company's earnings volatility after seeing its peers is an open and largely uncrowded question.
 
 ## 6. Multiple Testing
 
@@ -215,7 +215,7 @@ The package is split broadly into:
 * `scripts/`, individual research entry points;
 * `tests/`, regression, invariance and integrity tests;
 * `outputs/`, result artefacts; and
-* `.github/workflows/`, CI and forward recording.
+* `.github/workflows/`, continuous integration.
 
 A file-level map of the modules that matter most is in [`STRATEGY.md`](STRATEGY.md) Section 10.
 
