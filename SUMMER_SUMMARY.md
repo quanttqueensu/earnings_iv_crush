@@ -249,7 +249,7 @@ The GitHub history provides a dated record of how the project developed over the
 | **26 July** | Twelve-year quote-marked US book completed |
 | **11 August** | Automated cloud forward recorder deployed |
 | **12 August** | Forward valuation system upgraded and reconciled against the main P&L engine |
-| **15 August** | Clean 2025-26 dataset completed; summer selector retired as the primary direction and next-stage research programme set |
+| **15 August** | Clean 2025-26 dataset completed; summer selector superseded as the primary direction and next-stage research programme set |
 
 Repository: `github.com/jordanodorico/earnings_iv_crush`. The QUANTT fork at `quanttqueensu/earnings_iv_crush` is currently behind and needs syncing. Setup and the commands for rebuilding the headline numbers are in [`README.md`](README.md) Section 10.
 

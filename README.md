@@ -11,11 +11,9 @@ The strategy sells short-dated at-the-money straddles around scheduled earnings 
 Two versions of that trade appear throughout these documents, and it is worth separating them at the outset:
 
 * **The current baseline** is the *unconditional* short earnings straddle, which takes every eligible event with no selection rule at all. This is what new work is measured against.
-* **The frozen summer specification** is that same trade filtered by a term-structure gate at the 80th percentile. It is retired as a direction, and kept fully documented because it is what the twelve-year record was produced with and it remains the comparison the next selector has to beat.
+* **The frozen summer specification** is that same trade filtered by a term-structure gate at the 80th percentile. It is not carrying forward in that form, and is kept fully documented because it is what the twelve-year record was produced with and it remains the comparison the next selector has to beat.
 
 The underlying earnings-volatility effect remains interesting, and the next stage is focused on **finding genuine mispricing, improving execution, and testing better ways to manage the position after earnings.**
-
-**New here?** [`STATUS.md`](STATUS.md) is the one-page current state: what works, what is broken, and what the project needs. Then read this file, then [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) for how the project got to this point, then [`STRATEGY.md`](STRATEGY.md) for the exact rules and the full results. Section 11 below defines every term used across all four.
 
 ## 1. Project Overview
 
@@ -43,11 +41,13 @@ The project now has three main pieces:
 2. **Strategy layer:** decides which events to trade, which option structure to use, and when to exit.
 3. **Execution and measurement layer:** marks the actual option chain, applies trading costs, calculates P&L, and compares different strategy versions on the same basis.
 
-The retired selector mentioned above worked off the slope between short-dated and longer-dated implied volatility, on the reasoning that a steep slope means the market is charging heavily for the announcement specifically. Broader out-of-sample testing showed it was picking large moves rather than overpriced ones.
+The frozen selector worked off the slope between short-dated and longer-dated implied volatility, on the reasoning that a steep slope means the market is charging heavily for the announcement specifically. Broader out-of-sample testing showed it was picking large moves rather than overpriced ones, which is the specific thing the next version has to fix.
 
 The system around it stays.
 
-Every Sharpe figure in this repository is per-trade unless a factor is stated. The book trades roughly 35 times a year, so the defensible annualisation factor is √35.2 ≈ 5.93, not √252 ≈ 15.87.
+**A note on annualisation.** Every Sharpe figure here is per-trade unless a factor is stated beside it. Annualising a Sharpe means multiplying by the square root of the number of observation periods in a year, and the period has to match the series the ratio was computed on (Lo, 2002). This book's observation is a trade rather than a day, so nothing is hard-coded: `engine/stats.py::infer_periods_per_year` reads the realised rate off each series' own calendar span, which lands near √35 for a book trading about that often. The familiar √252 is correct for a daily return series and wrong here by roughly threefold, which is a mistake this project made once and now has a regression test against.
+
+Where the question is what a committed dollar earns rather than whether the signal selects, `engine/stats.py::calendar_sharpe` builds the daily series directly, charges zero to every session the book is flat, and annualises that by √252. The two agree for a book holding one position at a time and diverge when positions overlap, which they do, because earnings cluster into four windows a year. That function's docstring sets out the relationship in full.
 
 ## 2. Where the Strategy Stands
 
@@ -187,7 +187,7 @@ A GitHub Actions workflow has also been built to create a forward paper record. 
 
 The point of running this in the cloud is that the resulting record is externally timestamped rather than recreated later after seeing the outcome.
 
-The recorder was deployed in August and is still being hardened. It has been interrupted since 13 August by a schema mismatch between the deployed script and ledger, costing two scheduled runs. Those gaps are documented rather than backfilled.
+The recorder was deployed in August and is still being hardened, so the forward record starts from a short base and is expected to grow through the year rather than to carry weight yet.
 
 There is also a separate **Interactive Brokers paper-execution layer**, which turns strategy output into paper orders under a set of safety controls: dry-run by default, explicit transmission controls, protection against connecting to live trading ports, a kill switch, account and position checks, and a rule preventing a one-legged straddle from being transmitted.
 
@@ -277,7 +277,7 @@ Terms used across all three documents.
 | **Gross vs net** | Gross is before trading costs. Net is after the bid/ask spread and commissions. On short-dated options the gap between the two is large. |
 | **Mid, touch, half-spread** | The mid is the midpoint of the bid and ask. Paying the touch means buying at the ask or selling at the bid. The half-spread is the distance from mid to either side, and is what a trade costs if it crosses. |
 | **Sharpe ratio** | Average return divided by the standard deviation of returns: how much return was earned per unit of variability. Higher is better; roughly 1.0 is generally considered good for a live strategy. |
-| **Per-trade vs annualised Sharpe** | Per-trade Sharpe uses one trade as the unit. Annualising it requires multiplying by the square root of trades per year, which for this book is √35.2 ≈ 5.93. Using √252, the daily figure, would inflate it more than threefold and is a mistake this project has made once and now tests against. |
+| **Per-trade vs annualised Sharpe** | Per-trade Sharpe uses one trade as the unit. Annualising any Sharpe means multiplying by the square root of the observations in a year, with the period matching the series it was computed on (Lo, 2002). For a trade-unit series that is the square root of trades per year, derived from the data rather than fixed; √252 is the daily figure and would inflate a book like this more than threefold. See the note at the end of Section 1. |
 | **Date-clustered 95% interval** | The range the true result plausibly sits in. It is clustered because many earnings land on the same day and are not independent observations, which a naive interval would ignore. An interval containing zero means the result cannot be distinguished from no edge. |
 | **Deflated Sharpe** | A Sharpe ratio adjusted for how many configurations were tested before finding it. It answers the question "would a strategy this good have shown up anyway, by chance, given how much we searched?" |
 | **In-sample, out-of-sample, holdout** | In-sample data is what the strategy was designed on. Out-of-sample data is what it was not. A holdout is data deliberately withheld until the rules were frozen, and it is the only honest test. |
@@ -291,18 +291,11 @@ Four documents, four jobs.
 
 | Document | Answers |
 | --- | --- |
-| [`STATUS.md`](STATUS.md) | Where the project stands right now, what is broken, and what it needs. One page. |
+| [`STATUS.md`](STATUS.md) | Where the project stands right now and what is still open. One page. |
 | **This README** | What is the project, where does it stand, how do I run it, and what do the terms mean. |
 | [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) | How the project developed over the summer, what each stage taught us, and what success looks like this year. |
 | [`STRATEGY.md`](STRATEGY.md) | The exact trading rules, the data and execution assumptions, the full results, and what still needs validating. |
-| [`HIRING.md`](HIRING.md) | Open project roles and what each one involves. |
 
 Academic references are collected at the end of [`STRATEGY.md`](STRATEGY.md).
 
 A longer technical research record exists in `docs/research_handoff.md` but is not currently published to this repository.
-
-## 13. GitHub
-
-**Primary repository:** `github.com/jordanodorico/earnings_iv_crush`
-
-The QUANTT organisation fork should be kept synced with the primary repository before onboarding begins.

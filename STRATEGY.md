@@ -40,16 +40,20 @@ hit rate**. Its 95% interval is [-0.027, +0.120] and contains zero, so it is a
 baseline rather than a finished strategy, but it is a positive one on data no
 configuration ever touched.
 
-**The original term-structure selector did not survive the clean block and has
-been retired as the primary direction.** It returns -3.12% there, with an
+**The original term-structure selector did not survive the clean block and is
+being rebuilt rather than extended.** It returns -3.12% there, with an
 interval of [-0.347, -0.058] that excludes zero on the wrong side, and it loses
 to a participation-matched random selector. Its gross return is +0.07%, so cost
 is not the explanation: it was identifying events where a large move was
 expected, and those turned out to be the events where the large move happened.
 
+That diagnosis is what the next selector is built on. The problem is not that
+selection cannot work, it is that this rule selected on the size of the move
+rather than on the price charged for it, and Section 7 sets out how the next one
+is scored so it cannot repeat the error.
+
 The selector stays fully specified below, because it is what the twelve-year
-record was produced with and a retired rule that is documented is more useful
-than one quietly deleted.
+record was produced with and it is the benchmark its replacement has to beat.
 
 ## 3. Why the Trade Should Work
 
@@ -149,7 +153,7 @@ frozen. It sits on a broad flat region rather than a spike, which is the only
 reason to trust a chosen parameter, though Section 8 covers what the grid cost
 in multiple-testing terms.
 
-Section 6.3 covers why this rule has been retired.
+Section 6.3 covers why this rule is being rebuilt rather than extended.
 
 ### 4.3 The Cost Floor
 
@@ -217,11 +221,23 @@ Frozen specification, quote-marked, nothing retuned between blocks. The 2013 to
 | Profit factor | 1.397 | 0.951 | 1.141 |
 | Deflated Sharpe | 0.000113 | 7.4e-10 | ≈ 0 |
 
-The annualisation factor is √(trades per year) = √35.2 ≈ 5.93, not √252 ≈
-15.87. An earlier version used √252 on a book firing 35 times a year, inflating
-a headline Sharpe by 3.2 times. Every scaled number here states its factor and
-`tests/engine/test_annualisation_regressions.py` fails if anything defaults to
-√252.
+The annualisation factor above is not a chosen constant. A Sharpe annualises by
+the square root of the observations in a year, and the period has to match the
+series the ratio was computed on (Lo, 2002); the unit here is a trade, so
+`infer_periods_per_year` reads the realised rate off each block's own calendar
+span, which is why the two blocks carry 5.929 and 5.976 rather than a shared
+figure. The daily convention √252 ≈ 15.87 is correct for a daily series and
+wrong for this one: an earlier version applied it to a book firing 35 times a
+year and inflated a headline Sharpe 3.2 times.
+`tests/engine/test_annualisation_regressions.py` fails if anything defaults back
+to it.
+
+The complementary basis is `calendar_sharpe`, which builds the daily series,
+charges zero to every session the book is flat and annualises by √252. That
+measures what committed capital earns rather than whether the signal selects.
+The two coincide for a book holding one position at a time and diverge when
+positions overlap, which happens here because earnings cluster into four windows
+a year and several straddles share exit dates.
 
 Two things bound this result. The Deflated Sharpe is the binding one: against
 1,476 recorded configurations the expected maximum Sharpe from a family with no
@@ -286,12 +302,17 @@ more liquid names. The gated book's five worst names carry 44.8% of its loss.
 
 ### 6.4 Fifteen Selectors on One Basis
 
-Fifteen selectors were also rescored on one common ledger so that only the
-selection rule changed. The exercise showed that tightening the term gate
-increased hit rate monotonically, from 22.6% unconditional to 30.2% at the
-tightest threshold, but that ordering did not carry over to the clean
-quote-marked block in Section 6.3. The full comparison is in Appendix A and can
-be reproduced with `python scripts/agent_comparison.py`.
+Fifteen selectors were also rescored on one common ledger, so that events, marks,
+costs and denominator were identical in every row and only the selection rule
+changed. Tightening the term gate raised the hit rate monotonically, from 22.6%
+unconditional to 30.2% at the tightest threshold, and the skew and kurtosis
+overlays improved on the term gate alone. None of that ordering carried over to
+the clean quote-marked block in Section 6.3, and the two disagree on whether the
+gate beats a matched random null. That ledger reprices exits from inverted
+implied volatilities rather than marking them off traded prices, which runs
+systematically more negative and is the likely reason, but it has not been
+demonstrated and the comparison is not settled. Reproduce with
+`python scripts/agent_comparison.py`.
 
 ## 7. Where the Strategy Goes Next
 
@@ -404,7 +425,7 @@ new result is expected to follow them. Setup and the commands themselves are in
 | `earnings_iv_crush/live/` | The IBKR broker layer. |
 | `scripts/run_research.py` | Main research run. |
 | `scripts/validate_screen.py` | Rebuilds the settled verdict from cache; the fastest integrity check. |
-| `scripts/agent_comparison.py` | The Appendix A table. |
+| `scripts/agent_comparison.py` | The fifteen-selector comparison in Section 6.4. |
 | `scripts/score_oos_2026.py` | The Section 6.3 re-score. |
 | `scripts/paper_radar.py` | The scheduled recorder. |
 | `outputs/research/` | 657 artefacts. Superseded ones carry a `_SUPERSEDED` suffix rather than being deleted. |
@@ -418,45 +439,6 @@ outcomes must not change any pre-event selection quantity),
 `test_frozen_constants.py`, `test_annualisation_regressions.py`,
 `test_fills_rescore_attainability.py`, `test_paper_radar_provenance.py`,
 `test_trial_ledger.py`, `test_greeks_reference.py`.
-
-## Appendix A: Fifteen Selectors on One Basis
-
-Roughly 220 distinct configurations sit on disk. As they sit there they are not
-comparable: they mix per-trade with annualised Sharpe, return on premium with
-return on margin, and gross with net. The table below recomputes fifteen
-selectors from a single 912-event ledger through a single scorer, so events,
-marks, costs and denominator are identical in every row and only the rule
-changes.
-
-| Selector | N | Names | Hit | Mean RoM | Per-trade Sharpe | 95% CI |
-|---|:--:|:--:|:--:|:--:|:--:|:--:|
-| Unconditional | 912 | 45 | 22.6% | -11.42% | -0.642 | [-0.703, -0.590] |
-| Random, participation-matched | 205 | 45 | 23.4% | -11.12% | -0.576 | [-0.771, -0.488] |
-| Term gate q = 0.70 | 294 | 42 | 24.5% | -11.87% | -0.613 | [-0.713, -0.538] |
-| Term gate q = 0.75 | 252 | 39 | 27.0% | -11.51% | -0.585 | [-0.689, -0.504] |
-| **Term gate q = 0.80, frozen** | **205** | **37** | **29.3%** | **-10.80%** | **-0.576** | **[-0.688, -0.488]** |
-| Term gate q = 0.85 | 156 | 30 | 30.1% | -11.12% | -0.571 | [-0.702, -0.468] |
-| Term gate q = 0.90 | 106 | 23 | 30.2% | -10.02% | -0.607 | [-0.779, -0.456] |
-| Volatility premium alone | 213 | 37 | 25.8% | -13.22% | -0.599 | [-0.698, -0.518] |
-| Variance risk premium alone | 210 | 31 | 26.7% | -13.99% | -0.558 | [-0.657, -0.483] |
-| Implied move alone | 213 | 32 | 23.5% | -17.41% | -0.646 | [-0.747, -0.562] |
-| Low skew alone | 528 | 45 | 23.9% | -11.52% | -0.609 | [-0.689, -0.547] |
-| Low kurtosis alone | 458 | 43 | 25.6% | -13.97% | -0.643 | [-0.724, -0.580] |
-| Term q = 0.80 + low skew | 109 | 30 | 33.9% | -10.75% | -0.516 | [-0.653, -0.398] |
-| Term q = 0.80 + low kurtosis | 169 | 34 | 31.4% | -10.62% | -0.580 | [-0.704, -0.468] |
-| Term q = 0.80 + vol premium | 193 | 34 | 29.5% | -10.69% | -0.567 | [-0.681, -0.477] |
-
-**Read the ordering, not the level.** This ledger reprices exits from inverted
-implied volatilities instead of marking them off traded prices, and that basis
-runs systematically more negative: on the same 239 events, traded marks give
-+13.7% where a Black-Scholes reprice gives -34.7%. The levels are not comparable
-to Sections 6.1 or 6.3 and must not be quoted against them.
-
-On that reading the gate beats its matched random null, which Section 6.3
-contradicts on a quote-marked basis. The two have not been reconciled. The
-working explanation is that an inverted-IV basis penalises large-move events
-harder than traded marks do, which would flatter a selector that picks for move
-size, but that has not been demonstrated and remains an open item.
 
 ## References
 
@@ -487,4 +469,8 @@ size, but that has not been demonstrated and remains an open item.
 - Bakshi, G., Kapadia, N., & Madan, D. (2003). "Stock Return Characteristics,
   Skew Laws, and the Differential Pricing of Individual Equity Options." *Review
   of Financial Studies*, 16(1). The model-free skew and kurtosis measures used as
-  overlay selectors in Appendix A.
+  overlay selectors in Section 6.4.
+- Lo, A. W. (2002). "The Statistics of Sharpe Ratios." *Financial Analysts
+  Journal*, 58(4). The derivation of the square-root-of-time annualisation rule
+  and of where it fails; the basis for annualising by the series' own realised
+  observation rate rather than by a fixed calendar constant.
