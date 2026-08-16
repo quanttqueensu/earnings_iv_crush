@@ -9,7 +9,13 @@ description = "Filtered cross-sectional short-volatility strategy around schedul
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+authors = [{ name = "Jordan Odorico" }]
 keywords = ["quant", "options", "volatility", "earnings", "backtest"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Intended Audience :: Financial and Insurance Industry",
+]
 dependencies = [
     "numpy>=1.26",
     "pandas>=2.0",
@@ -28,6 +34,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["ruff>=0.6", "black>=24.0", "mypy>=1.8", "pytest>=8.0", "pre-commit>=3.5"]
+
+[project.urls]
+Repository = "https://github.com/quanttqueensu/earnings_iv_crush"
+Documentation = "https://github.com/quanttqueensu/earnings_iv_crush/tree/main/documentation"
 
 [tool.setuptools.packages.find]
 include = ["earnings_iv_crush*"]

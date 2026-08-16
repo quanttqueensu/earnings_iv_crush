@@ -6,9 +6,10 @@ nearest-expiry event statistic, and the rejection accounting.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
-from earnings_iv_crush.strategy.filters import passes_term_filter_panel
+from earnings_iv_crush.strategy.filters import expanding_gate_rank, passes_term_filter_panel
 
 
 def _panel(ticker, dates, spreads):
@@ -84,3 +85,64 @@ def test_stats_out_accounts_for_every_event():
     assert sum(stats.values()) == len(events)
     assert stats["no_panel_history"] == 1  # ZZZ
     assert stats["passed"] == 1 and stats["below_threshold"] == 1
+
+
+# ── expanding gate: the frozen selector ──────────────────────────────────────
+
+
+def test_expanding_gate_rank_matches_the_quantile_it_reproduces():
+    """``rank >= p`` must equal ``value >= np.quantile(prior, p)`` at every p.
+
+    The rank column exists so a percentile sweep is one comparison rather than a
+    re-scan. If it ever stops agreeing with the quantile it stands in for, every
+    swept result silently moves. The empirical fraction ``(prior <= v).mean()`` is
+    the wrong convention here: it places the value at ``p*n`` where ``np.quantile``
+    places it at ``p*(n-1)``.
+    """
+    rng = np.random.default_rng(11)
+    n = 300
+    values = rng.normal(0.1, 0.05, n)
+    dates = np.sort(pd.to_datetime(rng.choice(pd.date_range("2016-01-01", periods=1200), n)))
+
+    rank = expanding_gate_rank(values, dates, min_hist=25)
+
+    for p in (0.50, 0.75, 0.80, 0.90, 1.00):
+        for i in range(n):
+            prior = values[dates < dates[i]]
+            prior = prior[np.isfinite(prior)]
+            if len(prior) < 25:
+                assert np.isnan(rank[i])
+                continue
+            expected = values[i] >= np.quantile(prior, p)
+            got = (rank[i] if np.isfinite(rank[i]) else -9.0) >= p
+            assert got == expected, f"p={p} event={i}"
+
+
+def test_expanding_gate_is_strictly_causal():
+    """Same-day events must not enter one another's threshold, and later events never do."""
+    rng = np.random.default_rng(3)
+    n = 120
+    values = rng.normal(0.1, 0.05, n)
+    dates = np.repeat(pd.to_datetime(pd.date_range("2020-01-01", periods=n // 4)), 4)
+
+    rank = expanding_gate_rank(values, dates, min_hist=10)
+
+    # Rewriting every value dated on or after event i must not change event i's rank.
+    checked = 0
+    for i in np.flatnonzero(np.isfinite(rank)):
+        tampered = values.copy()
+        tampered[dates >= dates[i]] = 99.0
+        tampered[i] = values[i]
+        again = expanding_gate_rank(tampered, dates, min_hist=10)
+        assert again[i] == rank[i], f"event {i} moved when only same-day and later events changed"
+        checked += 1
+    assert checked > 0, "no event had enough history to test causality on"
+
+
+def test_expanding_gate_withholds_on_thin_history():
+    """Below ``min_hist`` prior events the gate returns NaN rather than admitting."""
+    values = np.linspace(0.0, 1.0, 40)
+    dates = pd.to_datetime(pd.date_range("2021-01-01", periods=40))
+    rank = expanding_gate_rank(values, dates, min_hist=25)
+    assert np.isnan(rank[:25]).all()
+    assert np.isfinite(rank[25:]).all()

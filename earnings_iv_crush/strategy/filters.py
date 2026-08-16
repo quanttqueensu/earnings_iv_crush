@@ -8,10 +8,12 @@ does not survive costs, so an event must pass both gates to be traded.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 from pandas.tseries.offsets import BDay
 
 from ..config import STRATEGY
+from ..frozen import SPEC
 
 # Sourced from the central config (see ``earnings_iv_crush/config.py``).
 IMPLIED_FAIR_RATIO = STRATEGY.implied_fair_ratio
@@ -19,6 +21,12 @@ USE_MOVE_GATE = STRATEGY.use_move_gate  # whether Gate 1 (move filter) is applie
 TERM_SPREAD_PCTL = STRATEGY.term_spread_pctl
 TRAILING_WINDOW = STRATEGY.trailing_window  # trailing days (panel form) or events (legacy form)
 TERM_MIN_PERIODS = STRATEGY.term_min_periods  # min daily obs before the panel gate will fire
+MIN_HIST = SPEC.min_hist  # prior events required before the expanding gate will fire
+
+#: Rank assigned to an event below every prior observation. The gate admits at every
+#: percentile including zero, so this must sort below the lowest admissible cut rather
+#: than tie with it.
+BELOW_ALL = -1.0
 
 
 # ── Gate 1: rich implied move ────────────────────────────────────────────────
@@ -146,6 +154,73 @@ def passes_term_filter_panel(
     if stats_out is not None:
         stats_out.update(counts)
     return pd.Series(flags, index=events.index)
+
+
+# ── Gate 2, expanding form: the frozen selector ──────────────────────────────
+
+
+def expanding_gate_rank(
+    values: np.ndarray, dates: np.ndarray, min_hist: int = MIN_HIST
+) -> np.ndarray:
+    """The largest percentile at which the frozen term gate would still admit each event.
+
+    This is the frozen specification's selection rule. The gate keeps event ``i`` when
+    ``values[i] >= quantile(prior, p)``, where ``prior`` is every event announcing
+    strictly earlier. Since ``np.quantile`` is piecewise linear and increasing in ``p``,
+    that condition holds exactly when ``p`` is at or below the point where the
+    interpolated quantile curve passes through ``values[i]``. Returning that crossing
+    point makes ``rank >= p`` identical to the gate at every ``p``, so a sweep over the
+    percentile grid becomes a comparison against one stored column.
+
+    The window is expanding rather than fixed, and strictly causal: only events dated
+    before event ``i`` enter its threshold. Using the full-sample percentile instead is
+    look-ahead, and on this book it was worth roughly 0.05 of per-trade Sharpe on its own.
+
+    A plain empirical fraction ``(prior <= v).mean()`` is *not* identical: it places the
+    value at index ``p*n`` where ``np.quantile`` places it at ``p*(n-1)``, and on this
+    book the difference admits fourteen extra events at ``p=0.80``. The distinction is
+    the difference between reproducing the gate and reproducing something near it.
+
+    Parameters
+    ----------
+    values : ndarray
+        The gated statistic per event, normally the front-minus-back term spread.
+    dates : ndarray
+        Announcement date per event, same length as ``values``. Comparison is strict,
+        so same-day events never enter one another's threshold.
+    min_hist : int
+        Prior events required before the gate fires at all. Below this the event is
+        left as NaN and excluded rather than admitted on a thin threshold.
+
+    Returns
+    -------
+    ndarray
+        Crossing percentile per event in ``[0, 1]``, ``BELOW_ALL`` for an event under
+        every prior observation, and NaN where history was insufficient.
+    """
+    out = np.full(len(values), np.nan)
+    for i in range(len(values)):
+        prior = values[dates < dates[i]]
+        prior = prior[np.isfinite(prior)]
+        if len(prior) < min_hist or not np.isfinite(values[i]):
+            continue
+        a = np.sort(prior)
+        v = float(values[i])
+        n = len(a)
+        if v >= a[-1]:
+            out[i] = 1.0
+            continue
+        if v < a[0]:
+            out[i] = BELOW_ALL
+            continue
+        j = int(np.searchsorted(a, v, side="right")) - 1
+        if j >= n - 1:
+            out[i] = 1.0
+            continue
+        step = a[j + 1] - a[j]
+        frac = (v - a[j]) / step if step > 0 else 0.0
+        out[i] = (j + frac) / (n - 1)
+    return out
 
 
 # ── Combined selection ───────────────────────────────────────────────────────

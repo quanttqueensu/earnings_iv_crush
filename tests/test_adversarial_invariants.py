@@ -133,15 +133,8 @@ def test_scrambling_outcomes_cannot_change_selection() -> None:
     """Selection quantities are computed at entry, so permuting outcomes must not move them.
 
     Uses the expanding term gate, the frozen specification's actual selector.
-
-    That selector still lives in the research scripts rather than in the package, so
-    this case only runs where those are present. Promoting it into ``strategy/`` is
-    what would let the invariant travel with a clone.
     """
-    expanding_gate_rank = pytest.importorskip(
-        "scripts.reverse_alpha_panel",
-        reason="the expanding term gate is not yet promoted into the package",
-    ).expanding_gate_rank
+    from earnings_iv_crush.strategy.filters import expanding_gate_rank
 
     rng = np.random.default_rng(0)
     n = 200

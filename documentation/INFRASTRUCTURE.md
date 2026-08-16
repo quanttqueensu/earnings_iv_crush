@@ -86,8 +86,8 @@ python -m pytest -q
 ```
 
 The suite runs on synthetic fixtures and needs no network. A correct environment reports
-**604 passed, 6 skipped, 4 deselected** out of 614 collected. The deselected four are marked
-`live` and hit real networks; the six skips need research artefacts that are not carried in
+**612 passed, 5 skipped, 4 deselected** out of 621 collected. The deselected four are marked
+`live` and hit real networks; the five skips need research artefacts that are not carried in
 the repository. Any other number means the environment is wrong, not that the tests are
 flaky.
 
@@ -101,7 +101,28 @@ python -m mypy earnings_iv_crush
 
 All three must pass before any push.
 
-### 2.2 Reading order
+### 2.2 See the pipeline run
+
+The test suite proves the environment is correct but shows you nothing about the system.
+This does, and also needs no credentials:
+
+```bash
+python scripts/demo_pipeline.py
+```
+
+It builds a synthetic event panel in memory and prices it through the same
+`pnl.build_ledger` the live strategy uses, charges the same measured cost stack, and
+reports through the same `screen.score_signal` contract every real result goes through.
+Nothing is mocked; only the input data is invented.
+
+The generator prices announcement risk fairly by construction, so the gross book comes
+back near zero, which is how you know the arithmetic is sound. The net book does not,
+and the gap between them is the cost stack. That gap is the constraint this whole project
+exists to attack, so it is worth seeing on day one before reading any real number.
+
+`tests/test_demo_pipeline.py` fails if anyone tunes the generator until it shows an edge.
+
+### 2.3 Reading order
 
 Read in this order. Each assumes the ones above it.
 
@@ -116,7 +137,7 @@ Read in this order. Each assumes the ones above it.
 5. This document, then `earnings_iv_crush/config.py` and `earnings_iv_crush/frozen.py`, which
    carry every parameter and the reason it holds its value.
 
-### 2.3 Adding a credential
+### 2.4 Adding a credential
 
 Copy `.env.example` to `.env` and fill in the values you have. `.env` is git-ignored and must
 stay that way. Every source is optional: the package degrades to keyless providers rather than
@@ -126,7 +147,7 @@ Never paste a key into a chat, a settings file, a permissions file, or a commit.
 ever exposed, rotate it. Deleting the message does nothing, because the key has already been
 transmitted.
 
-### 2.4 Running your first research question
+### 2.5 Running your first research question
 
 The protocol exists because this project has already produced results it had to withdraw. It
 is set out in full in [`STRATEGY.md`](STRATEGY.md) Section 9. In short:
@@ -143,7 +164,7 @@ is set out in full in [`STRATEGY.md`](STRATEGY.md) Section 9. In short:
    Section 8 and refuses to return a degenerate result quietly.
 5. **Report the result even when it kills the idea.** Most do. That is the job.
 
-### 2.5 House rules
+### 2.6 House rules
 
 - Explicit staging only. Never `git add -A` or `git add .`.
 - Every quantitative claim carries N, a dispersion measure, and the basis of any scaled number.
@@ -185,9 +206,9 @@ Installable package, `pip install -e .`, Python 3.10 or later. Continuous integr
 
 | Part | Files | Lines |
 |---|---:|---:|
-| `earnings_iv_crush/` | 71 | 16,342 |
-| `scripts/` | 15 | |
-| `tests/` | 72 | 7,980 |
+| `earnings_iv_crush/` | 71 | 16,417 |
+| `scripts/` | 16 | |
+| `tests/` | 73 | 8,102 |
 
 Package sub-structure: `data/` 32 modules, `engine/` 20, `strategy/` 6, `live/` 6,
 `baseline/` 2, `util/` 2.
@@ -409,6 +430,7 @@ block in its docstring. The ones carried in the repository:
 
 | Script | Purpose |
 |---|---|
+| `demo_pipeline.py` | The day-one end-to-end run on synthetic data. No credentials. See Section 2.2. |
 | `run_research.py` | The main research run. `--real` uses live sources. |
 | `validate_screen.py` | Rebuilds the settled book from cached marks and checks it reproduces N=391 and a per-trade Sharpe of +0.055992. The fastest integrity check on the whole machinery. |
 | `agent_comparison.py` | Scores every selection rule through one scorer on one basis, so the only thing differing between rows is the rule. |
@@ -423,12 +445,12 @@ block in its docstring. The ones carried in the repository:
 | `run_backtest.py`, `run_sensitivity.py`, `fetch_chains.py`, `smoke_test.py` | Backtest, sensitivity sweep, chain fetch, and a fast end-to-end smoke check. |
 
 Scripts that depend on research artefacts under `outputs/research/` will not run in a fresh
-clone until those artefacts are published. `smoke_test.py` and the test suite are the two
-things guaranteed to work on day one.
+clone until those artefacts are published. `demo_pipeline.py`, `smoke_test.py` and the test
+suite are what work on day one; the first of those needs no network at all.
 
 ## 11. Testing
 
-614 tests collected across 72 files. Four are marked `live`, hit real networks, and are
+621 tests collected across 73 files. Four are marked `live`, hit real networks, and are
 deselected by default.
 
 The invariant-pinning suites each name the defect they guard in their own docstring, which is
@@ -449,6 +471,12 @@ the convention to follow when adding one:
   label with a different specification raises.
 - `test_greeks_reference.py` validates the volatility inverter against an independent
   reference.
+- `test_term_gate_regressions.py` pins the frozen selector: `rank >= p` must equal
+  `value >= np.quantile(prior, p)` at every percentile, the window must stay strictly
+  causal so same-day and later events cannot enter a threshold, and thin history must
+  withhold rather than admit.
+- `test_demo_pipeline.py` keeps the day-one demo honest by failing if its synthetic
+  generator is ever tuned until it shows an edge.
 
 ## 12. Known limitations
 
@@ -466,9 +494,6 @@ Stated here so nobody has to rediscover them.
    Sharpe from +0.056 to +0.045. This is the largest unrepaired item in the book and the first
    thing a sceptic should attack.
 4. **Multiple testing bounds every in-sample number.** See Section 8.
-5. **One adversarial invariant does not run in a clone.** The expanding term gate it exercises
-   still lives in the research scripts rather than in the package, so that case skips with a
-   stated reason. Promoting it into `strategy/` would let the invariant travel with the code.
 
 ## 13. Amending this document
 
@@ -497,4 +522,5 @@ document covers how the system is built and how to work in it.
 | 2026-08-15 | 9.1 | Forward recorder documented after deployment; schema guard and seed guard added. |
 | 2026-08-16 | All | Rewritten for publication. Counts corrected to what the repository actually carries rather than the local tree; reading order repointed at published documents; data-source tables reconciled against the shipped modules. |
 | 2026-08-16 | 9.1 | Configuration check added, so an unconfigured clone skips the recorder cleanly instead of failing daily. |
-| 2026-08-16 | 12 | Limitation 5 added: one adversarial invariant skips in a clone because the gate it exercises is not yet in the package. |
+| 2026-08-16 | 1, 11, 12 | `expanding_gate_rank`, the frozen selector, promoted from the research scripts into `strategy/filters.py`. The adversarial look-ahead invariant now runs in a clone rather than skipping, and the gate is pinned against the quantile convention it reproduces. The limitation this replaced is removed. |
+| 2026-08-16 | 2.2, 10 | `demo_pipeline.py` added so a fresh clone can run the valuation and scoring path end to end with no credentials. Sections 2.2 onward renumbered. |

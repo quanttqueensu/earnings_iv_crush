@@ -195,13 +195,21 @@ Three workflows are meant to run beside one another through the year: historical
 
 ## 9. Codebase
 
+What a clone carries:
+
 | | |
 | --- | ---: |
-| Python modules | 307 |
-| Lines of Python | 64,000+ |
-| Package modules | 72 |
-| Automated tests | 645 |
-| Research/result artefacts | 657 |
+| Package modules | 71 |
+| Lines of package Python | 16,417 |
+| Research entry points | 16 |
+| Automated tests | 621 |
+| Lines of test Python | 8,102 |
+
+What the wider project has produced, most of which is generated locally rather than carried in the repository:
+
+| | |
+| --- | ---: |
+| Research and result artefacts | 657 |
 | Recorded configurations | 1,476 |
 | Option prints in execution study | 34,672 |
 
@@ -235,9 +243,15 @@ pip install -e ".[dev]"
 python -m pytest -q
 ```
 
-The test suite runs on synthetic fixtures and does not require paid data or network access.
+The test suite runs on synthetic fixtures and does not require paid data or network access. A correct environment reports 612 passed, 5 skipped and 4 deselected out of 621 collected.
 
-If the suite passes, the environment is ready.
+Then watch the pipeline actually run, which also needs no credentials:
+
+```bash
+python scripts/demo_pipeline.py
+```
+
+This prices a synthetic event panel through the same valuation, cost model and reporting contract every real result goes through. The generator prices announcement risk fairly by construction, so the gross book comes back near zero and the gap to the net book is the cost stack. It is a wiring check and a worked example, not a result, and it is labelled as such on every line. [`documentation/INFRASTRUCTURE.md`](documentation/INFRASTRUCTURE.md) Section 2.2 explains what to look at.
 
 **A note on the research entry points.** `outputs/` and the on-disk data caches are git-ignored, so the scripts below need datasets that are not carried in the repository. A fresh clone can run the test suite but cannot yet reproduce the research numbers. Getting a new member from a green suite to a reproducible result is an onboarding task for the start of the year, either by publishing the cached inputs or by shipping a small fixture set.
 
