@@ -68,5 +68,6 @@ the plumbing, which is the main argument for taking this project forward.
 | Time | Read |
 | --- | --- |
 | Three minutes | This document |
-| Twenty minutes | [`README.md`](README.md), the project, its status, setup, and a glossary of every term used |
+| Twenty minutes | [`README.md`](../README.md), the project, its status, setup, and a glossary of every term used |
+| Joining the project | [`INFRASTRUCTURE.md`](INFRASTRUCTURE.md), which takes a clone to a green test suite and explains the data sources, the codebase and the automated jobs |
 | An hour | [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) for how the project developed, then [`STRATEGY.md`](STRATEGY.md) for the rules, the full results and the constraints |

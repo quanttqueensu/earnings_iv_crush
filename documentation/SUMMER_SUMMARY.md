@@ -4,7 +4,7 @@
 **Period:** 25 May to 16 August 2026
 
 This is the narrative account of the summer: what was built, in what order, and what each stage
-taught us. For what the project is and what the terms mean, start with [`README.md`](README.md),
+taught us. For what the project is and what the terms mean, start with [`README.md`](../README.md),
 which carries a glossary in Section 11. For the exact trading rules and the full result set, see
 [`STRATEGY.md`](STRATEGY.md).
 
@@ -45,7 +45,7 @@ The core system now handles the full process:
 
 The codebase has also grown substantially, to roughly 64,000 lines of Python across 307 modules,
 carrying 645 automated tests and 657 result artefacts, with US option coverage from 2013 to 2026.
-The full breakdown is in [`README.md`](README.md) Section 9.
+The full breakdown is in [`README.md`](../README.md) Section 9.
 
 The main benefit of this is that the project does not need to start over every time the strategy changes. The data, execution, testing and backtesting infrastructure is already there. New ideas can now be plugged into the same system and compared on the same basis.
 
@@ -136,7 +136,7 @@ The summer was mainly a research and infrastructure build, so the forward record
 
 A scheduled process has been deployed through GitHub Actions that snapshots option chains around
 upcoming earnings, records candidate positions, marks them when their exit date arrives and commits
-the resulting book back to the repository. [`README.md`](README.md) Section 8 describes the
+the resulting book back to the repository. [`README.md`](../README.md) Section 8 describes the
 mechanism.
 
 The important part is that the forward history is being written by a scheduled cloud job rather than manually on a laptop. That gives the project a dated external record that cannot simply be recreated later after seeing what happened.
@@ -249,7 +249,7 @@ The GitHub history provides a dated record of how the project developed over the
 | **12 August** | Forward valuation system upgraded and reconciled against the main P&L engine |
 | **15 August** | Clean 2025-26 dataset completed; summer selector superseded as the primary direction and next-stage research programme set |
 
-Setup and the commands for rebuilding the headline numbers are in [`README.md`](README.md) Section 10.
+Setup and the commands for rebuilding the headline numbers are in [`README.md`](../README.md) Section 10.
 
 ## Bottom Line
 

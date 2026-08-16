@@ -15,7 +15,7 @@ performed (Section 6), where it goes next (Section 7), what still needs
 validating (Section 8), the protocol any new result has to follow (Section 9),
 and where the code lives (Section 10).
 
-It assumes you have read [`README.md`](README.md), which introduces the project
+It assumes you have read [`README.md`](../README.md), which introduces the project
 and defines every term used here in its Section 11 glossary. The narrative of
 how the strategy reached this specification is in
 [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md); setup and run instructions are in the
@@ -389,7 +389,7 @@ In more detail:
 
 Every result in this document was produced under the following rules, and any
 new result is expected to follow them. Setup and the commands themselves are in
-[`README.md`](README.md) Section 10.
+[`README.md`](../README.md) Section 10.
 
 1. **Pre-register first.** Write the hypothesis, the exact specification, the
    inference method, the success criterion and the kill criterion before the
@@ -432,7 +432,7 @@ new result is expected to follow them. Setup and the commands themselves are in
 
 The two `outputs/research/` rows are generated locally and are git-ignored, so
 they are described here but do not arrive with a clone. Publishing them is the
-onboarding task noted in [`README.md`](README.md) Section 10.
+onboarding task noted in [`README.md`](../README.md) Section 10.
 
 Invariant-pinning tests, each naming the defect it guards in its own docstring:
 `test_adversarial_invariants.py` (metamorphic rather than expected-value:

@@ -90,7 +90,7 @@ The selector was identifying **risk magnitude**, not necessarily **mispricing**.
 
 The next version of the strategy is being built around that distinction.
 
-The full result set, including the twelve-year record and the attribution behind it, is in [`STRATEGY.md`](STRATEGY.md) Section 6.
+The full result set, including the twelve-year record and the attribution behind it, is in [`STRATEGY.md`](documentation/STRATEGY.md) Section 6.
 
 ## 3. How the Strategy Developed
 
@@ -104,7 +104,7 @@ That is not strong enough to carry forward as the final strategy, particularly a
 
 The useful result is that the project now knows much more precisely **what needs to improve**.
 
-The stage-by-stage account, with what each stage produced and why it was kept or dropped, is in [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) Section 2.
+The stage-by-stage account, with what each stage produced and why it was kept or dropped, is in [`SUMMER_SUMMARY.md`](documentation/SUMMER_SUMMARY.md) Section 2.
 
 ## 4. Execution Matters
 
@@ -127,7 +127,7 @@ The next strategy generation will therefore test **liquidity and spread filters 
 
 ## 5. What Comes Next
 
-Five directions going into the year, in the order they are being prioritised. The full case for each, with the evidence behind it, is in [`STRATEGY.md`](STRATEGY.md) Section 7.
+Five directions going into the year, in the order they are being prioritised. The full case for each, with the evidence behind it, is in [`STRATEGY.md`](documentation/STRATEGY.md) Section 7.
 
 1. **Execution-aware selection.** None of the 1,476 recorded configurations ever started by asking whether the option itself was cheap enough to trade. The execution dataset now makes that possible. The first comparison will be an unconditional earnings book with liquidity and spread requirements against the original term-structure strategy at the same participation rate.
 2. **Find mispricing rather than large moves.** The original selector was good at finding large expected moves. The next one needs to find situations where the price of the move looks wrong, which is a harder measurement problem than it first appears and is the main open research question going into the year.
@@ -171,7 +171,7 @@ Credentials live only in a git-ignored `.env`.
 
 Historical option coverage currently reaches back to **2013**, with additional equity and earnings datasets extending much further.
 
-The rules that stop the backtest using information it would not have had at the time are specified in [`STRATEGY.md`](STRATEGY.md) Section 5.
+The rules that stop the backtest using information it would not have had at the time are specified in [`STRATEGY.md`](documentation/STRATEGY.md) Section 5.
 
 ## 8. Forward Recording and Paper Execution
 
@@ -214,10 +214,11 @@ The package is split broadly into:
 * `baseline/`, the unconditional benchmark;
 * `scripts/`, individual research entry points;
 * `tests/`, regression, invariance and integrity tests;
+* `documentation/`, the project documents;
 * `outputs/`, result artefacts; and
 * `.github/workflows/`, continuous integration.
 
-A file-level map of the modules that matter most is in [`STRATEGY.md`](STRATEGY.md) Section 10.
+A file-level map of the modules that matter most is in [`STRATEGY.md`](documentation/STRATEGY.md) Section 10.
 
 ## 10. Running the Project
 
@@ -257,7 +258,7 @@ With the cache present, `validate_screen.py` reproduces:
 * per-trade Sharpe = +0.055992; and
 * clustered interval = [-0.0421, +0.1803].
 
-Before running a new research question of your own, read [`STRATEGY.md`](STRATEGY.md) Section 9. It sets out the protocol every result in this project is expected to follow.
+Before running a new research question of your own, read [`STRATEGY.md`](documentation/STRATEGY.md) Section 9. It sets out the protocol every result in this project is expected to follow.
 
 ## 11. Glossary
 
@@ -287,13 +288,18 @@ Terms used across all three documents.
 
 ## 12. Documents
 
-Four documents, four jobs.
+This README is the front door. Everything else lives in [`documentation/`](documentation), one
+document per job.
 
 | Document | Answers |
 | --- | --- |
-| [`STATUS.md`](STATUS.md) | Where the project stands right now and what is still open. One page. |
 | **This README** | What is the project, where does it stand, how do I run it, and what do the terms mean. |
-| [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) | How the project developed over the summer, what each stage taught us, and what success looks like this year. |
-| [`STRATEGY.md`](STRATEGY.md) | The exact trading rules, the data and execution assumptions, the full results, and what still needs validating. |
+| [`STATUS.md`](documentation/STATUS.md) | Where the project stands right now and what is still open. One page. |
+| [`INFRASTRUCTURE.md`](documentation/INFRASTRUCTURE.md) | How the system is built and how to work in it: onboarding, the data sources and their APIs, the codebase, the automated jobs, the scripts and the tests. Maintained through the year. |
+| [`SUMMER_SUMMARY.md`](documentation/SUMMER_SUMMARY.md) | How the project developed over the summer, what each stage taught us, and what success looks like this year. |
+| [`STRATEGY.md`](documentation/STRATEGY.md) | The exact trading rules, the data and execution assumptions, the full results, and what still needs validating. |
 
-Academic references are collected at the end of [`STRATEGY.md`](STRATEGY.md).
+New members should start with [`INFRASTRUCTURE.md`](documentation/INFRASTRUCTURE.md) Section 2,
+which takes a clone to a green test suite with no credentials.
+
+Academic references are collected at the end of [`STRATEGY.md`](documentation/STRATEGY.md).
