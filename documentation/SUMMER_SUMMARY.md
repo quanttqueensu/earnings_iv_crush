@@ -8,7 +8,7 @@ taught us. For what the project is and what the terms mean, start with [`README.
 which carries a glossary in Section 11. For the exact trading rules and the full result set, see
 [`STRATEGY.md`](STRATEGY.md).
 
-## TL;DR
+## Summary
 
 Over the summer this project grew from a relatively simple earnings-volatility idea into a full options research and execution platform.
 
