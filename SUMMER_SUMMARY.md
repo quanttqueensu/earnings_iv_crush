@@ -12,15 +12,15 @@ which carries a glossary in Section 11. For the exact trading rules and the full
 
 Over the summer this project grew from a relatively simple earnings-volatility idea into a full options research and execution platform.
 
-The original idea was to sell short-dated volatility around earnings announcements and use the shape of the implied-volatility term structure to identify the best opportunities. That led to more than **1,400 tested configurations**, multiple strategy designs, twelve years of quote-level US options data, extensions into international markets, and a direct study of more than **34,000 real option executions**.
+The original idea was to sell short-dated volatility around earnings announcements and use the shape of the implied-volatility term structure to identify the best opportunities. That led to more than **1,400 tested configurations**, multiple strategy designs, twelve years of quote-level US options data, extensions into international markets, and a direct study of more than **34,000 real option market prints**.
 
-The biggest takeaway from the summer is that the underlying earnings-volatility effect is there. On a completely untouched 2025-26 dataset, the unconditional short-straddle book produced a **61.0% hit rate, +3.44% gross return on margin and +0.49% net return on margin across 1,221 events**. The 95% date-clustered interval on that net figure is **[-0.027, +0.120] and contains zero**, so this is a starting point rather than a finished result, but it is a real one on data nothing was fitted to.
+The biggest takeaway from the summer is that the underlying earnings-volatility effect is there. On a completely untouched 2025-26 dataset, the unconditional short-straddle book produced a **61.0% hit rate, +3.44% gross return on margin and +0.49% net return on margin across 1,221 events**. The per-trade Sharpe is **+0.043 with a date-clustered 95% interval of [-0.027, +0.120], which contains zero**, so this is a starting point rather than a finished result, but it is a real one on data nothing was fitted to.
 
-What did not hold up was the original term-structure filter used to choose which earnings events to trade. On that same clean dataset it returned **-3.12% net on margin, with a clustered interval of [-0.347, -0.058] that excludes zero on the wrong side, and it lost to selecting events at random at a matched trade count**. Its gross return was **+0.07%**, so the problem is not trading costs. The filter was finding events where the market charged for a large move, and those turned out to be the events where the large move actually happened.
+What did not hold up was the original term-structure filter used to choose which earnings events to trade. On that same clean dataset it returned **-3.12% net on margin at a per-trade Sharpe of -0.210, with a date-clustered 95% interval of [-0.347, -0.058] that excludes zero on the wrong side, and it lost to selecting events at random at a matched trade count**. Its gross return was **+0.07%**, so the problem is not trading costs. The filter was finding events where the market charged for a large move, and those turned out to be the events where the large move actually happened.
 
 That changes the direction of the project, but in a useful way. Instead of spending the year trying to improve the same filter, the next phase is focused on **execution-aware selection, alternative holding periods, better measures of relative mispricing, and new volatility signals**. Several of those directions are already built far enough to begin testing immediately.
 
-At the same time, the infrastructure is largely in place: **645 automated tests, nine data sources, a paper-trading connection to Interactive Brokers, and a cloud-based forward recorder designed to build a timestamped live history throughout the year.**
+At the same time, the infrastructure is largely in place: **645 automated tests, multiple historical and live data sources behind one interface, US option coverage from 2013 to 2026, a paper-trading connection to Interactive Brokers, and a cloud-based forward recorder designed to build a timestamped live history throughout the year.**
 
 The summer was about building the platform and figuring out where the opportunity actually is. The goal for the year is to turn that into a strategy we would be comfortable putting forward as a complete systematic options book.
 
@@ -78,13 +78,14 @@ The more encouraging result entering the year is actually the simplest version o
 
 On the clean 2025-26 dataset, built after the main summer search was already complete, the
 **unconditional** short earnings straddle produced the figures quoted at the top of this document:
-a 61.0% hit rate and +0.49% net on margin across 1,221 events, with a clustered interval of
-[-0.027, +0.120]. The interval contains zero, so this is not a proven edge and I am not presenting
-it as one. The point is that there appears to be something worth working with **before adding any
-sophisticated selection model at all**, on data that no configuration was ever fitted to. For
-comparison, the frozen term-structure filter applied to the same events returned **-3.12%**, with
-an interval of [-0.347, -0.058] that excludes zero on the wrong side, and a random selector taking
-the same number of trades from the same pool beat it. The side-by-side table is in
+a 61.0% hit rate and +0.49% net on margin across 1,221 events, at a per-trade Sharpe of +0.043 with
+a date-clustered 95% interval of [-0.027, +0.120]. That interval contains zero, so this is not a
+proven edge and I am not presenting it as one. The point is that there appears to be something
+worth working with **before adding any sophisticated selection model at all**, on data that no
+configuration was ever fitted to. For comparison, the frozen term-structure filter applied to the
+same events returned **-3.12%** at a per-trade Sharpe of -0.210, whose interval of
+[-0.347, -0.058] excludes zero on the wrong side, and a random selector taking the same number of
+trades from the same pool beat it. The side-by-side table is in
 [`STRATEGY.md`](STRATEGY.md) Section 6.3.
 
 That gives us a much better starting point for the year.
@@ -103,9 +104,9 @@ Those are much more targeted questions than where the project started in May.
 
 ### Execution looks especially important
 
-One of the biggest projects this summer was a separate study of actual option executions.
+One of the biggest projects this summer was a separate study of where option trades actually fill.
 
-Using **34,672 prints matched to their prevailing bid and ask**, the project measured where real trades were actually filling instead of assuming that every strategy could trade at the midpoint. Median price improvement came out at exactly zero, only 21.2% of prints executed at or better than the mid, and 54.3% paid the full spread.
+Using **34,672 real option market prints matched to their prevailing bid and ask**, the project measured where trades were actually filling instead of assuming that every strategy could trade at the midpoint. Median price improvement came out at exactly zero, only 21.2% of prints executed at or better than the mid, and 54.3% paid the full spread.
 
 That work made it clear that execution cannot be treated as a small adjustment at the end of the backtest. For short-dated options, it can be one of the largest drivers of whether an otherwise interesting signal survives.
 
@@ -140,11 +141,11 @@ mechanism.
 
 The important part is that the forward history is being written by a scheduled cloud job rather than manually on a laptop. That gives the project a dated external record that cannot simply be recreated later after seeing what happened.
 
-**Current status, stated plainly: the recorder is down, and has been since 13 August.** The deployed script reads a `mark_source` column that the deployed ledger, still on an older twelve-column schema, does not carry, so every run since then has exited with an error and committed nothing. Two scheduled runs have been lost and the live book holds zero completed trades, with two positions open. The fix is to deploy the current script and ledger together, since the two have to ship as a pair.
+**Current status, stated plainly: the recorder is down, and has been since 13 August**, because the deployed script and the deployed ledger fell out of step and have to be redeployed together. Two scheduled runs have been lost, and the live book currently holds two open positions and no completed trades.
 
 I am recording that here rather than repairing it quietly, because a forward record with undocumented gaps is not worth much. It is also a fair illustration of why the forward stage is starting now rather than after another semester of research: this class of failure does not appear in a backtest.
 
-A separate **Interactive Brokers paper-trading system** is also built, with safety controls around order transmission, and can turn strategy output into paper orders without any risk of reaching a live account.
+A separate **Interactive Brokers paper-trading system** is also built, with layered safety controls designed to prevent accidental live routing, and can turn strategy output into paper orders.
 
 The goal over the year is to move from a project dominated by historical testing to one with a meaningful **forward paper history** sitting beside it.
 
@@ -260,8 +261,8 @@ At the beginning of the summer, it was essentially one hypothesis about selling 
 
 Three months later, there is a working options research platform, twelve years of quote-level history, more than a thousand strategy configurations tested, a direct execution-cost dataset, multiple discarded strategy families, paper-trading infrastructure and a clear set of next experiments.
 
-The original term-structure selector will not be the final strategy, but I do not think that makes the summer unsuccessful. If anything, finding that out now is what makes the next stage more interesting. It is also worth saying that the finding is well evidenced rather than a single bad block: three separate datasets and two independent methods all point the same way.
+The original term-structure selector will not be the final strategy, but I do not think that makes the summer unsuccessful. If anything, finding that out now is what makes the next stage more interesting. It is also not just one bad test. Three separate datasets and two different analyses point in the same direction.
 
-The underlying earnings-volatility premium is still the piece worth attacking. The difference going into the year is that we now have a much better idea of **where the current approach leaves money on the table, what needs to change, and the infrastructure to test those changes quickly.**
+The underlying earnings-volatility effect is still the piece worth attacking. The difference going into the year is that we now have a much better idea of **where the current approach leaves money on the table, what needs to change, and the infrastructure to test those changes quickly.**
 
 The next phase is about turning that foundation into a strategy we would actually want to trade.

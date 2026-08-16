@@ -6,9 +6,14 @@ A systematic options project built around one question:
 
 **Does the volatility priced into single-name options before earnings exceed the risk that actually shows up, and can that difference be captured after real trading costs?**
 
-The current strategy sells short-dated at-the-money straddles around scheduled earnings announcements. The summer work built the infrastructure to test that idea properly, including quote-level option data, transaction-cost measurement, multiple strategy variants, forward recording, and an Interactive Brokers paper-execution layer.
+The strategy sells short-dated at-the-money straddles around scheduled earnings announcements. The summer work built the infrastructure to test that idea properly, including quote-level option data, transaction-cost measurement, multiple strategy variants, forward recording, and an Interactive Brokers paper-execution layer.
 
-The original summer selector is no longer the final direction of the project. The underlying earnings-volatility effect remains interesting, and the next stage is focused on **finding genuine mispricing, improving execution, and testing better ways to manage the position after earnings.**
+Two versions of that trade appear throughout these documents, and it is worth separating them at the outset:
+
+* **The current baseline** is the *unconditional* short earnings straddle, which takes every eligible event with no selection rule at all. This is what new work is measured against.
+* **The frozen summer specification** is that same trade filtered by a term-structure gate at the 80th percentile. It is retired as a direction, and kept fully documented because it is what the twelve-year record was produced with and it remains the comparison the next selector has to beat.
+
+The underlying earnings-volatility effect remains interesting, and the next stage is focused on **finding genuine mispricing, improving execution, and testing better ways to manage the position after earnings.**
 
 **New here?** Read this file first, then [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) for how the project got to this point, then [`STRATEGY.md`](STRATEGY.md) for the exact rules and the full results. Section 11 below defines every term used across all three.
 
@@ -38,7 +43,7 @@ The project now has three main pieces:
 2. **Strategy layer:** decides which events to trade, which option structure to use, and when to exit.
 3. **Execution and measurement layer:** marks the actual option chain, applies trading costs, calculates P&L, and compares different strategy versions on the same basis.
 
-The summer strategy used the slope between short-dated and longer-dated implied volatility as its main selector. That rule has now been retired as the primary direction after broader out-of-sample testing.
+The retired selector mentioned above worked off the slope between short-dated and longer-dated implied volatility, on the reasoning that a steep slope means the market is charging heavily for the announcement specifically. Broader out-of-sample testing showed it was picking large moves rather than overpriced ones.
 
 The system around it stays.
 
@@ -56,8 +61,7 @@ On a clean 2025-26 dataset that no configuration was fitted to, the **unconditio
 | Hit rate | **61.0%** |
 | Gross return on margin | **+3.44%** |
 | Net return on margin | **+0.49%** |
-| Per-trade Sharpe | +0.043 |
-| Date-clustered 95% interval | [-0.027, +0.120] |
+| Per-trade Sharpe, 95% CI | +0.043, date-clustered [-0.027, +0.120] |
 
 Every term in that table is defined in Section 11.
 
@@ -71,10 +75,10 @@ The original term-structure rule did not.
 
 On the same clean block:
 
-| Book | Net RoM | Gross RoM | 95% interval |
-| --- | :--: | :--: | :--: |
-| Unconditional | **+0.49%** | **+3.44%** | [-0.027, +0.120] |
-| Frozen term selector | **-3.12%** | +0.07% | **[-0.347, -0.058]** |
+| Book | Net RoM | Gross RoM | Per-trade Sharpe | 95% CI on the Sharpe |
+| --- | :--: | :--: | :--: | :--: |
+| Unconditional | **+0.49%** | **+3.44%** | +0.043 | [-0.027, +0.120] |
+| Frozen term selector | **-3.12%** | +0.07% | **-0.210** | **[-0.347, -0.058]** |
 
 Picking events at random, at the same number of trades, also beat the frozen rule.
 

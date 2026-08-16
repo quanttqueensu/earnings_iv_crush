@@ -10,8 +10,9 @@ difference. The question is whether that compensation exceeds the risk it pays
 for, and whether anything survives the cost of trading it.
 
 Over the summer the machinery to answer that on real quote data was built, and
-then used: twelve years of OPRA consolidated quotes, nine data sources behind
-one interface, 645 tests, 1,476 recorded configurations.
+then used: twelve years of OPRA consolidated quotes, multiple historical and
+live data sources behind one interface, 645 tests, 1,476 recorded
+configurations.
 
 Start with [`README.md`](README.md) for the project and the terminology, then
 [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) for how it developed and
@@ -24,8 +25,9 @@ eligible event indiscriminately returns +3.44% gross and +0.49% net on margin
 across 1,221 trades at a 61% hit rate.
 
 The filter is not. On that same block the term-structure gate the project spent
-three months refining returns -3.12%, with an interval excluding zero on the
-wrong side, and random selection at a matched trade count beats it. Gross
+three months refining returns -3.12% at a per-trade Sharpe of -0.210, whose 95%
+interval excludes zero on the wrong side, and random selection at a matched
+trade count beats it. Gross
 return is +0.07%, so cost is not the culprit. The gate finds events where the
 market charges a large implied move, and those turn out to be events where the
 large move happens.
