@@ -420,7 +420,7 @@ new result is expected to follow them. Setup and the commands themselves are in
 | `earnings_iv_crush/engine/pnl.py` | The reference valuation, `build_trade`. Everything must reconcile to it. |
 | `earnings_iv_crush/engine/screen.py` | The reporting contract: N, hit rate, per-trade Sharpe, clustered interval, stated annualisation factor. |
 | `earnings_iv_crush/engine/stats.py` | Date-clustered bootstrap, Deflated Sharpe, probabilistic Sharpe. |
-| `earnings_iv_crush/data/` | 34 modules, one per source, plus `providers.py`, a market registry so no provider branching leaks into run logic. |
+| `earnings_iv_crush/data/` | 32 modules, one per source, plus `providers.py`, which binds a market to its chain, calendar and spot sources so no provider branching leaks into run logic. |
 | `earnings_iv_crush/strategy/` | The selection rules. |
 | `earnings_iv_crush/live/` | The IBKR broker layer. |
 | `scripts/run_research.py` | Main research run. |

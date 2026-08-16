@@ -151,15 +151,13 @@ The main US historical results use OPRA consolidated bid and ask quotes through 
 
 Option marks are taken from the last valid two-sided quote at or before **15:59 ET** on the relevant session.
 
-The broader system also connects to:
+The universe is US single-name equity options. The broader system also connects to:
 
 * WRDS datasets through the QUANTT R2 mirror;
 * Alpaca;
 * Finnhub;
 * SEC EDGAR;
 * DoltHub;
-* NSE India;
-* B3 Brazil;
 * London Strategic Edge;
 * yfinance;
 * FRED; and

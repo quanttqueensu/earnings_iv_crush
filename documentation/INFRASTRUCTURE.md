@@ -220,8 +220,9 @@ specification, cross-checked against `config.STRATEGY` at import so the two cann
 disagree, and carries the reconciliation targets a research script can assert against before
 its own results are believed.
 
-`data/providers.py` is a market registry binding each market to a chain, calendar and spot
-triple, so no provider branching leaks into run logic.
+`data/providers.py` binds a market to its chain, calendar and spot sources as one triple, so
+no provider branching leaks into run logic. The registry is what made the cross-market test in
+Section 5.2 cheap to run and cheap to close; the live universe is US only.
 
 ## 5. Data sources and APIs
 
@@ -255,12 +256,16 @@ PostgreSQL path, which requires an account the project does not have.
 | Alpaca free tier | `data/alpaca_options.py` | Contract universe and daily option bars from about February 2024. No implied volatility or greeks on the free tier, so volatility is inverted locally. | `ALPACA_KEY`, `ALPACA_SECRET` |
 | Finnhub free tier | `data/earnings.py` | Live earnings calendar with the before-open / after-close field, cross-checked against SEC EDGAR acceptance times and Yahoo before a session is trusted. | `FINNHUB_API_KEY` |
 | DoltHub | `data/dolthub_options.py` | US dated chains from roughly 2019 to late 2024 with real bid and ask and publisher-computed greeks. Public SQL over HTTP. | none |
-| NSE India UDiFF bhavcopy | `data/nse_options.py` | Indian single-name options. Settlement price, open interest and underlying in one file. | none |
-| B3 Brazil COTAHIST | `data/b3_options.py` | Brazilian single-name options, with genuine best bid and offer. | none |
 | yfinance | `data/options.py`, `data/equities.py` | Current chains and daily equity bars. The forward recorder's snapshot source. | none |
 | FRED | `data/vix.py` | VIX and VIX3M. | `FRED_API_KEY`, optional |
 | SEC EDGAR | `data/sec_edgar.py` | Ticker to CIK map, 8-K Item 2.02 filings with session, reported diluted EPS via XBRL. | `SEC_USER_AGENT` |
 | Tiingo | `data/equities.py` | Equity OHLCV, with yfinance as the keyless fallback. | `TIINGO_API_KEY` |
+
+The universe is US single-name equity options. Two cross-market adapters, `data/nse_options.py`
+and `data/b3_options.py`, remain in the tree because the work that closed them is worth keeping
+readable, but they are **not live infrastructure and should not be built on**. Geographic
+expansion was tested and returned a clean negative; the result and the reason are in
+[`STRATEGY.md`](STRATEGY.md) Section 7. Do not write a third adapter.
 
 ### 5.3 Cost discipline on metered pulls
 
@@ -524,3 +529,4 @@ document covers how the system is built and how to work in it.
 | 2026-08-16 | 9.1 | Configuration check added, so an unconfigured clone skips the recorder cleanly instead of failing daily. |
 | 2026-08-16 | 1, 11, 12 | `expanding_gate_rank`, the frozen selector, promoted from the research scripts into `strategy/filters.py`. The adversarial look-ahead invariant now runs in a clone rather than skipping, and the gate is pinned against the quantile convention it reproduces. The limitation this replaced is removed. |
 | 2026-08-16 | 2.2, 10 | `demo_pipeline.py` added so a fresh clone can run the valuation and scoring path end to end with no credentials. Sections 2.2 onward renumbered. |
+| 2026-08-16 | 4, 5.2 | NSE India and B3 Brazil removed from the data-source table. Listing them as available sources presented a closed negative as live infrastructure. The adapters stay in the tree, labelled as not to be built on, and the result that closed them stays in `STRATEGY.md` Section 7. |
