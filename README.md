@@ -251,7 +251,7 @@ python scripts/demo_pipeline.py
 
 This prices a synthetic event panel through the same valuation, cost model and reporting contract every real result goes through. The generator prices announcement risk fairly by construction, so the gross book comes back near zero and the gap to the net book is the cost stack. It is a wiring check and a worked example, not a result, and it is labelled as such on every line. [`documentation/INFRASTRUCTURE.md`](documentation/INFRASTRUCTURE.md) Section 2.2 explains what to look at.
 
-**A note on the research entry points.** `outputs/` and the on-disk data caches are git-ignored, so the scripts below need datasets that are not carried in the repository. A fresh clone can run the test suite but cannot yet reproduce the research numbers. Getting a new member from a green suite to a reproducible result is an onboarding task for the start of the year, either by publishing the cached inputs or by shipping a small fixture set.
+**A note on the research entry points.** `outputs/` and the on-disk data caches are git-ignored, so the scripts below need datasets that are not carried in the repository. A fresh clone can run the test suite and `scripts/demo_pipeline.py`, which puts synthetic events through the whole valuation and scoring path, but cannot yet reproduce any real research number. Getting a new member from a green suite to a reproducible result is an onboarding task for the start of the year, either by publishing the cached inputs or by shipping a small fixture set.
 
 ```bash
 # Rebuild the settled twelve-year result from the cached quote marks

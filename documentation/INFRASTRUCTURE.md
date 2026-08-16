@@ -196,8 +196,8 @@ outputs/paper/         the forward paper book, committed by the recorder
 Two things are deliberately absent from a clone. Research artefacts under `outputs/research/`
 and the on-disk data caches are git-ignored, because they are large and partly vendor-derived.
 The consequence is stated plainly in [`../README.md`](../README.md) Section 10: a fresh clone
-runs the test suite but cannot yet reproduce the research numbers. Closing that gap is an
-onboarding task for the start of the year.
+runs the test suite and the demo, but cannot yet reproduce any real research number. Closing
+that gap is an onboarding task for the start of the year.
 
 ## 4. Codebase architecture
 

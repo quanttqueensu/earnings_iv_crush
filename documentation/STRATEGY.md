@@ -28,8 +28,8 @@ The book has three parts:
 - **The event engine.** Decides which announcements are tradeable, on what
   session, at what strike and expiry.
 - **The selector.** Decides which of those events to take.
-- **The cost floor.** 11.6% of premium round trip, measured from roughly 35k
-  option market quotes rather than assumed.
+- **The cost floor.** 11.6% of premium round trip, measured from 34,672 option
+  market prints against their prevailing quotes rather than assumed.
 
 **The underlying earnings-volatility effect is clear, and the simplest
 unconditional implementation is the most useful baseline going into the year.**

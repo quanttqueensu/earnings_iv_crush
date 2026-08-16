@@ -28,7 +28,7 @@ mispricing rather than on magnitude is the pivot the next stage is built around.
 | Continuous integration | Green on every commit to main |
 | Twelve-year book | Reproducible from cache in one command, N = 391, Sharpe +0.055992 |
 | Clean 2025-26 block | Scored, pre-registered before the first data pull |
-| Execution costs | Measured from roughly 35k option market quotes |
+| Execution costs | Measured from 34,672 option market prints against their prevailing quotes |
 | Broker layer | Interactive Brokers paper execution built, dry-run by default |
 | Research protocol | Pre-registration, trial ledger and one scoring path enforced by tests |
 
@@ -37,9 +37,10 @@ mispricing rather than on magnitude is the pivot the next stage is built around.
 Stated plainly, because the point of a status document is the second list.
 
 1. **A fresh clone cannot reproduce the research.** The caches and result artefacts are
-   git-ignored, so a new member can run the test suite and nothing else. Closing this means
-   either publishing the cached inputs or shipping a small fixture set, and it is the first
-   onboarding job.
+   git-ignored. A new member can run the test suite and `scripts/demo_pipeline.py`, which
+   exercises the whole valuation and scoring path on synthetic events, but cannot rebuild any
+   real number. Closing this means either publishing the cached inputs, which needs a
+   redistribution answer, or shipping a small fixture set. It is the first onboarding job.
 2. **The margin model has never been checked against a broker statement.** A probe suggests
    the broker charges 2.2 to 2.4 times the modelled figure. Comparisons between books are
    unaffected, since they share the convention, but absolute return levels are research
