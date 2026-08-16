@@ -10,9 +10,9 @@ is committed.
 
 This module implements:
 
-* ``aggregate_pnl_attribution`` — sum the Greek P&L attribution over a ledger.
-* ``cumulative_equity``         — equity curve from a ledger.
-* ``build_tearsheet``           — render and save the four-panel tearsheet + CSV.
+* ``aggregate_pnl_attribution`` - sum the Greek P&L attribution over a ledger.
+* ``cumulative_equity``         - equity curve from a ledger.
+* ``build_tearsheet``           - render and save the four-panel tearsheet + CSV.
 """
 
 from __future__ import annotations
@@ -128,7 +128,7 @@ def build_tearsheet(
     outdir.mkdir(parents=True, exist_ok=True)
 
     fig, axes = plt.subplots(2, 2, figsize=(13, 9))
-    fig.suptitle("Earnings IV-Crush — Filtered Strategy vs Agent 0", fontsize=14)
+    fig.suptitle("Earnings IV-Crush - Filtered Strategy vs Agent 0", fontsize=14)
 
     # (1) Equity curves
     ax = axes[0, 0]

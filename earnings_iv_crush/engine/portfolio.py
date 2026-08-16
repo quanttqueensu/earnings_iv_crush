@@ -11,10 +11,10 @@ calendar-day with flat days included, and the standard risk metrics on top.
 
 This module implements:
 
-* ``ledger_daily_pnl`` — realised P&L booked on each trade's exit date.
-* ``equity_curve``     — fixed-notional account value from a daily P&L series.
-* ``drawdown``         — running peak-to-trough drawdown of an equity curve.
-* ``risk_metrics``     — total return, CAGR, vol, Sharpe, max drawdown and, when a
+* ``ledger_daily_pnl`` - realised P&L booked on each trade's exit date.
+* ``equity_curve``     - fixed-notional account value from a daily P&L series.
+* ``drawdown``         - running peak-to-trough drawdown of an equity curve.
+* ``risk_metrics``     - total return, CAGR, vol, Sharpe, max drawdown and, when a
   market series is supplied, beta and correlation to it.
 
 Notes

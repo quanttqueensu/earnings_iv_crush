@@ -8,10 +8,10 @@ its vega / gamma / theta / delta sources (see ``engine.attribution``).
 
 This module implements:
 
-* ``bs_price`` / ``straddle_price`` — Black-Scholes value of an option / straddle.
-* ``bs_delta`` / ``bs_gamma`` / ``bs_vega`` / ``bs_theta`` / ``bs_rho`` — Greeks.
-* ``straddle_greeks`` — aggregate Greeks of an ATM straddle.
-* ``implied_vol`` — invert the price to recover implied volatility.
+* ``bs_price`` / ``straddle_price`` - Black-Scholes value of an option / straddle.
+* ``bs_delta`` / ``bs_gamma`` / ``bs_vega`` / ``bs_theta`` / ``bs_rho`` - Greeks.
+* ``straddle_greeks`` - aggregate Greeks of an ATM straddle.
+* ``implied_vol`` - invert the price to recover implied volatility.
 
 Conventions: ``t`` is time-to-expiry in years; ``r`` and ``sigma`` are annualised
 and continuously compounded. ``bs_theta`` is the derivative with respect to

@@ -5,8 +5,8 @@ Central configuration for the Earnings IV-Crush research framework.
 All tunable parameters live here as two immutable dataclasses so the assumptions
 behind a result are visible in one place rather than scattered across modules:
 
-* ``GlobalConfig``   — account, pricing, cost and data-window settings.
-* ``StrategyConfig`` — the filter, sizing, risk and regime parameters that
+* ``GlobalConfig``   - account, pricing, cost and data-window settings.
+* ``StrategyConfig`` - the filter, sizing, risk and regime parameters that
   define the strategy itself.
 
 The module-level singletons ``GLOBAL`` and ``STRATEGY`` hold the canonical
@@ -155,7 +155,7 @@ class StrategyConfig:
         this percentile of its trailing distribution. Defaults to ``0.80`` (the
         interior-stable operating point of the per-trade Sharpe surface).
     trailing_window : int
-        Length of the term-spread trailing window — trading days for the
+        Length of the term-spread trailing window - trading days for the
         per-name panel gate, or events for the legacy gate. Defaults to ``30``.
     term_min_periods : int
         Minimum daily observations before the panel term gate will fire.

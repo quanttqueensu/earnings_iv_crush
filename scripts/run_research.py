@@ -238,7 +238,7 @@ def _load_real_events(args) -> pd.DataFrame:
             raise SystemExit(f"{cal_path} not found - run scripts/build_calendar.py first")
         cal = pd.read_parquet(cal_path)
         cal = cal[(cal["announce_date"] >= args.start) & (cal["announce_date"] <= args.end)]
-        print(f"Earnings events in window: {len(cal)}  (assembling entry+exit chains)…")
+        print(f"Earnings events in window: {len(cal)}  (assembling entry+exit chains)...")
         # --cache-only: read snapshots from disk only, never hitting the API, so
         # an early read can run against a partially-warm cache without cold
         # fetches (events with any uncached chain are skipped). Used while a
@@ -293,7 +293,7 @@ def _load_real_events(args) -> pd.DataFrame:
                 f"No historical earnings dates for {sorted(set(args.tickers))} "
                 f"in [{args.start}, {args.end}]."
             )
-        print(f"Earnings events in window: {len(cal)}  (assembling entry+exit chains)…")
+        print(f"Earnings events in window: {len(cal)}  (assembling entry+exit chains)...")
         entry_fetch = cached_chain_fetcher("entry", source=mkt.chain_source, fetch=mkt.fetch_chain)
         events = build_execution_events(
             cal,
@@ -316,7 +316,7 @@ def _load_real_events(args) -> pd.DataFrame:
     events = events.dropna(subset=needed)
     if len(events) < 10:
         raise SystemExit(
-            f"Only {len(events)} usable real events — too few to fit. "
+            f"Only {len(events)} usable real events - too few to fit. "
             "Widen the window or universe."
         )
     if cache:
@@ -346,7 +346,7 @@ def _load_term_panel(args, events):
             return cached
     print(
         f"Building per-name daily term-spread panel for {events['ticker'].nunique()} "
-        f"names x trailing {TRAILING_WINDOW} days (network-bound)…"
+        f"names x trailing {TRAILING_WINDOW} days (network-bound)..."
     )
     mkt = args.mkt
     fetch_chain = cached_chain_fetcher(
@@ -467,7 +467,7 @@ def main() -> None:
         default="panel",
         help="Term filter: 'panel' = per-name trailing 30-day percentile "
         "(default; the point-in-time gate used for every reported figure); "
-        "'events' = legacy rolling form, kept for the synthetic path only — "
+        "'events' = legacy rolling form, kept for the synthetic path only - "
         "its rolling window includes the current row, so it is in-sample "
         "contaminated on real data.",
     )
@@ -511,7 +511,7 @@ def main() -> None:
 
     mode = "REAL (Alpaca surfaces)" if args.real else "synthetic, planted edge"
     print("=" * 70)
-    print(f"Earnings IV-Crush — enriched research run ({mode})")
+    print(f"Earnings IV-Crush - enriched research run ({mode})")
     print("=" * 70)
 
     if args.real:
@@ -532,7 +532,7 @@ def main() -> None:
     if args.real:
         _filter_funnel(events, model, term_panel=term_panel)
 
-    # Gross (commission-only) vs net (full cost stack) — the thesis is net.
+    # Gross (commission-only) vs net (full cost stack) - the thesis is net.
     gross = backtest(run_strategy(events, model, term_panel=term_panel))
     net_strat_ledger = run_strategy(events, model, costs=costs, term_panel=term_panel)
     net_agent0_ledger = run_agent0(events, seed=11, costs=costs)
@@ -553,9 +553,9 @@ def main() -> None:
         "max_dd_duration",
         "avg_return_on_margin",
     )
-    _show("Filtered strategy — GROSS (commission only)", gross, metric_keys)
-    _show("Filtered strategy — NET (full cost stack)", net_strat, metric_keys)
-    _show("Agent 0 control — NET", net_agent0, metric_keys)
+    _show("Filtered strategy - GROSS (commission only)", gross, metric_keys)
+    _show("Filtered strategy - NET (full cost stack)", net_strat, metric_keys)
+    _show("Agent 0 control - NET", net_agent0, metric_keys)
 
     cost_drag = gross["total_return"] - net_strat["total_return"]
     print(f"\nCost drag (gross - net total return): {cost_drag:+.4%}")
@@ -569,7 +569,7 @@ def main() -> None:
         seed=1,
     )
     _show(
-        "Filter significance — daily-Sharpe, annualised at the book's own cadence "
+        "Filter significance - daily-Sharpe, annualised at the book's own cadence "
         "(zero-fills flat days; frequency-confounded)",
         cmp,
         (
@@ -589,7 +589,7 @@ def main() -> None:
     # every date the control traded but it did not, penalising selectivity rather
     # than per-trade edge. These statistics score the two books frequency-neutral.
     _show(
-        "Filter edge — frequency-neutral (per-trade + size-matched control)",
+        "Filter edge - frequency-neutral (per-trade + size-matched control)",
         cmp,
         (
             "mean_rom_strategy",
@@ -662,13 +662,13 @@ def main() -> None:
         print(
             f"Verdict ({label}) over {net_strat['n_trades']} trades:\n"
             f"  Daily-Sharpe gate (frequency-confounded): {cmp['sharpe_delta']:+.2f} "
-            f"— {'PASS' if cmp['filter_gate_pass'] else 'below +0.50 gate'}. This charges the "
+            f"- {'PASS' if cmp['filter_gate_pass'] else 'below +0.50 gate'}. This charges the "
             f"filter a flat-day return on every date only the control traded.\n"
             f"  Frequency-neutral: per-trade Sharpe {edge} control "
             f"({cmp['per_trade_sharpe_strategy']:.2f} vs {cmp['per_trade_sharpe_agent0']:.2f}); "
             f"size-matched control wins {cmp['size_matched_win_prob']:.0%} of draws "
             f"(95% CI [{cmp['size_matched_delta_ci_low']:+.2f}, "
-            f"{cmp['size_matched_delta_ci_high']:+.2f}], straddles 0 — not conclusive at this N)."
+            f"{cmp['size_matched_delta_ci_high']:+.2f}], straddles 0 - not conclusive at this N)."
         )
     print(f"Tearsheet: {png}")
 

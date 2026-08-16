@@ -8,10 +8,10 @@ cache works whether or not ``pyarrow`` is installed.
 
 This module implements:
 
-* ``cache_path``    — resolve the on-disk path for a cache key.
-* ``write_frame``   — persist a DataFrame (parquet, or CSV fallback).
-* ``read_frame``    — load a cached DataFrame by key.
-* ``has_frame``     — check whether a key is cached.
+* ``cache_path``    - resolve the on-disk path for a cache key.
+* ``write_frame``   - persist a DataFrame (parquet, or CSV fallback).
+* ``read_frame``    - load a cached DataFrame by key.
+* ``has_frame``     - check whether a key is cached.
 """
 
 from __future__ import annotations

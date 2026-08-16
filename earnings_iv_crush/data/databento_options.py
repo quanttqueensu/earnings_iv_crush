@@ -196,7 +196,7 @@ def _split_factor(ticker: str, asof: pd.Timestamp) -> float:
             splits = yf.Ticker(ticker).splits
         except Exception as exc:
             # Failing open with factor 1.0 on a name that HAS split centres the
-            # strike band orders of magnitude off and selects nothing — which
+            # strike band orders of magnitude off and selects nothing - which
             # is then cached as a permanently empty chain. Make the failure
             # visible instead of silent.
             print(f"databento_options: splits fetch failed for {ticker} ({exc}); assuming none.")

@@ -6,10 +6,12 @@
 # Local working material - kept out of the repo (notes, drafts, scratch).
 _private/
 
-# Local tooling and editor-agent material - never part of the project
+# Local editor and tooling directories - never part of the project
+.vscode/
+.idea/
 .claude/
-CLAUDE.md
 .understand-anything/
+CLAUDE.md
 
 # Data (raw and processed pulls are git-ignored per the data plan)
 data/raw/

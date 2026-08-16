@@ -10,8 +10,8 @@ the structure economics through the production ledger.
 
 This module implements:
 
-* ``select_structure``   — pick a structure for one event.
-* ``assign_structures``  — vectorise the choice across an event frame.
+* ``select_structure``   - pick a structure for one event.
+* ``assign_structures``  - vectorise the choice across an event frame.
 
 Structure labels: ``"iron_fly"``, ``"calendar"``, ``"straddle"``.
 """
@@ -46,7 +46,7 @@ def select_structure(
 
     Decision order:
 
-    1. ``iron_fly`` when ``vix`` exceeds ``vix_threshold`` — cap the tail in a
+    1. ``iron_fly`` when ``vix`` exceeds ``vix_threshold`` - cap the tail in a
        high-volatility regime.
     2. ``calendar`` when the term-structure premium is both material
        (``term_spread >= calendar_min_term_spread``) and dominates the level

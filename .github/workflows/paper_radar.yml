@@ -34,28 +34,83 @@ jobs:
   radar:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check the recorder is configured
+        # The earnings calendar needs a Finnhub key. Without it there is nothing to
+        # record, which is a repository that has not been set up rather than a fault:
+        # skip cleanly instead of failing, so an unconfigured clone does not carry a
+        # daily red run it cannot fix.
+        id: configured
+        env:
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+        run: |
+          if [ -z "$FINNHUB_API_KEY" ]; then
+            echo "::notice::FINNHUB_API_KEY is not set; skipping the forward recorder."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      - uses: actions/setup-python@v5
+      - if: steps.configured.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - if: steps.configured.outputs.ready == 'true'
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
+      - if: steps.configured.outputs.ready == 'true'
+        name: Install dependencies
         run: pip install pandas numpy scipy pyarrow requests yfinance
 
-      - name: Confirm the richness seed is present
+      - if: steps.configured.outputs.ready == 'true'
+        name: Confirm the richness seed is present
         # Without it the radar records every name with rich status "unknown", which
         # is an unconditional book, not the overlay. Better to know on day one.
         run: |
           test -f data/rich_set.csv || { echo "::error::data/rich_set.csv missing - rebuild with scripts/build_rich_seed.py"; exit 1; }
           echo "seed rows: $(( $(wc -l < data/rich_set.csv) - 1 ))"
 
-      - name: Run paper radar
+      - if: steps.configured.outputs.ready == 'true'
+        name: Run paper radar
         env:
           FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: python scripts/paper_radar.py
 
-      - name: Commit updated books
+      - if: steps.configured.outputs.ready == 'true'
+        name: Verify the books match the schema before committing
+        # The header on disk decides which fields a booked row keeps: appending a dict to
+        # a frame read off an older header silently discards every key that header does
+        # not name. That once dropped the exit mark and its provenance from the first
+        # live trade while still writing a plausible-looking return. Check here so a
+        # non-canonical book can never reach the remote, rather than surfacing on
+        # whichever later run happens to read a column that is no longer there.
+        run: |
+          python - <<'PY'
+          import csv
+          import sys
+          from pathlib import Path
+
+          from scripts.paper_radar import LEDGER_COLS, OPEN_COLS
+
+          bad = False
+          for path, cols in (
+              (Path("outputs/paper/radar_ledger.csv"), LEDGER_COLS),
+              (Path("outputs/paper/radar_open_positions.csv"), OPEN_COLS),
+          ):
+              if not path.exists():
+                  continue
+              with path.open(newline="") as fh:
+                  header = next(csv.reader(fh), [])
+              if header != cols:
+                  print(f"::error::{path} header does not match the schema")
+                  print(f"  missing: {[c for c in cols if c not in header]}")
+                  print(f"  unexpected: {[c for c in header if c not in cols]}")
+                  bad = True
+          sys.exit(1 if bad else 0)
+          PY
+
+      - if: steps.configured.outputs.ready == 'true'
+        name: Commit updated books
         run: |
           git config user.name "paper-radar[bot]"
           git config user.email "paper-radar@users.noreply.github.com"

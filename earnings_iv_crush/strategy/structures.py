@@ -4,10 +4,10 @@ Defined-risk and term-structure trade variants around the short straddle.
 The naked short ATM straddle is the primary structure, with two variants the
 regime selector switches to:
 
-* **Iron fly** — short ATM straddle plus long out-of-the-money call and put
+* **Iron fly** - short ATM straddle plus long out-of-the-money call and put
   wings at ``wing_mult`` times the implied event move. The wings cap the loss,
   required when VIX is elevated (defined-risk regime).
-* **Calendar** — short the front-week straddle, long a vega-balanced back-month
+* **Calendar** - short the front-week straddle, long a vega-balanced back-month
   straddle. Harvests the term-structure premium when the front-vs-back IV slope
   dominates the absolute level mispricing.
 
@@ -18,10 +18,10 @@ skew refinement is deferred to the historical-data phase).
 
 This module implements:
 
-* ``iron_fly_wings``  — wing strikes from the implied event move.
-* ``iron_fly_pnl``    — short iron-fly economics (loss is capped).
-* ``calendar_ratio``  — vega-balancing front/back contract ratio.
-* ``calendar_pnl``    — short-front / long-back calendar economics.
+* ``iron_fly_wings``  - wing strikes from the implied event move.
+* ``iron_fly_pnl``    - short iron-fly economics (loss is capped).
+* ``calendar_ratio``  - vega-balancing front/back contract ratio.
+* ``calendar_pnl``    - short-front / long-back calendar economics.
 """
 
 from __future__ import annotations

@@ -430,6 +430,10 @@ new result is expected to follow them. Setup and the commands themselves are in
 | `outputs/research/` | 657 artefacts. Superseded ones carry a `_SUPERSEDED` suffix rather than being deleted. |
 | `outputs/research/audit/` | Per-event SHA-256 lineage over source data, config, costs, marks, P&L and quotes for 2,062 events, plus an independent reconstruction that imports nothing from the package. |
 
+The two `outputs/research/` rows are generated locally and are git-ignored, so
+they are described here but do not arrive with a clone. Publishing them is the
+onboarding task noted in [`README.md`](README.md) Section 10.
+
 Invariant-pinning tests, each naming the defect it guards in its own docstring:
 `test_adversarial_invariants.py` (metamorphic rather than expected-value:
 deleting post-entry records must not change any entry quantity; halving prices

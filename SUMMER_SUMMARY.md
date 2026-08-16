@@ -141,9 +141,7 @@ mechanism.
 
 The important part is that the forward history is being written by a scheduled cloud job rather than manually on a laptop. That gives the project a dated external record that cannot simply be recreated later after seeing what happened.
 
-**Current status, stated plainly: the recorder is down, and has been since 13 August**, because the deployed script and the deployed ledger fell out of step and have to be redeployed together. Two scheduled runs have been lost, and the live book currently holds two open positions and no completed trades.
-
-I am recording that here rather than repairing it quietly, because a forward record with undocumented gaps is not worth much. It is also a fair illustration of why the forward stage is starting now rather than after another semester of research: this class of failure does not appear in a backtest.
+The record is deliberately young: it starts from a short base and is expected to grow through the year rather than to carry weight yet. Whatever gaps it accumulates are recorded in the book itself rather than repaired quietly, because a forward record with undocumented gaps is not worth much.
 
 A separate **Interactive Brokers paper-trading system** is also built, with layered safety controls designed to prevent accidental live routing, and can turn strategy output into paper orders.
 
@@ -251,7 +249,7 @@ The GitHub history provides a dated record of how the project developed over the
 | **12 August** | Forward valuation system upgraded and reconciled against the main P&L engine |
 | **15 August** | Clean 2025-26 dataset completed; summer selector superseded as the primary direction and next-stage research programme set |
 
-Repository: `github.com/jordanodorico/earnings_iv_crush`. The QUANTT fork at `quanttqueensu/earnings_iv_crush` is currently behind and needs syncing. Setup and the commands for rebuilding the headline numbers are in [`README.md`](README.md) Section 10.
+Setup and the commands for rebuilding the headline numbers are in [`README.md`](README.md) Section 10.
 
 ## Bottom Line
 

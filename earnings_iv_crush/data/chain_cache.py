@@ -4,7 +4,7 @@ Disk-cached wrapper around the Alpaca historical chain fetcher.
 
 The real backtest needs tens of thousands of (ticker, date) chain snapshots
 and Alpaca's free tier is rate-limited, so every snapshot is cached to the
-git-ignored ``data/processed`` tree on first fetch — including empty results,
+git-ignored ``data/processed`` tree on first fetch - including empty results,
 which are written as sentinel frames so a name with no chain that day is not
 re-fetched on every run.
 
@@ -84,8 +84,8 @@ def cached_chain_fetcher(
     -------
     callable
         ``fetch_chain(ticker, asof) -> chain`` with the canonical schema. The
-        returned callable exposes ``empty_served`` — how many cached empty
-        sentinels it handed out — so callers can surface the potential loss.
+        returned callable exposes ``empty_served`` - how many cached empty
+        sentinels it handed out - so callers can surface the potential loss.
     """
     strike_window, horizon_days = VARIANTS[variant]
     fetch = fetch or alpaca_options.fetch_option_chain

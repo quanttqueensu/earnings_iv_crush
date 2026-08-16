@@ -72,7 +72,7 @@ def main() -> None:
     costs = CostModel()
 
     print("=" * 70)
-    print("Earnings IV-Crush — threshold sensitivity + walk-forward (synthetic)")
+    print("Earnings IV-Crush - threshold sensitivity + walk-forward (synthetic)")
     print("=" * 70)
     print(
         f"Events: {len(events)}  |  grid: {len(RATIOS)}x{len(PCTLS)} "

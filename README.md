@@ -1,6 +1,6 @@
 # Earnings IV Crush
 
-[![CI](https://github.com/jordanodorico/earnings_iv_crush/actions/workflows/ci.yml/badge.svg)](https://github.com/jordanodorico/earnings_iv_crush/actions/workflows/ci.yml)
+[![CI](https://github.com/quanttqueensu/earnings_iv_crush/actions/workflows/ci.yml/badge.svg)](https://github.com/quanttqueensu/earnings_iv_crush/actions/workflows/ci.yml)
 
 A systematic options project built around one question:
 
@@ -224,7 +224,7 @@ A file-level map of the modules that matter most is in [`STRATEGY.md`](STRATEGY.
 Python 3.10+.
 
 ```bash
-git clone https://github.com/jordanodorico/earnings_iv_crush.git
+git clone https://github.com/quanttqueensu/earnings_iv_crush.git
 cd earnings_iv_crush
 
 python -m venv .venv
@@ -297,5 +297,3 @@ Four documents, four jobs.
 | [`STRATEGY.md`](STRATEGY.md) | The exact trading rules, the data and execution assumptions, the full results, and what still needs validating. |
 
 Academic references are collected at the end of [`STRATEGY.md`](STRATEGY.md).
-
-A longer technical research record exists in `docs/research_handoff.md` but is not currently published to this repository.

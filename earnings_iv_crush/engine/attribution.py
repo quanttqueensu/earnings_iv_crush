@@ -5,15 +5,15 @@ A short straddle held across an earnings event earns its money from the
 post-event implied-volatility collapse (the vega leg) and loses it to large
 realised moves (the short-gamma leg). This module attributes the realised P&L
 to those sources via a first-order Greek (Taylor) expansion evaluated at entry,
-plus a once-at-close delta hedge — the desk-level view that makes explicit that
+plus a once-at-close delta hedge - the desk-level view that makes explicit that
 the edge is the vega (crush) component, consistent with the Dubinsky-Johannes
 (2006) event-variance framing in the literature review.
 
 This module implements:
 
-* ``attribute_straddle_pnl`` — split realised short-straddle P&L into delta,
+* ``attribute_straddle_pnl`` - split realised short-straddle P&L into delta,
   gamma, vega and theta components plus a higher-order residual.
-* ``delta_hedge_pnl``        — P&L of the once-at-entry-close delta hedge.
+* ``delta_hedge_pnl``        - P&L of the once-at-entry-close delta hedge.
 
 References
 ----------

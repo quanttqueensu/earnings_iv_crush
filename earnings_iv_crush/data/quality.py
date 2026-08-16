@@ -3,7 +3,7 @@ quality.py
 Data-quality gates for chains and events, with logged exclusion reasons.
 
 Free-tier data is shallow (Alpaca closes stand in for bid/ask, OI is a
-snapshot), so rather than trading through bad prints the pipeline drops them —
+snapshot), so rather than trading through bad prints the pipeline drops them -
 but never silently. ``filter_chain`` returns the quote-level report and
 ``event_quality`` flags whole events; the exclusion table built from these
 reasons feeds the research document, where the per-cohort drop rates are part
@@ -42,9 +42,9 @@ def filter_chain(
     """Drop untradeable quotes; return the survivors and a per-reason report.
 
     Gates, in order: non-positive or NaN mid price; open interest below
-    ``min_oi`` (NaN OI passes — Alpaca's snapshot OI is often missing and
+    ``min_oi`` (NaN OI passes - Alpaca's snapshot OI is often missing and
     absence is not evidence of illiquidity); relative spread above
-    ``max_rel_spread`` (only binds with real NBBO — with close-as-bid/ask the
+    ``max_rel_spread`` (only binds with real NBBO - with close-as-bid/ask the
     spread is zero); strikes beyond ``max_moneyness`` of spot.
 
     Parameters

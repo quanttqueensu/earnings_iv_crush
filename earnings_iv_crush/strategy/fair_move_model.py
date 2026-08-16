@@ -16,9 +16,9 @@ reports the out-of-sample skill the validation step needs.
 
 This module implements:
 
-* ``FairMoveModel``           — fit / predict, OLS or ridge.
-* ``FairMoveModel.diagnostics`` — R-squared, adjusted R-squared, t-statistics.
-* ``FairMoveModel.evaluate_walk_forward`` — out-of-sample R-squared, calibration.
+* ``FairMoveModel``           - fit / predict, OLS or ridge.
+* ``FairMoveModel.diagnostics`` - R-squared, adjusted R-squared, t-statistics.
+* ``FairMoveModel.evaluate_walk_forward`` - out-of-sample R-squared, calibration.
 
 References
 ----------

@@ -136,7 +136,40 @@ def _load(path: Path, cols: list[str]) -> pd.DataFrame:
             f"unattributable book. Move the existing rows to outputs/research/ and "
             f"restart the live ledger, or stamp the column by hand."
         )
-    return df
+    missing = [c for c in cols if c not in df.columns]
+    if missing and len(df):
+        # Rows written before a column existed cannot be back-filled from the file: a
+        # ledger with no mark_source, for instance, gives no way to know whether its
+        # returns are quote-marked or on the retired intrinsic estimator, and those two
+        # differ by the sign of the mean. Stop rather than pool them.
+        raise SystemExit(
+            f"ERROR: {path} has {len(df)} rows written under an older schema and is "
+            f"missing {missing}. Those rows cannot be reconstructed onto the current "
+            f"basis. Move them to outputs/research/ and restart the live ledger."
+        )
+    # A headers-only file left by an earlier schema has nothing to migrate, but its
+    # header still governs what an appended row keeps, so adopt the current columns.
+    return df.reindex(columns=cols) if missing else df
+
+
+def _append(df: pd.DataFrame, row: dict[str, object], cols: list[str]) -> pd.DataFrame:
+    """Append one row to a book, refusing to drop or invent a field.
+
+    ``df.loc[len(df)] = row`` aligns the dict against the columns the frame already has
+    and silently discards every key it does not recognise. Read off a file written under
+    an older header, that strips the exit mark and its provenance from each new trade
+    while still writing a plausible-looking ``ret``, which is exactly the confusion the
+    provenance columns exist to prevent.
+    """
+    missing = [c for c in cols if c not in row]
+    unexpected = [c for c in row if c not in cols]
+    if missing or unexpected:
+        raise SystemExit(
+            f"ERROR: refusing to write a row whose fields do not match the book's "
+            f"schema (missing {missing}, unexpected {unexpected})."
+        )
+    booked = pd.DataFrame([row], columns=cols)
+    return booked if df.empty else pd.concat([df, booked], ignore_index=True)
 
 
 def _write(df: pd.DataFrame, path: Path) -> None:
@@ -301,7 +334,7 @@ def run_exits(today: pd.Timestamp, dry: bool) -> int:
         ret = pnl_ps / credit_ps if credit_ps else float("nan")
         rom = pnl_ps / margin_ps if margin_ps else float("nan")
 
-        ledger.loc[len(ledger)] = {
+        row: dict[str, object] = {
             "ticker": r["ticker"],
             "announce_date": r["announce_date"],
             "entry_date": r["entry_date"],
@@ -325,6 +358,7 @@ def run_exits(today: pd.Timestamp, dry: bool) -> int:
             "in_rich_set": r["in_rich_set"],
             "source": LIVE,
         }
+        ledger = _append(ledger, row, LEDGER_COLS)
         booked += 1
     keep = openpos[pd.to_datetime(openpos["exit_date"]) > today]
     if not dry:
@@ -335,7 +369,7 @@ def run_exits(today: pd.Timestamp, dry: bool) -> int:
 
 def run_entries(
     today: pd.Timestamp, names: list[str], rich: set[str] | None, dry: bool
-) -> tuple[int, int, list[str]]:
+) -> tuple[int, int, int, list[str]]:
     end = (today + timedelta(days=LOOKAHEAD_DAYS)).strftime("%Y-%m-%d")
     cal = earnings.fetch_earnings_calendar(today.strftime("%Y-%m-%d"), end)
     if cal.empty:
@@ -374,7 +408,7 @@ def run_entries(
             skips.append(reason)
             continue
         spot, strike, expiry, straddle, im = snap
-        openpos.loc[len(openpos)] = {
+        opening: dict[str, object] = {
             "ticker": e["ticker"],
             "announce_date": str(announce.date()),
             "session": e.get(session_col),
@@ -387,6 +421,7 @@ def run_entries(
             "implied_move": im,
             "in_rich_set": in_rich,
         }
+        openpos = _append(openpos, opening, OPEN_COLS)
         opened += 1
     if not dry:
         _write(openpos, OPEN_CSV)

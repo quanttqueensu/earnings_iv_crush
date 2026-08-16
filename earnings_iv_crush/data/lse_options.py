@@ -6,7 +6,7 @@ Pulls daily option bars from the LSE vault via ``history(dataset='options',
 timeframe='1d')``.  Two pull strategies:
 
 1. **Bulk** (recommended for backtest builds): call ``pull_ticker_raw()`` once
-   per underlying — one vault export job fetches every 1d option bar the ticker
+   per underlying - one vault export job fetches every 1d option bar the ticker
    has ever printed.  The raw result is cached under ``data/processed/lse_raw/``
    and sliced by date when ``fetch_option_chain`` is called.
 
@@ -25,7 +25,7 @@ Data quality notes:
   names. No bid/ask is available on historical bars; both sides carry the
   close, matching the Databento pre-2023 convention.
 * Spot comes from yfinance (split-adjusted close), lifted by the cumulative
-  split factor to match LSE's raw (unadjusted) historical strikes — identical
+  split factor to match LSE's raw (unadjusted) historical strikes - identical
   to the Databento methodology.
 
 Requires ``LSE_API_KEY`` in ``.env``.

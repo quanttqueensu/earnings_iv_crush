@@ -81,7 +81,7 @@ def _resolve_session(raw, default_session: str) -> tuple[str, bool]:
     ``None``, NaN, empty strings and the string ``"nan"`` all fall back to
     ``default_session``. NaN must be handled explicitly: it is truthy, so the
     old ``raw or default`` idiom let it through and ``entry_exit_dates`` then
-    silently routed the event down the non-amc (bmo) branch — one day early.
+    silently routed the event down the non-amc (bmo) branch - one day early.
 
     Returns
     -------

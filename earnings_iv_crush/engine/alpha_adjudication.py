@@ -262,3 +262,131 @@ def file_sha256(path: str | Path) -> str:
 def write_manifest(path: str | Path, manifest: dict) -> None:
     """Write stable, human-readable JSON metadata for a result run."""
     Path(path).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+# ── pre-registered trial ledger ──────────────────────────────────────────────
+
+
+class TrialLedgerError(RuntimeError):
+    """Raised when a result is claimed for a specification that was never declared."""
+
+
+class TrialLedger:
+    """Declare every specification before any is run, and count them honestly.
+
+    The Deflated Sharpe Ratio charges a result for the number of configurations
+    the researcher effectively tried. Reconstructing that count afterwards is the
+    failure this class exists to prevent: the IV-crush book's DSR could not be
+    trusted until the 1,476 searched configurations were rebuilt from logs, and a
+    count assembled after seeing the results is not a count.
+
+    The contract is deliberately awkward in one direction. :meth:`declare` may be
+    called freely before results exist, but :meth:`n_trials` counts every declared
+    specification whether or not it was run, so abandoning a branch does not
+    reduce the deflation. :meth:`record` refuses a label that was never declared.
+
+    Parameters
+    ----------
+    path : str or Path
+        JSON file backing the ledger. Reloaded if it already exists, so a run
+        resumed across sessions keeps its declared trial count.
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self._declared: dict[str, dict] = {}
+        self._results: dict[str, dict] = {}
+        if self.path.exists():
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+            self._declared = dict(payload.get("declared", {}))
+            self._results = dict(payload.get("results", {}))
+
+    # -- declaration ---------------------------------------------------------
+
+    def declare(self, label: str, spec: dict) -> None:
+        """Register one specification before it is run.
+
+        Re-declaring an existing label with a different spec raises, so a
+        specification cannot be quietly edited after the fact.
+        """
+        existing = self._declared.get(label)
+        if existing is not None and existing != spec:
+            raise TrialLedgerError(
+                f"{label} was already declared with a different specification. "
+                "Declare a new label rather than editing a registered one."
+            )
+        self._declared[label] = dict(spec)
+        self._flush()
+
+    def declare_grid(self, prefix: str, grid: dict[str, Sequence]) -> list[str]:
+        """Declare the full Cartesian product of a parameter grid.
+
+        Every cell counts toward ``n_trials``, which is the point: a grid searched
+        is a grid paid for, whether or not every cell is reported.
+
+        Returns
+        -------
+        list of str
+            The declared labels, in declaration order.
+        """
+        keys = sorted(grid)
+        labels: list[str] = []
+        combos: list[dict] = [{}]
+        for key in keys:
+            combos = [{**base, key: value} for base in combos for value in grid[key]]
+        for combo in combos:
+            suffix = "_".join(f"{k}={combo[k]}" for k in keys)
+            label = f"{prefix}::{suffix}"
+            self.declare(label, combo)
+            labels.append(label)
+        return labels
+
+    # -- results -------------------------------------------------------------
+
+    def record(self, label: str, result: dict) -> None:
+        """Attach a result to a declared label."""
+        if label not in self._declared:
+            raise TrialLedgerError(
+                f"{label} was never declared. Every specification must be registered "
+                "before it is run, or the trial count understates the search."
+            )
+        self._results[label] = dict(result)
+        self._flush()
+
+    # -- inspection ----------------------------------------------------------
+
+    @property
+    def n_trials(self) -> int:
+        """Number of declared specifications, run or not."""
+        return len(self._declared)
+
+    @property
+    def declared(self) -> dict[str, dict]:
+        """Read-only view of declared specifications."""
+        return dict(self._declared)
+
+    @property
+    def results(self) -> dict[str, dict]:
+        """Read-only view of recorded results."""
+        return dict(self._results)
+
+    def sr_trials_std(self) -> float:
+        """Standard deviation of recorded Sharpes, for the DSR's trial dispersion.
+
+        Returns ``0.0`` when fewer than two results carry a finite ``sharpe``,
+        which reduces the DSR to a PSR against the expected maximum under a
+        zero-dispersion assumption.
+        """
+        sharpes = [
+            float(r["sharpe"])
+            for r in self._results.values()
+            if "sharpe" in r and np.isfinite(float(r["sharpe"]))
+        ]
+        if len(sharpes) < 2:
+            return 0.0
+        return float(np.std(np.asarray(sharpes), ddof=1))
+
+    def _flush(self) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {"declared": self._declared, "results": self._results}
+        self.path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")

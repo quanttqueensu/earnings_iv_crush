@@ -115,6 +115,98 @@ class StraddleMark:
     repaired: bool
 
 
+class AmbiguousQuoteError(ValueError):
+    """A contract appears more than once with quotes that disagree and cannot be ordered.
+
+    Distinct from a missing contract, which is an ordinary exclusion. This means the feed
+    offered two different prices for the same instrument at the same observation and there
+    is no timestamp to break the tie, so any choice between them is arbitrary. Choosing
+    silently is how a duplicate row becomes an undetectable mark error, so the caller is
+    told instead and the event leaves the sample with a stated reason.
+    """
+
+    def __init__(self, label: str, key: tuple, n: int, columns: list[str]) -> None:
+        self.label, self.key, self.n, self.columns = label, key, n, columns
+        super().__init__(
+            f"{label}: contract {key} appears {n} times with disagreeing "
+            f"{', '.join(columns)} and no timestamp to order them. "
+            "Exclude the event rather than picking a row."
+        )
+
+
+#: Columns that carry a quote. Duplicates are identical only if these all agree.
+_QUOTE_COLUMNS = ("bid", "ask", "iv", "mid_window")
+
+#: Timestamp columns a feed might supply, in order of preference. None of the cached
+#: chains carry any of these; the branch exists so a future feed that does is handled
+#: correctly rather than falling through to the arbitrary choice.
+_TS_COLUMNS = ("ts_recv", "ts_event", "timestamp", "quote_time")
+
+
+def dedupe_contracts(chain: pd.DataFrame, *, asof=None, label: str = "chain") -> pd.DataFrame:
+    """Resolve repeated ``(expiry, strike, right)`` rows, or refuse to.
+
+    Three branches, in order:
+
+    1. **Exact duplicates collapse.** If every quote-bearing column agrees, the rows are
+       the same observation delivered twice and the first is kept.
+    2. **Timestamped duplicates take the latest valid quote at or before ``asof``.** This
+       is the only ordering that corresponds to what a trader could have seen.
+    3. **Disagreeing, unorderable duplicates raise.** "First" is arbitrary, and an
+       arbitrary choice that changes a mark is exactly the silent fallback this project
+       keeps being bitten by.
+
+    Parameters
+    ----------
+    chain : pd.DataFrame
+        Canonical chain with ``expiry``, ``strike`` and ``right``.
+    asof : optional
+        Observation time. Quotes after it are discarded before the latest is taken.
+    label : str
+        Identifier used in the raised message.
+
+    Returns
+    -------
+    pd.DataFrame
+        The chain with at most one row per contract.
+
+    Raises
+    ------
+    AmbiguousQuoteError
+        On disagreeing duplicates with no usable timestamp.
+    """
+    keys = ["expiry", "strike", "right"]
+    if not set(keys).issubset(chain.columns):
+        return chain
+    dup = chain.duplicated(subset=keys, keep=False)
+    if not dup.any():
+        return chain
+
+    quote_cols = [c for c in _QUOTE_COLUMNS if c in chain.columns]
+    ts_col = next((c for c in _TS_COLUMNS if c in chain.columns), None)
+
+    keep: list[pd.DataFrame] = [chain[~dup]]
+    for key, group in chain[dup].groupby(keys, sort=False):
+        # Branch 1: identical observations delivered more than once.
+        if not quote_cols or group[quote_cols].drop_duplicates().shape[0] == 1:
+            keep.append(group.iloc[[0]])
+            continue
+        # Branch 2: a real timestamp orders them.
+        if ts_col is not None:
+            ordered = group.copy()
+            ordered[ts_col] = pd.to_datetime(ordered[ts_col], errors="coerce")
+            if asof is not None:
+                ordered = ordered[ordered[ts_col] <= pd.Timestamp(asof)]
+            ordered = ordered[ordered[ts_col].notna()].sort_values(ts_col)
+            if len(ordered):
+                keep.append(ordered.iloc[[-1]])
+                continue
+        # Branch 3: refuse.
+        raise AmbiguousQuoteError(label, tuple(key), len(group), quote_cols)
+
+    return pd.concat(keep).loc[lambda d: ~d.index.duplicated(keep="first")].sort_index()
+
+
 def _leg(chain: pd.DataFrame, expiry, strike: float, right: str, side: MarkSide = "mid") -> float:
     """One leg's price from a canonical chain, or NaN.
 
@@ -131,6 +223,7 @@ def _leg(chain: pd.DataFrame, expiry, strike: float, right: str, side: MarkSide 
     ]
     if not len(s):
         return float("nan")
+    s = dedupe_contracts(s, label=f"_leg({expiry}, {strike}, {right})")
     row = s.iloc[0]
     return side_price(row.get("bid", float("nan")), row.get("ask", float("nan")), side)
 
@@ -181,10 +274,16 @@ def implied_forward(
     # Mid on both sides. A bid-bid regression biases the fitted forward and discount by
     # the difference in the two legs' half-spreads, which is not zero once quotes are
     # real: the call and put at one strike are not equally liquid after an earnings gap.
+    # Resolve repeated contracts before the regression. Without this, ``.loc[ks]`` returns
+    # more rows than ``ks`` holds and the fit fails on a shape mismatch rather than on
+    # anything meaningful. ``dedupe_contracts`` collapses identical rows, orders
+    # timestamped ones, and raises on disagreeing rows it cannot order, so a duplicated
+    # feed row can never silently choose a mark.
+    sub = dedupe_contracts(sub, label=f"implied_forward({expiry})")
     quoted = add_quote_columns(sub)
     calls = quoted[quoted["right"] == "C"].set_index("strike")["mid"]
     puts = quoted[quoted["right"] == "P"].set_index("strike")["mid"]
-    ks = calls.index.intersection(puts.index)
+    ks = calls.index.intersection(puts.index).unique()
     ks = ks[(ks >= spot * (1 - band)) & (ks <= spot * (1 + band))]
     if len(ks) < min_strikes:
         return float(spot), 1.0

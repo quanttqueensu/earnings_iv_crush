@@ -1,7 +1,7 @@
 """stats.py
 Performance and significance statistics for the trade book.
 
-Pure functions over return / P&L series — no orchestration, no I/O — so they
+Pure functions over return / P&L series - no orchestration, no I/O - so they
 are unit-tested in isolation and reused by ``engine.backtester`` and the
 research tearsheet. Covers the strategy's success metrics (Sharpe, Sortino,
 profit factor, win/loss ratio, drawdown duration) and the research-grade
@@ -11,12 +11,14 @@ Ratio, and the Deflated Sharpe Ratio that penalises filter-threshold tuning.
 
 This module implements:
 
-* ``sharpe`` / ``sortino_ratio``          — annualised risk-adjusted return.
-* ``profit_factor`` / ``win_loss_ratio``  — gross-win/-loss diagnostics.
-* ``max_drawdown_duration``               — longest peak-to-recovery span.
-* ``bootstrap_sharpe_ci``                 — resampled Sharpe confidence interval.
-* ``probabilistic_sharpe_ratio``          — P(true Sharpe > benchmark).
-* ``expected_max_sharpe`` / ``deflated_sharpe_ratio`` — multiple-testing
+* ``sharpe`` / ``sortino_ratio``          - annualised risk-adjusted return.
+* ``nyse_sessions`` / ``calendar_sharpe`` - Sharpe on the exchange calendar with
+  idle sessions zero-filled (the capital-allocation basis).
+* ``profit_factor`` / ``win_loss_ratio``  - gross-win/-loss diagnostics.
+* ``max_drawdown_duration``               - longest peak-to-recovery span.
+* ``bootstrap_sharpe_ci``                 - resampled Sharpe confidence interval.
+* ``probabilistic_sharpe_ratio``          - P(true Sharpe > benchmark).
+* ``expected_max_sharpe`` / ``deflated_sharpe_ratio`` - multiple-testing
   adjusted significance (Bailey & López de Prado).
 
 References
@@ -30,9 +32,25 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
+from pandas.tseries.holiday import (
+    AbstractHolidayCalendar,
+    GoodFriday,
+    Holiday,
+    USLaborDay,
+    USMartinLutherKingJr,
+    USMemorialDay,
+    USPresidentsDay,
+    USThanksgivingDay,
+    nearest_workday,
+    sunday_to_monday,
+)
 from scipy import stats as _sps
 
 EULER_MASCHERONI = 0.5772156649015329
+
+# Unscheduled full-day NYSE closures inside the project's 2013-2024 sample.
+# Hurricane Sandy (2012) predates it; the Carter funeral (2025) postdates it.
+NYSE_AD_HOC_CLOSURES = ("2018-12-05",)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -96,6 +114,118 @@ def sharpe(returns: pd.Series, periods_per_year: float = 252) -> float:
     if sd == 0 or not np.isfinite(sd):
         return 0.0
     return float(returns.mean() / sd * np.sqrt(periods_per_year))
+
+
+class _NYSECalendar(AbstractHolidayCalendar):
+    """NYSE holiday rules. Federal calendar less Columbus Day and Veterans Day,
+    plus Good Friday, plus Juneteenth from its first observance in 2022.
+
+    Saturday observance is not uniform, which is why New Year's carries a
+    different rule from the rest: the exchange closes the preceding Friday for a
+    Saturday Christmas or Independence Day, but not for a Saturday New Year's
+    (31 December 2021 was a full session). ``nearest_workday`` rolls back in all
+    three cases, so New Year's uses ``sunday_to_monday`` instead and a Saturday
+    occurrence simply falls off the weekday index.
+    """
+
+    rules = [
+        Holiday("NewYears", month=1, day=1, observance=sunday_to_monday),
+        USMartinLutherKingJr,
+        USPresidentsDay,
+        GoodFriday,
+        USMemorialDay,
+        Holiday("Juneteenth", month=6, day=19, start_date="2022-06-20", observance=nearest_workday),
+        Holiday("Independence", month=7, day=4, observance=nearest_workday),
+        USLaborDay,
+        USThanksgivingDay,
+        Holiday("Christmas", month=12, day=25, observance=nearest_workday),
+    ]
+
+
+def nyse_sessions(start: pd.Timestamp, end: pd.Timestamp) -> pd.DatetimeIndex:
+    """
+    NYSE trading sessions between two dates, inclusive.
+
+    Weekdays less the exchange holiday calendar and the unscheduled closures in
+    :data:`NYSE_AD_HOC_CLOSURES`. Half-days (the 1pm closes around Independence
+    Day, Thanksgiving and Christmas) are full sessions for this purpose: the
+    book either has a mark on them or it does not.
+
+    Parameters
+    ----------
+    start, end : pd.Timestamp
+        Inclusive bounds.
+
+    Returns
+    -------
+    pd.DatetimeIndex
+        Session dates, ascending.
+    """
+    days = pd.bdate_range(start, end)
+    holidays = _NYSECalendar().holidays(start, end)
+    return days.difference(holidays).difference(pd.to_datetime(list(NYSE_AD_HOC_CLOSURES)))
+
+
+def calendar_sharpe(daily_return: pd.Series, periods_per_year: float = 252) -> float:
+    """
+    Annualised Sharpe on the exchange calendar, idle sessions zero-filled.
+
+    Reindexes a dated return series onto every NYSE session in its own span and
+    charges a zero return to each day the book does not trade, then annualises
+    by ``sqrt(252)``. This is the capital-allocation basis: it measures what a
+    dollar committed to the book earns per unit of risk over a year, including
+    the days that dollar sits idle. Idle days contribute exactly zero because
+    the Sharpe numerator is an excess return and cash earns the risk-free rate
+    it is measured against, so no cash-return assumption is needed at any level
+    of rates.
+
+    Relation to :func:`infer_periods_per_year`. For a book that trades one
+    position at a time, zero-filling and scaling by ``sqrt(252)`` is
+    algebraically the same as scaling the per-trade Sharpe by
+    ``sqrt(trades per year)``, to first order in mean/sd. The two diverge when
+    positions overlap: earnings cluster into four windows a year, so several
+    straddles share exit dates and diversify against each other within a day.
+    That effect is in the daily series and is not in the trade count, which is
+    why this is the better basis for a clustered event book.
+
+    Do not confuse either figure with the per-trade Sharpe, which is a
+    signal-detection statistic for whether the gate selects, not a claim about
+    what the capital earns.
+
+    Parameters
+    ----------
+    daily_return : pd.Series
+        Date-indexed returns on the funded account, net of costs. A non-datetime
+        index is scored as-is, with no zero-filling.
+    periods_per_year : float
+        Annualisation factor for the zero-filled series. Defaults to ``252``,
+        which is the whole point of this function; override only for a non-daily
+        calendar.
+
+    Returns
+    -------
+    float
+        Annualised Sharpe, or ``0.0`` for an empty or zero-dispersion series.
+    """
+    r = pd.Series(daily_return, dtype=float)
+    if len(r) == 0:
+        return 0.0
+    if isinstance(r.index, pd.DatetimeIndex):
+        idx = r.index
+    elif r.index.dtype == object:
+        # Date strings are fine; anything else is positional and must not be
+        # coerced. ``pd.DatetimeIndex`` reads an integer index as nanoseconds
+        # since the epoch rather than raising, which would silently zero-fill a
+        # positional series across 1970 and return a meaningless 0.0.
+        try:
+            idx = pd.DatetimeIndex(r.index)
+        except (TypeError, ValueError):
+            return sharpe(r, periods_per_year)
+    else:
+        return sharpe(r, periods_per_year)
+    r = r.groupby(idx).sum()
+    r = r.reindex(nyse_sessions(idx.min(), idx.max()), fill_value=0.0)
+    return sharpe(r, periods_per_year)
 
 
 def sortino_ratio(returns: pd.Series, periods_per_year: float = 252, target: float = 0.0) -> float:

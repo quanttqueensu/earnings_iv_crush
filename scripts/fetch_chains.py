@@ -2,9 +2,9 @@
 fetch_chains.py
 Pre-warm the chain snapshot cache for a universe's earnings events.
 
-Enumerates every (ticker, date, variant) snapshot the backtest will need —
+Enumerates every (ticker, date, variant) snapshot the backtest will need -
 entry (T-1) and exit (T+holding) chains per event, plus the trailing 30
-trading days per event for the term panel (deduplicated per ticker) — and
+trading days per event for the term panel (deduplicated per ticker) - and
 fetches them through the disk-cached Alpaca fetcher. Progress is tracked in a
 manifest parquet (status per snapshot: pending/done/empty/error), so the run
 can be killed and resumed at any point; cached snapshots cost nothing on

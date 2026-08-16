@@ -57,6 +57,11 @@ EXCHANGE_TZ = "America/New_York"
 SNAPSHOT = "15:59"
 COST = 0.116
 
+# Kept as literals rather than imported from scripts/paper_radar.py so the two entry
+# points stay independent; they are pinned equal by the provenance tests.
+MARK_QUOTE = "quote"
+BACKFILL = "backfill"
+
 CACHE = Path("data/cache/backfill_chains")
 OUT_LEDGER = Path("outputs/research/backfill_ledger.csv")
 OUT_SUMMARY = Path("outputs/research/backfill_summary.csv")
@@ -434,6 +439,15 @@ def main() -> None:
                 # The retired estimator, kept only so the two stay comparable.
                 "ret_intrinsic_proxy": 1.0 - rm / im,
                 "in_rich_set": str(tkr in rich).lower(),
+                # Provenance travels on the row, not on the directory it happens to sit
+                # in. A file moved or concatenated loses its folder; these two columns
+                # are what keeps a backtested row from being read as forward evidence,
+                # and they match the live ledger's schema so the failure is visible
+                # rather than structural. Every row here is quote-marked by
+                # construction: an unquoted exit leg is skipped, never filled at
+                # intrinsic.
+                "mark_source": MARK_QUOTE,
+                "source": BACKFILL,
             }
         )
         if (i + 1) % 25 == 0:

@@ -11,8 +11,8 @@ unchanged once historical option access (WRDS/Alpaca) lands.
 
 This module implements:
 
-* ``build_surface_panel``         — daily (ticker, date) ATM surface rows.
-* ``join_earnings_to_surfaces``   — pre-event surface + realised move per event.
+* ``build_surface_panel``         - daily (ticker, date) ATM surface rows.
+* ``join_earnings_to_surfaces``   - pre-event surface + realised move per event.
 """
 
 from __future__ import annotations

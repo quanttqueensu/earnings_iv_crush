@@ -12,22 +12,22 @@ on without re-deriving the timing, cost, or significance machinery.
 
 This module implements:
 
-* ``make_trading_calendar`` / ``event_day0``      — the integer trading-day
+* ``make_trading_calendar`` / ``event_day0``      - the integer trading-day
   ordinal calendar (from the Fama-French daily factor file's own dates, i.e.
   the NYSE calendar) and bmo/amc/dmh event-day resolution.
-* ``car``                                          — delisting-aware
+* ``car``                                          - delisting-aware
   cumulative abnormal return over an event window (Bernard & Thomas 1989).
-* ``calendar_time_portfolio``                      — Jegadeesh & Titman (1993)
+* ``calendar_time_portfolio``                      - Jegadeesh & Titman (1993)
   overlapping-cohort daily portfolio return, long/short/long-short.
-* ``ff4_alpha``                                    — Carhart four-factor
+* ``ff4_alpha``                                    - Carhart four-factor
   alpha with Newey-West/HAC standard errors (Newey & West 1987).
-* ``equity_roundtrip_cost_bps``                    — the quoted-spread cost
+* ``equity_roundtrip_cost_bps``                    - the quoted-spread cost
   model building block (Frazzini & Lamont 2007 style equity trading-cost
   proxy), with a trailing-median fallback for missing NBBO.
-* ``cluster_bootstrap_ci``                          — cluster (not i.i.d.)
+* ``cluster_bootstrap_ci``                          - cluster (not i.i.d.)
   bootstrap confidence interval, resampling whole announcement dates so
   same-day earnings clustering does not overstate precision.
-* ``summarise_book``                                — the standard trade-book
+* ``summarise_book``                                - the standard trade-book
   scorecard (N, hit rate, Sharpe on both bases, significance), built on
   ``engine.stats``.
 
@@ -113,7 +113,7 @@ def event_day0(anndats: dt.date | pd.Timestamp, session: str, cal_index: dict[dt
     ``bmo`` (before market open) trades on the announcement date itself, so
     day0 is the first trading day on or after ``anndats``. ``amc`` (after
     close), ``dmh`` (during market hours) and any unresolved session are all
-    treated as day0 = the first trading day strictly after ``anndats`` — the
+    treated as day0 = the first trading day strictly after ``anndats`` - the
     conservative assumption that the same-day reaction cannot be traded
     (matches ``wrds_panel.session_from_time``'s conservative dmh -> amc-like
     handling).
@@ -168,7 +168,7 @@ def car(
     daily : pd.DataFrame
         Per name-day panel with ``permno``, ``ordinal`` (trading-day ordinal,
         see :func:`make_trading_calendar`), ``ret_adj`` (total return already
-        incorporating the Shumway 1997 delisting adjustment — see
+        incorporating the Shumway 1997 delisting adjustment - see
         ``wrds_panel.build_event_panel``), and, when ``adjust='mkt'``,
         ``mktrf`` and ``rf``.
     events : pd.DataFrame
@@ -240,7 +240,7 @@ def calendar_time_portfolio(
     ``positions`` table can mix long and short rows: the pooled side-weighted
     average handles a long-only, short-only, or combined long-short book with
     one formula (for the combined book this is the pooled portfolio return,
-    not a fixed 50/50 gross split across separately-normalised legs — state
+    not a fixed 50/50 gross split across separately-normalised legs - state
     this basis when quoting the book's return).
 
     Parameters
@@ -254,7 +254,7 @@ def calendar_time_portfolio(
         (delisting-aware).
     weight : str
         ``"ew"`` (equal-weight, default) or ``"vw"`` (value-weight on
-        ``entry_mktcap``, fixed at entry — no daily cap-weight drift).
+        ``entry_mktcap``, fixed at entry - no daily cap-weight drift).
 
     Returns
     -------
@@ -343,7 +343,7 @@ def ff4_alpha(
     -------
     dict
         ``alpha_daily`` (per-day intercept), ``alpha_ann`` (``alpha_daily *
-        252`` — an arithmetic scaling of a daily mean return, not a Sharpe
+        252`` - an arithmetic scaling of a daily mean return, not a Sharpe
         rescaling, so ``x252`` not ``sqrt(252)`` is correct here),
         ``t_alpha``, ``betas`` (dict of the four factor loadings), ``r2``,
         ``n_days``, ``subtract_rf`` (the basis the alpha was computed on,
@@ -395,7 +395,7 @@ def equity_roundtrip_cost_bps(daily: pd.DataFrame) -> pd.Series:
     winsorised at :data:`SPREAD_WINSOR_BPS`.
 
     This function returns only the **per-day half-spread proxy**, aligned to
-    ``daily``'s row index — not a combined round-trip figure, because a
+    ``daily``'s row index - not a combined round-trip figure, because a
     round trip needs two days (entry ``e`` and exit ``x``) that this
     function does not know about. Combine two lookups into one round-trip
     cost as::
@@ -521,7 +521,7 @@ def summarise_book(
     reimplementing them, so this scorecard and the rest of the book's
     reporting always agree. Annualises via
     :func:`engine.stats.infer_periods_per_year` (the event book's own
-    realised cadence), never a fixed ``sqrt(252)`` — the canonical failure
+    realised cadence), never a fixed ``sqrt(252)`` - the canonical failure
     mode for a sparse event book.
 
     Parameters
@@ -543,7 +543,7 @@ def summarise_book(
         sharpe_ci_high``. The CI is on the annualised-Sharpe basis, computed
         with :func:`cluster_bootstrap_ci` clustered on calendar date
         (``n_boot=5000``, a bounded default for the Python-loop bootstrap
-        cost — pass a larger sample through ``cluster_bootstrap_ci`` directly
+        cost - pass a larger sample through ``cluster_bootstrap_ci`` directly
         for a tighter CI on a smaller book).
     """
     r = pd.Series(returns, dtype=float).reset_index(drop=True)

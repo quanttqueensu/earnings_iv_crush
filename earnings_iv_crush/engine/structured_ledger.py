@@ -10,8 +10,8 @@ default elsewhere.
 
 This module implements:
 
-* ``STRUCTURED_COLUMNS``      — the common per-trade schema.
-* ``build_structured_ledger`` — dispatch straddle / iron fly / calendar to a
+* ``STRUCTURED_COLUMNS``      - the common per-trade schema.
+* ``build_structured_ledger`` - dispatch straddle / iron fly / calendar to a
   sized, costed ledger.
 
 Notes

@@ -5,7 +5,7 @@ Per-cohort performance comparison: does size/liquidity carry the edge?
 The backtest runs two frozen universes (megacap vs broad; see
 ``data/universe.py``). This module cuts one trade ledger by cohort label and
 tests whether per-trade economics differ between the liquidity-clean megacap
-book and the broad-only remainder — the cleanest free-data read on whether the
+book and the broad-only remainder - the cleanest free-data read on whether the
 filtered IV-crush edge survives outside the most liquid names.
 """
 

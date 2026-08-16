@@ -1,8 +1,8 @@
 """sensitivity.py
 Filter-threshold sensitivity sweep for the IV-crush strategy.
 
-Re-prices the strategy across a grid of the two filter thresholds — the
-implied-vs-fair ratio and the term-structure percentile — and scores each cell
+Re-prices the strategy across a grid of the two filter thresholds - the
+implied-vs-fair ratio and the term-structure percentile - and scores each cell
 against the unfiltered Agent 0 control. The sweep is the raw material for the
 sensitivity analysis and, crucially, for an honest Deflated Sharpe: the number of
 cells is the effective number of trials, which the DSR uses to discount the best
@@ -10,8 +10,8 @@ cell's Sharpe for selection bias.
 
 This module implements:
 
-* ``threshold_sweep``    — grid of (ratio, pctl) -> strategy-vs-control metrics.
-* ``sweep_dsr_params``   — derive (n_trials, per-period Sharpe dispersion) from a
+* ``threshold_sweep``    - grid of (ratio, pctl) -> strategy-vs-control metrics.
+* ``sweep_dsr_params``   - derive (n_trials, per-period Sharpe dispersion) from a
   sweep, for ``stats.deflated_sharpe_ratio``.
 
 References
@@ -142,7 +142,7 @@ def sweep_dsr_params(sweep: pd.DataFrame, periods_per_year: int = 252) -> tuple[
     Returns
     -------
     tuple
-        ``(n_trials, sr_trials_std)`` — the number of grid cells and the standard
+        ``(n_trials, sr_trials_std)`` - the number of grid cells and the standard
         deviation of the cells' per-period Sharpe ratios.
     """
     n_trials = int(len(sweep))

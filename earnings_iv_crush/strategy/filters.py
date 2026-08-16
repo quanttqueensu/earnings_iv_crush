@@ -88,7 +88,7 @@ def passes_term_filter_panel(
     stats_out : dict, optional
         When supplied, filled with rejection accounting: ``no_panel_history``
         (ticker absent from the panel), ``below_min_periods`` (window too
-        sparse), ``below_threshold`` and ``passed`` — so gate attrition is
+        sparse), ``below_threshold`` and ``passed`` - so gate attrition is
         visible rather than silently folded into "did not pass".
     stat_col : str, optional
         Events column holding the statistic to gate. Defaults to

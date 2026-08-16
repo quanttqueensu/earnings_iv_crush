@@ -2,13 +2,22 @@
 universe.py
 Static backtest universes with survivorship treatment.
 
-Two cohorts, both frozen at the start of the sample window (2024-01) so the
-selection is point-in-time:
+**These are not point-in-time universes.** Both cohorts are selected using January 2024
+information and then studied backwards to 2013, so membership is conditioned on what a firm
+had become by the *end* of the sample rather than on what it was when each trade was
+booked. The audit measured the size of this: of the fifty names, only 27 were genuinely
+top-50 by CRSP market capitalisation in January 2013 (35 top-100, 40 top-300, and 46 listed
+at all), rising to 39 by 2024. Any study using them is a fixed ex-post survivor panel
+examined historically, and the direction of the resulting bias is unknown rather than
+conservative. Results must be described as such and never as a contemporaneous large-cap
+universe. See ``outputs/research/audit/universe_pointintime.csv``.
 
-* ``MEGACAP_50`` — the fifty largest S&P 100 names by market capitalisation as
+Two cohorts, both selected as of 2024-01:
+
+* ``MEGACAP_50`` - the fifty largest S&P 100 names by market capitalisation as
   of January 2024, all with weekly options and deep books. This is the
   liquidity-clean cohort.
-* ``BROAD_300``  — three hundred S&P 500 constituents as of January 2024,
+* ``BROAD_300``  - three hundred S&P 500 constituents as of January 2024,
   spanning the capitalisation and liquidity spectrum. ``MEGACAP_50`` is a
   strict subset.
 
@@ -423,7 +432,7 @@ def liquidity_screen(
 ) -> pd.DataFrame:
     """Annotate tickers with a liquidity decile from a current option snapshot.
 
-    Annotation only — never use this to drop names from a backtest, because the
+    Annotation only - never use this to drop names from a backtest, because the
     snapshot is taken after the sample and conditioning membership on it would
     reintroduce look-ahead.
 

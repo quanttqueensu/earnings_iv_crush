@@ -9,12 +9,12 @@ claim, so this module makes the full cost stack explicit and configurable.
 
 This module implements:
 
-* ``CostModel``        — frozen dataclass holding the commission, exchange-fee,
+* ``CostModel``        - frozen dataclass holding the commission, exchange-fee,
   bid-ask and slippage assumptions, with sensible defaults for liquid
   front-month ATM options.
-* ``CostBreakdown``    — the itemised cost of one round trip, in USD and as a
+* ``CostBreakdown``    - the itemised cost of one round trip, in USD and as a
   fraction of the entry credit.
-* ``CostModel.round_trip_cost`` — price a short-straddle open-and-close.
+* ``CostModel.round_trip_cost`` - price a short-straddle open-and-close.
 
 Cost stack (conservative average for liquid front-month ATM):
 

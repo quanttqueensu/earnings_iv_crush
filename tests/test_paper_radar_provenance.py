@@ -14,12 +14,15 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
+from scripts.backfill_forward_window import BACKFILL
+from scripts.backfill_forward_window import MARK_QUOTE as BACKFILL_MARK_QUOTE
 from scripts.paper_radar import (
     COST,
     LEDGER_COLS,
     LIVE,
     MARK_FALLBACK,
     MARK_QUOTE,
+    _append,
     _load,
 )
 
@@ -72,12 +75,57 @@ def test_load_refuses_a_populated_ledger_with_no_source(tmp_path) -> None:
         _load(path, LEDGER_COLS)
 
 
-def test_load_accepts_an_empty_legacy_ledger(tmp_path) -> None:
-    """A headers-only file has nothing to misattribute, so it must not block the run."""
-    path = tmp_path / "radar_ledger.csv"
-    pd.DataFrame(columns=[c for c in LEDGER_COLS if c != "source"]).to_csv(path, index=False)
+def test_load_normalises_an_empty_legacy_ledger(tmp_path) -> None:
+    """A headers-only file has nothing to misattribute, so it must not block the run.
 
-    assert _load(path, LEDGER_COLS).empty
+    It must not be handed back with its old header either. ``_append`` writes through the
+    frame's columns, so a stale header silently decides which fields a booked trade keeps
+    - the defect that dropped ``mark_source`` from the first live exit and crashed the
+    cloud job on the next line.
+    """
+    path = tmp_path / "radar_ledger.csv"
+    legacy = [c for c in LEDGER_COLS if c not in ("mark_source", "straddle_exit")]
+    pd.DataFrame(columns=legacy).to_csv(path, index=False)
+
+    got = _load(path, LEDGER_COLS)
+
+    assert got.empty
+    assert list(got.columns) == LEDGER_COLS
+
+
+def test_load_refuses_populated_rows_written_under_an_older_schema(tmp_path) -> None:
+    """Rows predating a column cannot be reconstructed onto the current basis.
+
+    A ledger with no ``mark_source`` gives no way to tell a quote-marked return from one
+    on the retired intrinsic estimator, and on the canonical panel those differ by the
+    sign of the mean. Pooling them is worse than stopping.
+    """
+    legacy = _row()
+    del legacy["mark_source"]
+    path = tmp_path / "radar_ledger.csv"
+    pd.DataFrame([legacy]).to_csv(path, index=False)
+
+    with pytest.raises(SystemExit, match="mark_source"):
+        _load(path, LEDGER_COLS)
+
+
+def test_append_writes_every_schema_field_regardless_of_frame_columns() -> None:
+    """Appending must not inherit which fields survive from the frame it lands in."""
+    stale = pd.DataFrame(columns=[c for c in LEDGER_COLS if c != "mark_source"])
+
+    got = _append(stale, _row(), LEDGER_COLS)
+
+    assert list(got.columns) == LEDGER_COLS
+    assert got.loc[0, "mark_source"] == MARK_QUOTE
+
+
+def test_append_refuses_a_row_that_does_not_match_the_schema() -> None:
+    """A missing field is a defect to raise on, not a NaN to write into the book."""
+    short = _row()
+    del short["mark_source"]
+
+    with pytest.raises(SystemExit, match="mark_source"):
+        _append(pd.DataFrame(columns=LEDGER_COLS), short, LEDGER_COLS)
 
 
 def test_load_round_trips_a_stamped_ledger(tmp_path) -> None:
@@ -152,13 +200,26 @@ def test_cost_is_charged_on_premium_not_on_margin() -> None:
     assert (gross_rom - net_rom) == pytest.approx(COST * credit_ps / margin_ps)
 
 
+def test_the_backfill_stamps_a_provenance_the_live_filter_excludes() -> None:
+    """The backtest's own labels must line up with the ones the live book filters on.
+
+    ``backfill_forward_window.py`` keeps these as literals rather than importing them, so
+    nothing but this test stops the two entry points drifting apart. Were its rows to
+    arrive stamped ``live``, or its marks under a spelling the quote filter misses, a
+    backtest would be counted as forward evidence with no error raised anywhere.
+    """
+    assert BACKFILL_MARK_QUOTE == MARK_QUOTE
+    assert BACKFILL != LIVE
+    assert BACKFILL.lower() == BACKFILL
+
+
 def test_only_live_rows_count_toward_the_forward_book() -> None:
     """The reported book is the live subset, so a backfilled winner cannot flatter it.
 
     Mirrors the filter in ``main``: a book of one live loser and one backfilled winner
     must read as a losing book of N=1, never as a break-even book of N=2.
     """
-    ledger = pd.DataFrame([_row(net_ret=-0.30), _row("MSFT", net_ret=+0.90, source="backfill")])
+    ledger = pd.DataFrame([_row(net_ret=-0.30), _row("MSFT", net_ret=+0.90, source=BACKFILL)])
 
     live = ledger[ledger["source"].astype(str).str.lower() == LIVE]
 

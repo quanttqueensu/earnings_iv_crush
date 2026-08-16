@@ -15,7 +15,7 @@ denormalisation*: I/B/E/S ``statsum_epsus`` carries the realised ``actual``
 and ``anndats_act`` on every historical snapshot row of a fiscal period,
 including snapshots recorded a year before the announcement. Every consensus
 figure this module selects is taken from the single row whose ``statpers``
-strictly precedes ``anndats_act`` — see :func:`_pit_select_consensus`.
+strictly precedes ``anndats_act`` - see :func:`_pit_select_consensus`.
 
 The second hazard is memory: CRSP ``dsf`` stores prices/returns/volume as
 decimal128, which pandas materialises as Python ``Decimal`` objects at
@@ -91,7 +91,7 @@ def _read_arrow(
 
     CRSP (and Fama-French) store prices, returns and factor loadings as
     decimal128, which pandas materialises as Python ``Decimal`` objects on
-    ``to_pandas()`` — roughly 10x the memory of ``float64`` and unusable in
+    ``to_pandas()`` - roughly 10x the memory of ``float64`` and unusable in
     vectorised numpy arithmetic. Casting at the Arrow layer, before
     ``to_pandas()``, avoids ever materialising the Decimal representation.
     Measured on one year of ``crsp_a_stock.dsf``: 1.82M rows, 1,267 MB via
@@ -240,7 +240,7 @@ def load_ibes_consensus(start: str, end: str) -> pd.DataFrame:
     Raw I/B/E/S quarterly EPS consensus snapshots, ``anndats_act`` in ``[start, end]``.
 
     Every row of ``statsum_epsus`` for ``measure='EPS', fiscalp='QTR'`` whose
-    (denormalised) actual-announcement date falls in the window — i.e. every
+    (denormalised) actual-announcement date falls in the window - i.e. every
     historical consensus snapshot of every fiscal period *announced* in the
     window, not yet reduced to one row per event. See
     :func:`_pit_select_consensus` for the point-in-time reduction.
@@ -339,7 +339,7 @@ def load_crsp_daily(
 
     Each year is pulled with the decimal128 cast applied (see
     :func:`_read_arrow`), then immediately filtered down to ``permnos``
-    *before* being appended and *before* the next year is read — so peak
+    *before* being appended and *before* the next year is read - so peak
     memory holds at most one year of the full (unfiltered) CRSP universe
     plus the accumulated filtered result, never the full 29-year unfiltered
     pull. Columns are downcast to float32 after filtering.
@@ -453,7 +453,7 @@ def _pit_select_consensus(raw: pd.DataFrame) -> pd.DataFrame:
     Implements the plan's PIT rule exactly: keep ``statpers < anndats_act``
     (strict), take the row with the maximum ``statpers`` among those, and
     take *every* field (including ``actual`` and ``anndats_act``) from that
-    same row — never mixing fields across rows, which is what protects
+    same row - never mixing fields across rows, which is what protects
     against the I/B/E/S split-restatement trap (a later row's ``actual``
     need not be on the same split basis as an earlier row's ``meanest``).
     Also applies the ``numest >= MIN_NUMEST`` and ``stdev > 0`` guards here
@@ -529,7 +529,7 @@ def _augment_daily(
     dlstcd = d["dlstcd"].astype(float).to_numpy()
     # Shumway (1997): a missing delisting return on a performance-related
     # code (500-599, e.g. liquidation/bankruptcy) is filled at -30% rather
-    # than dropped or zeroed — omitting this biases the long leg upward,
+    # than dropped or zeroed - omitting this biases the long leg upward,
     # the classic PEAD-replication error.
     performance_code = (dlstcd >= 500) & (dlstcd < 600)
     shumway_fill = np.where(performance_code & np.isnan(dlret), -0.30, dlret)
@@ -542,7 +542,7 @@ def _augment_daily(
 
     # dollar volume: `vol` is already in raw shares on this mirror (verified
     # against AAPL's known 2020-01-02 volume), `shrout` is in thousands of
-    # shares (verified against AAPL's known market cap the same day) — the
+    # shares (verified against AAPL's known market cap the same day) - the
     # two columns are on *different* unit bases and must not share a scale
     # factor.
     d["dollar_vol"] = d["prc"].abs() * d["vol"]
@@ -647,7 +647,7 @@ def build_event_panel(
     del daily_raw
 
     # entry-day (day0-1 for price/mktcap/adv60, day0 for cfacpr/spread) lookups,
-    # exact match on (permno, ordinal) — CRSP missing that exact trading day
+    # exact match on (permno, ordinal) - CRSP missing that exact trading day
     # (halt, delisted before day0) yields NaN, which the price/adv60/cost gates
     # below drop naturally rather than silently substituting a stale value.
     events["day0_minus_1"] = events["day0_ordinal"] - 1

@@ -9,7 +9,7 @@ out-of-sample events are booked and scored exactly like the live strategy.
 
 This module implements:
 
-* ``walk_forward_backtest`` — expanding-window OOS selection, ledger and stats.
+* ``walk_forward_backtest`` - expanding-window OOS selection, ledger and stats.
 
 References
 ----------

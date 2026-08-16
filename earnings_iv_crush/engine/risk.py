@@ -10,11 +10,11 @@ curve.
 
 This module implements:
 
-* ``worst_case_size``        — contracts so worst-case loss = ``risk_frac`` of NAV.
-* ``apply_premium_stop``     — floor naked P&L at the 3x-premium stop.
-* ``circuit_breaker_breach`` — first date the equity curve breaches the limit.
-* ``halt_new_entries``       — drop entries placed after a breach.
-* ``cap_concentration``      — enforce one position per ticker, N per sector/day.
+* ``worst_case_size``        - contracts so worst-case loss = ``risk_frac`` of NAV.
+* ``apply_premium_stop``     - floor naked P&L at the 3x-premium stop.
+* ``circuit_breaker_breach`` - first date the equity curve breaches the limit.
+* ``halt_new_entries``       - drop entries placed after a breach.
+* ``cap_concentration``      - enforce one position per ticker, N per sector/day.
 """
 
 from __future__ import annotations
@@ -163,7 +163,7 @@ def halt_new_entries(
 
     Builds the equity curve from the ledger (by exit date), finds the first
     drawdown breach, and removes any trade whose ``entry_date`` is strictly after
-    that breach date — the strategy halts new entries and re-evaluates.
+    that breach date - the strategy halts new entries and re-evaluates.
 
     Parameters
     ----------

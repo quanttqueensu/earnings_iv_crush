@@ -9,10 +9,10 @@ t-test, bootstrap CI, Deflated Sharpe) that justify the cross-sectional filter.
 
 This module implements:
 
-* ``daily_return_series`` — collapse a ledger to a per-day return series.
-* ``backtest``            — full performance-metric dict for one ledger.
-* ``compare``             — strategy-vs-control spread statistics and DSR.
-* ``sharpe``              — re-exported from ``engine.stats`` for convenience.
+* ``daily_return_series`` - collapse a ledger to a per-day return series.
+* ``backtest``            - full performance-metric dict for one ledger.
+* ``compare``             - strategy-vs-control spread statistics and DSR.
+* ``sharpe``              - re-exported from ``engine.stats`` for convenience.
 
 References
 ----------
@@ -38,6 +38,7 @@ _EMPTY_STATS = {
     "avg_return_on_margin": float("nan"),
     "sharpe": 0.0,
     "per_trade_sharpe": float("nan"),
+    "calendar_sharpe": 0.0,
     "periods_per_year": float(252),
     "sortino": 0.0,
     "profit_factor": 0.0,
@@ -111,13 +112,21 @@ def backtest(
     alongside as ``per_trade_sharpe``, is frequency-neutral and is the verdict
     metric; the annualised ``sharpe`` is a presentational scaling of it.
 
+    ``calendar_sharpe`` reports the same book on the capital-allocation basis:
+    the daily series zero-filled onto every NYSE session in its span and scaled
+    by ``sqrt(252)``. For a one-at-a-time book that equals the ``sharpe`` above;
+    it differs here because earnings cluster and positions overlap. Quote it
+    whenever the question is what a funded account earns rather than whether the
+    gate selects.
+
     Returns
     -------
     dict
         ``n_trades``, ``total_pnl``, ``total_return``, ``hit_rate``, ``avg_pnl``,
         ``avg_return_on_margin``, ``sharpe``, ``per_trade_sharpe``,
-        ``periods_per_year``, ``sortino``, ``profit_factor``, ``win_loss_ratio``,
-        ``max_drawdown``, ``max_dd_duration``, ``final_equity``.
+        ``calendar_sharpe``, ``periods_per_year``, ``sortino``,
+        ``profit_factor``, ``win_loss_ratio``, ``max_drawdown``,
+        ``max_dd_duration``, ``final_equity``.
     """
     if trades is None or len(trades) == 0:
         return {**_EMPTY_STATS, "final_equity": float(account)}
@@ -144,6 +153,7 @@ def backtest(
         "avg_return_on_margin": float(ror.mean()) if ror is not None else float("nan"),
         "sharpe": float(stats.sharpe(daily_return, ppy)),
         "per_trade_sharpe": float(per_trade_sr),
+        "calendar_sharpe": float(stats.calendar_sharpe(daily_return)),
         "periods_per_year": float(ppy),
         "sortino": float(stats.sortino_ratio(daily_return, ppy)),
         "profit_factor": float(stats.profit_factor(pnl)),
@@ -189,12 +199,21 @@ def frequency_neutral_stats(
     The annualised daily Sharpe in :func:`compare` reindexes both books onto a
     common calendar and zero-fills flat days. A selective filter that trades a
     subset of the control's dates is therefore charged a zero-return observation
-    on every day it sits in cash, which penalises *selectivity* itself rather
-    than per-trade edge. These statistics remove that confound two ways:
+    on every day it sits in cash, so the comparison mixes per-trade edge with
+    how often each book is in the market.
 
-    * **Per-trade Sharpe ratio** — ``mean / std`` of ``return_on_margin``,
+    That zero-fill is not an error. It is the correct treatment for the question
+    *what does a dollar allocated to this book earn* (see
+    :func:`stats.calendar_sharpe`), because idle capital is genuinely idle. It
+    is the wrong treatment for the question these statistics answer, which is
+    *does the gate select better events than no gate*, a signal-detection
+    question in which trade frequency is a nuisance parameter. Two questions,
+    two statistics; neither answers the other. These remove the frequency
+    confound two ways:
+
+    * **Per-trade Sharpe ratio** - ``mean / std`` of ``return_on_margin``,
       un-annualised, so it does not scale with trade count.
-    * **Size-matched daily-Sharpe delta** — the control is repeatedly subsampled
+    * **Size-matched daily-Sharpe delta** - the control is repeatedly subsampled
       (without replacement) to the strategy's trade count and scored on its own
       (un-padded) daily calendar, so strategy and control are compared at the
       same frequency. The reported delta is the strategy's own daily Sharpe minus

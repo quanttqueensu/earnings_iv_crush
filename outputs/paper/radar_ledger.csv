@@ -1,1 +1,1 @@
-ticker,announce_date,entry_date,exit_date,spot_entry,spot_exit,implied_move,realised_move,ret,net_ret,in_rich_set,source
+ticker,announce_date,entry_date,exit_date,spot_entry,spot_exit,strike,expiry,straddle_entry,straddle_exit,implied_move,realised_move,ret,net_ret,ret_on_margin,net_ret_on_margin,ret_intrinsic_proxy,mark_source,in_rich_set,source
