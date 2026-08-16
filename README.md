@@ -15,7 +15,7 @@ Two versions of that trade appear throughout these documents, and it is worth se
 
 The underlying earnings-volatility effect remains interesting, and the next stage is focused on **finding genuine mispricing, improving execution, and testing better ways to manage the position after earnings.**
 
-**New here?** Read this file first, then [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) for how the project got to this point, then [`STRATEGY.md`](STRATEGY.md) for the exact rules and the full results. Section 11 below defines every term used across all three.
+**New here?** [`STATUS.md`](STATUS.md) is the one-page current state: what works, what is broken, and what the project needs. Then read this file, then [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) for how the project got to this point, then [`STRATEGY.md`](STRATEGY.md) for the exact rules and the full results. Section 11 below defines every term used across all four.
 
 ## 1. Project Overview
 
@@ -287,10 +287,11 @@ Terms used across all three documents.
 
 ## 12. Documents
 
-Three documents, three jobs.
+Four documents, four jobs.
 
 | Document | Answers |
 | --- | --- |
+| [`STATUS.md`](STATUS.md) | Where the project stands right now, what is broken, and what it needs. One page. |
 | **This README** | What is the project, where does it stand, how do I run it, and what do the terms mean. |
 | [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md) | How the project developed over the summer, what each stage taught us, and what success looks like this year. |
 | [`STRATEGY.md`](STRATEGY.md) | The exact trading rules, the data and execution assumptions, the full results, and what still needs validating. |
