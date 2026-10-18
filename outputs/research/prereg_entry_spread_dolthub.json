@@ -1,0 +1,11 @@
+{
+  "trial_id": "entry_spread_filter_dolthub_2019_2024",
+  "declared_utc": "2026-10-09",
+  "prereg_file": "_private/entry_spread_dolthub_prereg.md",
+  "prereg_sha256": "d8a3bd8ae7dc990804f4e7801820b903461d16c5299006cd0bd188bc4930a169",
+  "n_trials_declared": 1,
+  "threshold_entry_half_spread": 0.0382,
+  "hypothesis_origin": "exploratory, 2025-26 broad block after T1 failed",
+  "dsr_trial_count": 1495,
+  "quotes_pulled_before_freeze": false
+}

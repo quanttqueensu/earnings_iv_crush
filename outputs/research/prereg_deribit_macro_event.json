@@ -1,0 +1,16 @@
+{
+  "trial_id": "deribit_macro_event_pilot",
+  "declared_utc": "2026-10-09",
+  "prereg_file": "_private/deribit_macro_event_prereg.md",
+  "prereg_sha256": "40282b07111557141201bb50da51747e67d668b8d87395e7963f7ec921f5bb77",
+  "n_trials_declared": 1,
+  "market": "Deribit BTC options",
+  "trades_pulled_before_freeze": false,
+  "amendments": [
+    {
+      "file": "_private/deribit_macro_event_prereg_amendment_01.md",
+      "sha256": "4bb3870d94d41a282fa8959ee0cd6ce97f647c1b56f6a0e9eb747dfb853e7a5e",
+      "reason": "delivery-price paging defect"
+    }
+  ]
+}

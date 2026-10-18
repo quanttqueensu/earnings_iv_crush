@@ -1,0 +1,9 @@
+{
+  "trial_id": "post_event_vrp",
+  "declared_utc": "2026-10-15",
+  "prereg_file": "_private/post_event_vrp_prereg.md",
+  "prereg_sha256": "3cbc2b4695987c3e757bb1d14c5384a3c674e542c372eea32a5a13cabe540e0e",
+  "n_trials_declared": 1,
+  "prices_pulled_before_freeze": false,
+  "note": "exit-day chain expiry availability checked on a 60-event sample (no prices or P&L computed)"
+}

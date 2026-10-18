@@ -1,0 +1,54 @@
+{
+  "trial_id": "oos_2026_broad_term_gate",
+  "declared_utc": "2026-08-15",
+  "n_trials_declared": 1,
+  "hypothesis": "The frozen term-gated short ATM straddle earns a positive per-trade return on margin, net of cost, on the 2025-2026 broad-universe block. This block was constructed after the 1,476-trial search concluded and no configuration was ever selected, tuned, or scored on it.",
+  "why_this_block_is_clean": "outputs/research/events_broad_oos_2025.parquet was built by scripts/build_broad_oos_2025.py after the settled verdict. No parameter in the frozen specification was chosen with reference to any observation in it. It is the only genuinely untouched block available to the project.",
+  "data": {
+    "events": "outputs/research/events_broad_oos_2025.parquet",
+    "n_events": 2037,
+    "n_names": 346,
+    "entry_date_range": ["2025-01-09", "2026-06-04"],
+    "marks": "Databento OPRA cbbo-1m consolidated BBO, last bar at or before 15:59 America/New_York, window built by localise-and-convert not string concatenation",
+    "spot": "yfinance adjusted closes, one batched panel, so entry and exit share a split basis"
+  },
+  "specification": {
+    "gate": "expanding causal term gate, iv_term_spread at or above the 0.80 quantile of all strictly-earlier events, MIN_HIST=25",
+    "frozen_from": "earnings_iv_crush/frozen.py, term_spread_pctl=0.80, use_move_gate=False",
+    "vehicle": "naked short ATM straddle, nearest expiry, strike nearest spot on the entry chain",
+    "entry": "entry session 15:59 ET snapshot",
+    "exit": "exit session 15:59 ET snapshot, marked at the same strike and expiry actually sold, so the buy-back is charged intrinsic plus remaining premium",
+    "return": "return on margin, Reg-T approximation via engine.pnl.regt_straddle_margin",
+    "contracts": 1,
+    "contract_invariance": "return on margin is invariant to contract count; sizing is therefore not a free parameter here"
+  },
+  "cost_bases_reported": {
+    "gross": "no cost charged, diagnostic only, never the headline",
+    "primary": "11.6% of entry premium round trip, the project's canonical break-even, identical to the basis used by scripts/backfill_forward_window.py so the two forward results are comparable"
+  },
+  "primary_statistic": "per-trade Sharpe of the gated book, net at the primary cost basis",
+  "inference": {
+    "interval": "date-clustered bootstrap 95% confidence interval",
+    "n_boot": 5000,
+    "seed": 0,
+    "cluster_key": "entry_date",
+    "annualisation": "sqrt(trades per year) inferred from the block's own cadence and stated beside any annualised figure; sqrt(252) is not permitted"
+  },
+  "benchmarks": {
+    "agent_0": "the same universe with no gate, scored identically",
+    "random_gate": "participation-matched random selection, seed 0, same number of trades as the term gate"
+  },
+  "success_criterion": "gated net per-trade Sharpe positive with a date-clustered 95% interval excluding zero, and a positive lift over the participation-matched random gate",
+  "kill_criteria": [
+    "interval contains zero: reported as not established on this block",
+    "point estimate negative: reported as a negative result, stated as plainly as the 2013-2018 holdout",
+    "fewer than 150 scored trades after mark attrition: reported as underpowered, with the achieved N and the attrition reason stated"
+  ],
+  "attrition_disclosure": "events dropped for unquoted legs are counted and reported by reason. Mark attrition is not random; it skews toward liquid names, which is stated wherever the result is quoted.",
+  "reporting_commitment": "This result is written into all three submission documents whichever way it comes back. A clean out-of-sample block loses its entire value the moment its reporting becomes conditional on its sign.",
+  "spend": {
+    "hard_cap_usd": 15.0,
+    "estimate_reported_before_pull": true,
+    "actual_reconciled_after": true
+  }
+}

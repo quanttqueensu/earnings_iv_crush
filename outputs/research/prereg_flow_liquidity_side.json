@@ -1,0 +1,29 @@
+{
+  "trial_id": "flow_liquidity_side",
+  "declared_utc": "2026-10-15",
+  "prereg_file": "_private/flow_liquidity_side_prereg.md",
+  "prereg_sha256": "1a47f2de76b6ce1e7980861d5840e4202efa13ae095bcc40d402164d681b2744",
+  "n_trials_declared": 2,
+  "trials": [
+    "F1_resting_orders",
+    "F2_demand_pressure"
+  ],
+  "spend_cap_usd": 10.0,
+  "estimate_usd_broad": 2.12,
+  "data_pulled_before_freeze": false,
+  "dsr_trial_count": 1497,
+  "amendments": [
+    {
+      "file": "_private/flow_liquidity_side_prereg_addendum_01.md",
+      "sha256": "a77eaaaed1004ab4dfedce8673bc804c610ec6a8ebe53d6865586ccf8c332c74",
+      "made_before_outcomes": true,
+      "reason": "F1 measurement tightening after adversarial review"
+    }
+  ],
+  "addendum_02_file": "_private/flow_liquidity_side_prereg_addendum_02.md",
+  "addendum_02_sha256": "58f294d17523344b42e7f6acd9be149da616ca0d2d6fe54ce6be1511da9eba02",
+  "addendum_02_before_outcomes": true,
+  "addendum_03_file": "_private/flow_liquidity_side_prereg_addendum_03.md",
+  "addendum_03_sha256": "cc3aa6cfceda727fd3959922f87ed2425b3ec6217a8aed352ff074d602da0402",
+  "addendum_03_before_paired_outcomes": true
+}

@@ -1,0 +1,8 @@
+{
+  "trial_id": "kalshi_maker_favourites",
+  "declared_utc": "2026-10-15",
+  "prereg_file": "_private/kalshi_maker_prereg.md",
+  "prereg_sha256": "73740d812e7b05fb1d8b79fb03ecfcf8a62a95948a5c05eaef49c4112c80963f",
+  "n_trials_declared": 1,
+  "trades_pulled_before_freeze": false
+}

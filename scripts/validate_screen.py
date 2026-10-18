@@ -24,11 +24,11 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import scripts.market_validate as mv  # noqa: E402
+import earnings_iv_crush.research.market_marks as mv  # noqa: E402
 from earnings_iv_crush.data import databento_quotes as dq  # noqa: E402
 from earnings_iv_crush.engine.screen import score_signal  # noqa: E402
-from scripts.run_extension_verdict import EXTENSION, Q  # noqa: E402
-from scripts.validate_skew_oos import expanding_high_term_mask  # noqa: E402
+from earnings_iv_crush.research.gates import expanding_high_term_mask  # noqa: E402
+from research.frozen_selector.run_extension_verdict import EXTENSION, Q  # noqa: E402
 
 # Published verdict, from paper/iv_crush_verdict.tex and outputs/research/extension_verdict.csv.
 EXPECTED_N = 391

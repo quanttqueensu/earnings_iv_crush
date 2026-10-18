@@ -1,0 +1,9 @@
+{
+  "trial_id": "date_shift",
+  "declared_utc": "2026-10-16",
+  "prereg_file": "_private/date_shift_prereg.md",
+  "prereg_sha256": "ad21eef3c02d9d1ed394dd6346e79847d1a11df750574fa77eedb2961a85f920",
+  "n_trials_declared": 1,
+  "outcomes_viewed_before_freeze": false,
+  "note": "signal distribution inspected on both blocks to set thresholds; no outcome viewed"
+}

@@ -43,7 +43,6 @@ def test_all_lists_the_public_surface():
         "fetch_historical_option_chain",
         "fetch_dolthub_option_chain",
         "fetch_databento_option_chain",
-        "fetch_lse_option_chain",
         "fetch_historical_equity_ohlcv",
         "fetch_analyst_dispersion",
     }

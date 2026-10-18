@@ -1,0 +1,11 @@
+{
+  "trial_id": "p5_strangle",
+  "declared_utc": "2026-10-15",
+  "prereg_file": "_private/p5_strangle_prereg.md",
+  "prereg_sha256": "58b3e99886818acf9efd7adeb1888869268c0203cb19f129b655e9b7a4cb9e1d",
+  "n_trials_declared": 1,
+  "prices_pulled_before_freeze": false,
+  "amendment_01_file": "_private/p5_strangle_amendment_01.md",
+  "amendment_01_sha256": "637ad0c74f624d9d01d54ee63e171fdfa7ae9e0394cc554fd238fee68063724f",
+  "amendment_01_before_outcomes": true
+}

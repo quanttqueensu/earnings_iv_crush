@@ -5,7 +5,7 @@ Defined-risk and term-structure trade variants around the short straddle.
 ATM straddle and nothing else, because it is the only structure that survives the
 measured cost stack: the wings cost more than the entire cost budget. Both
 variants below were priced, scored and dropped. The result is in
-``documentation/STRATEGY.md`` Section 7. The code stays because the comparison is
+``docs/RESEARCH_STATE.md``. The code stays because the comparison is
 worth being able to rerun, not because either variant is a live vehicle.
 
 The two variants:

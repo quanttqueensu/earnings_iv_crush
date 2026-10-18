@@ -34,7 +34,7 @@ _REQUIRED = {
 @pytest.fixture(scope="module")
 def rescore() -> pd.DataFrame:
     if not RESCORE.exists():
-        pytest.skip(f"{RESCORE} absent; run scripts/run_fills_rescore.py")
+        pytest.skip(f"{RESCORE} absent; run research/execution/run_fills_rescore.py")
     return pd.read_csv(RESCORE)
 
 

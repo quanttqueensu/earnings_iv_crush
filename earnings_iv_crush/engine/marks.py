@@ -52,8 +52,8 @@ where a crossing is actually being modelled.
 
 What this does NOT fix
 ----------------------
-Parity leans on the OTM leg's print being fresh; only an intraday feed can verify that
-(see ``data.lse_intraday``). On a trade-marked feed the spread also remains an
+Parity leans on the OTM leg's print being fresh; only an intraday quote feed can verify
+that. On a trade-marked feed the spread also remains an
 assumption in ``engine.costs`` rather than a measurement, though a quote-marked chain
 supplies the real width in ``rel_spread``.
 

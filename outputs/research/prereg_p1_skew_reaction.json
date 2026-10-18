@@ -1,0 +1,19 @@
+{
+  "trial_id": "p1_skew_reaction",
+  "declared_utc": "2026-10-15",
+  "prereg_file": "_private/p1_skew_reaction_prereg.md",
+  "prereg_sha256": "183460d8c8ecebba20e20af5c233d3f6724934cb93da9f4a54d2376692ae9d14",
+  "n_trials_declared": 1,
+  "trials": [
+    "P1_put_skew_predicts_earnings_window_return"
+  ],
+  "trial_ledger_base": 1497,
+  "dsr_trial_count": 1498,
+  "outcomes_computed_before_freeze": false,
+  "primary_outcome": "[0,+2] session market-adjusted stock return vs SPY from the entry-day close",
+  "primary_statistic": "decile 1 (flattest skew) minus decile 10 (steepest) mean, within calendar-month buckets, net of 5 bp per side",
+  "blocks": {
+    "confirmation": "2025-2026 broad (single block)",
+    "second_block_planned": "DoltHub 2019-2024, not part of this test"
+  }
+}

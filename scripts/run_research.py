@@ -12,7 +12,7 @@ Two of those stages are inert on the frozen specification and are run only so th
 comparison can be reproduced. The move gate is off (``use_move_gate=False``,
 failed out of sample), so selection is the causal term percentile alone; and the
 vehicle is the naked straddle, so the structure mix reports one structure. Both
-decisions are in ``documentation/STRATEGY.md`` Section 7.
+decisions are in ``docs/RESEARCH_STATE.md``.
 
 The default run uses a synthetic, planted-edge event set and validates the
 machinery against a known answer. ``--real`` swaps in the live pipeline: Yahoo
@@ -236,19 +236,19 @@ def _load_real_events(args) -> pd.DataFrame:
             return cached
 
     if args.universe:
-        # Pre-built calendar (scripts/build_calendar.py) with validated sessions,
-        # fetched through the disk-cached Alpaca fetcher (scripts/fetch_chains.py
+        # Pre-built calendar (scripts/build/build_calendar.py) with validated sessions,
+        # fetched through the disk-cached Alpaca fetcher (scripts/build/fetch_chains.py
         # pre-warms it; cold snapshots are fetched and cached on the fly).
         cal_path = OUTPUT_DIR / f"events_master_{args.universe}.parquet"
         if not cal_path.exists():
-            raise SystemExit(f"{cal_path} not found - run scripts/build_calendar.py first")
+            raise SystemExit(f"{cal_path} not found - run scripts/build/build_calendar.py first")
         cal = pd.read_parquet(cal_path)
         cal = cal[(cal["announce_date"] >= args.start) & (cal["announce_date"] <= args.end)]
         print(f"Earnings events in window: {len(cal)}  (assembling entry+exit chains)...")
         # --cache-only: read snapshots from disk only, never hitting the API, so
         # an early read can run against a partially-warm cache without cold
         # fetches (events with any uncached chain are skipped). Used while a
-        # parallel scripts/fetch_chains.py warm is still in flight.
+        # parallel scripts/build/fetch_chains.py warm is still in flight.
         mkt = args.mkt
         entry_fetch = (
             _cache_only_chain_fetcher("entry", source=mkt.chain_source)
@@ -415,18 +415,16 @@ def main() -> None:
     )
     ap.add_argument(
         "--market",
-        choices=["us", "india", "brazil"],
+        choices=["us"],
         default=GLOBAL.market,
-        help="Market bundle (calendar/spot/chain). The live universe is 'us'; "
-        "'india' and 'brazil' reproduce the closed cross-market result and are "
-        "not maintained. See data/providers.py.",
+        help="Market bundle (calendar/spot/chain). See data/providers.py.",
     )
     ap.add_argument(
         "--chain-source",
-        choices=["alpaca", "dolthub", "nse", "b3"],
+        choices=["alpaca", "dolthub"],
         default=GLOBAL.chain_source,
         help="Override the market's default chain provider. None keeps the "
-        "market default (us -> dolthub, india -> nse, brazil -> b3).",
+        "market default (us -> dolthub).",
     )
     ap.add_argument(
         "--start",
@@ -444,7 +442,7 @@ def main() -> None:
         "--universe",
         choices=["megacap", "broad"],
         default=None,
-        help="Use a pre-built universe calendar (scripts/build_calendar.py) and the "
+        help="Use a pre-built universe calendar (scripts/build/build_calendar.py) and the "
         "disk-cached Alpaca fetcher; enables the cohort comparison on 'broad'.",
     )
     ap.add_argument(
@@ -506,9 +504,7 @@ def main() -> None:
     if args.start is None:
         args.start = args.mkt.default_start
     if args.tickers is None:
-        args.tickers = (
-            providers.india_full_universe() if args.market == "india" else args.mkt.universe
-        )
+        args.tickers = args.mkt.universe
     if args.holding_days is not None:
         print(
             "NOTE: --holding-days is deprecated and ignored; exit timing is now "

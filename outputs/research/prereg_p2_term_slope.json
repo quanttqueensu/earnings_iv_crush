@@ -1,0 +1,31 @@
+{
+  "trial_id": "p2_deeventised_term_slope_dolthub_2021_2026",
+  "declared_utc": "2026-10-15",
+  "prereg_file": "_private/p2_term_slope_prereg.md",
+  "prereg_sha256": "3f399b6aa7c788a280840fab6fa0d5af52fec712b58c7b16dbb6ea55b506659a",
+  "n_trials_declared": 1,
+  "primary": "full-touch long-short mean per trade, return on premium, date-clustered 95% CI",
+  "kill_rule": "full-touch long-short interval includes zero",
+  "construction": "short-dated: 14-day vs 49-day ATM IV slope, not a Vasquez replication",
+  "dsr_trial_count": 1497,
+  "trial_count_after": 1498,
+  "outcomes_computed_before_freeze": false,
+  "chains_pulled_before_freeze": false,
+  "amendments": [
+    {
+      "file": "_private/p2_term_slope_prereg_amendment_01.md",
+      "sha256": "350ca7697df4983767246641d27e0ea45df5ce9716e52fcc2b4984576b54da28",
+      "declared_utc": "2026-10-15",
+      "reason": "DoltHub snapshot cadence: exact NYSE-session pins, formation-month clustering",
+      "outcomes_computed_before_amendment": false
+    },
+    {
+      "file": "_private/p2_term_slope_prereg_amendment_02.md",
+      "sha256": "467fca4389c24c90abbd450802303990486640d20898d74c15114cf62f52071f",
+      "declared_utc": "2026-10-15",
+      "reason": "exclude name-months with a split inside the holding window; first scoring run void (split artefacts)",
+      "outcomes_computed_before_amendment": true,
+      "first_run_void": true
+    }
+  ]
+}
