@@ -9,25 +9,30 @@ _private/
 # Local editor and tooling directories - never part of the project
 .vscode/
 .idea/
-.claude/
 .understand-anything/
-CLAUDE.md
+# The Claude Code desk (CLAUDE.md, .claude/) is shared; personal settings and agent
+# worktrees are not.
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/worktrees/
 
-# Data (raw and processed pulls are git-ignored per the data plan)
+# Data (raw, processed and cached pulls are git-ignored per the data plan)
 data/raw/
 data/processed/
+data/cache/
 *.parquet
+# Small test fixtures may be committed when they exist.
+!tests/fixtures/**/*.parquet
+
+# Stray run output at the repository root
+/*.log
+/*.csv
+*.bak
 
 # Generated research artefacts (tearsheets, metric dumps).
 # Ignore the CONTENTS, not the directory: git does not descend into an excluded
 # directory, so a negation under `outputs/` would never be reached.
 outputs/*
-# The forward paper book is the record itself and must persist. The cloud recorder
-# commits it back after every run; while it was ignored, `git add` failed and the job
-# pushed nothing whilst still reporting success.
-!outputs/paper/
-outputs/paper/*
-!outputs/paper/*.csv
 
 # One research artefact is published, by name. `fills_rescore.csv` is the three-row
 # cost-basis summary that `tests/test_fills_rescore_attainability.py` reads to stop the
@@ -39,6 +44,9 @@ outputs/paper/*
 !outputs/research/
 outputs/research/*
 !outputs/research/fills_rescore.csv
+# The pre-registration hash records: the project's own declarations (trial id, date,
+# SHA-256 of the frozen text), checked against research/*/preregs by the test suite.
+!outputs/research/prereg_*.json
 
 # Python
 __pycache__/
@@ -51,6 +59,14 @@ env/
 .ipynb_checkpoints/
 .mypy_cache/
 .ruff_cache/
+build/
+dist/
+.coverage
+htmlcov/
+
+# LaTeX intermediates anywhere
+*.aux
+*.synctex.gz
 
 # LaTeX build artefacts (the compiled PDF is kept; intermediates are not)
 paper/*.aux
@@ -69,6 +85,9 @@ Thumbs.db
 ~$*
 
 # Research paper drafts: kept local, not published.
-# Root-anchored: an unanchored `paper/` matches at any depth and would also swallow
-# outputs/paper/, the forward book.
 /paper/
+
+# Cloud paper-book deployment: credentials and VM state stay on the VM.
+deploy/*.env
+deploy/state/
+ivcrush_deploy.tar.gz

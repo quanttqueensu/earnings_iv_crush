@@ -1,5 +1,13 @@
 # The Crush Book
 
+> **Reference, dated 2026-08.** The strategy specification and the results to August. Where it
+> disagrees with [`../SYSTEM.md`](../SYSTEM.md), that file wins. Superseded: section 6.3's 2025-26
+> figures come from a ledger later found biased upward by outcome-dependent attrition (corrected
+> unconditional Sharpe -0.087 [-0.142, -0.031], N=1,492); section 7 is replaced by
+> [`../ROADMAP.md`](../ROADMAP.md), whose earlier items have since been tested and closed
+> ([`../RESEARCH_STATE.md`](../RESEARCH_STATE.md)); section 9 by [`../PROTOCOL.md`](../PROTOCOL.md);
+> section 10 by [`../ARCHITECTURE.md`](../ARCHITECTURE.md).
+
 A rule-based short-volatility book around scheduled earnings announcements:
 single-name US equity options only, one round trip per announcement.
 
@@ -15,7 +23,7 @@ performed (Section 6), where it goes next (Section 7), what still needs
 validating (Section 8), the protocol any new result has to follow (Section 9),
 and where the code lives (Section 10).
 
-It assumes you have read [`README.md`](../README.md), which introduces the project
+It assumes you have read [`README.md`](../../README.md), which introduces the project
 and defines every term used here in its Section 11 glossary. The narrative of
 how the strategy reached this specification is in
 [`SUMMER_SUMMARY.md`](SUMMER_SUMMARY.md); setup and run instructions are in the
@@ -312,7 +320,7 @@ gate beats a matched random null. That ledger reprices exits from inverted
 implied volatilities rather than marking them off traded prices, which runs
 systematically more negative and is the likely reason, but it has not been
 demonstrated and the comparison is not settled. Reproduce with
-`python scripts/agent_comparison.py`.
+`python research/frozen_selector/agent_comparison.py`.
 
 ## 7. Where the Strategy Goes Next
 
@@ -389,7 +397,7 @@ In more detail:
 
 Every result in this document was produced under the following rules, and any
 new result is expected to follow them. Setup and the commands themselves are in
-[`README.md`](../README.md) Section 10.
+[`README.md`](../../README.md) Section 10.
 
 1. **Pre-register first.** Write the hypothesis, the exact specification, the
    inference method, the success criterion and the kill criterion before the
@@ -425,14 +433,14 @@ new result is expected to follow them. Setup and the commands themselves are in
 | `earnings_iv_crush/live/` | The IBKR broker layer. |
 | `scripts/run_research.py` | Main research run. |
 | `scripts/validate_screen.py` | Rebuilds the settled verdict from cache; the fastest integrity check. |
-| `scripts/agent_comparison.py` | The fifteen-selector comparison in Section 6.4. |
-| `scripts/score_oos_2026.py` | The Section 6.3 re-score. |
+| `research/frozen_selector/agent_comparison.py` | The fifteen-selector comparison in Section 6.4. |
+| `research/frozen_selector/score_oos_2026.py` | The Section 6.3 re-score. |
 | `outputs/research/` | 661 artefacts, generated locally and git-ignored. Superseded ones carry a `_SUPERSEDED` suffix rather than being deleted. |
 | `outputs/research/audit/` | Per-event SHA-256 lineage over source data, config, costs, marks, P&L and quotes for 2,062 events, plus an independent reconstruction that imports nothing from the package. |
 
 The two `outputs/research/` rows are generated locally and are git-ignored, so
 they are described here but do not arrive with a clone. Publishing them is the
-onboarding task noted in [`README.md`](../README.md) Section 10.
+onboarding task noted in [`README.md`](../../README.md) Section 10.
 
 Invariant-pinning tests, each naming the defect it guards in its own docstring:
 `test_adversarial_invariants.py` (metamorphic rather than expected-value:

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(**/.env)",
+      "Read(./deploy/*.env)",
+      "Edit(./.env)",
+      "Edit(./deploy/*.env)",
+      "Write(./_private/TRANSMIT_OK)",
+      "Bash(*TRANSMIT_OK*)"
+    ],
+    "ask": [
+      "Edit(./research/*/preregs/**)",
+      "Write(./research/*/preregs/**)",
+      "Edit(./outputs/research/prereg_*.json)",
+      "Edit(./earnings_iv_crush/live/**)",
+      "Edit(./earnings_iv_crush/config.py)",
+      "Edit(./earnings_iv_crush/frozen.py)",
+      "Edit(./outputs/live/**)",
+      "Bash(python -m scripts.paper_trade_ibkr session --transmit*)",
+      "Bash(python -m scripts.paper_trade_ibkr forward-exit --transmit*)",
+      "Bash(python scripts/paper_trade_ibkr.py*--transmit*)",
+      "Bash(python scripts/build/*)",
+      "Bash(python -m earnings_iv_crush.data.sync push*)",
+      "Bash(git push*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "Bash(git rebase*)",
+      "Bash(pip install*)",
+      "Bash(python -m pip install*)"
+    ],
+    "allow": [
+      "Bash(python -m pytest*)",
+      "Bash(python -m ruff check*)",
+      "Bash(python -m black --check*)",
+      "Bash(python -m mypy*)",
+      "Bash(python -m earnings_iv_crush.ops.orient*)",
+      "Bash(python -m earnings_iv_crush.data.sync verify*)",
+      "Bash(python scripts/validate_screen.py)",
+      "Bash(python scripts/demo_pipeline.py)",
+      "Bash(python -m scripts.paper_trade_ibkr session --dry-run*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git blame*)",
+      "Bash(git branch*)",
+      "WebFetch(domain:docs.claude.com)",
+      "WebFetch(domain:code.claude.com)",
+      "WebFetch(domain:interactivebrokers.github.io)",
+      "WebFetch(domain:databento.com)",
+      "WebFetch(domain:www.sec.gov)",
+      "WebFetch(domain:papers.ssrn.com)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/session_context.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/post_edit_check.py\"",
+            "timeout": 20
+          }
+        ]
+      }
+    ]
+  }
+}
