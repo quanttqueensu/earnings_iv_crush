@@ -92,6 +92,94 @@ def qualify_underlying(ib: IB, ticker: str) -> UnderlyingQuote:
     return UnderlyingQuote(contract=contract, spot=float(spot))
 
 
+def option_grid(ib: IB, underlying: UnderlyingQuote) -> tuple[list[pd.Timestamp], list[float]]:
+    """Listed expiries and strikes for ``underlying`` on SMART, both sorted ascending."""
+    params = ib.reqSecDefOptParams(underlying.contract.symbol, "", "STK", underlying.contract.conId)
+    smart = [p for p in params if p.exchange == "SMART"] or list(params)
+    expiries = sorted({pd.Timestamp(e) for p in smart for e in p.expirations})
+    strikes = sorted({float(k) for p in smart for k in p.strikes})
+    return expiries, strikes
+
+
+def snapshot_strikes(
+    ib: IB,
+    underlying: UnderlyingQuote,
+    expiry: pd.Timestamp,
+    strikes: list[float],
+) -> pd.DataFrame:
+    """Snapshot both rights at the given strikes of one expiry, in the canonical schema.
+
+    The session pass needs one expiry and a handful of strikes per name, not the
+    90-day, +/-20% grid :func:`snapshot_chain` pulls. Keeping the request to a few
+    dozen contracts stays well inside IB's market-data line limit and its pacing,
+    so a day with a dozen candidates still prices inside the pre-ladder window.
+    """
+    from ib_async import Option
+
+    code = pd.Timestamp(expiry).strftime("%Y%m%d")
+    contracts = [
+        Option(underlying.contract.symbol, code, float(k), right, "SMART")
+        for k in strikes
+        for right in ("C", "P")
+    ]
+    qualified = [c for c in ib.qualifyContracts(*contracts) if c is not None and c.conId]
+    if not qualified:
+        return pd.DataFrame(columns=CHAIN_COLUMNS)
+    return _tickers_to_chain(ib.reqTickers(*qualified))
+
+
+def quote_legs(ib: IB, legs: list) -> dict:
+    """Current touch of each ladder leg, keyed by ``leg.key``.
+
+    A request that raises returns an empty mapping, so the ladder holds every resting
+    order rather than walking a book it could not read. A leg with no two-sided quote
+    comes back with NaN prices and is refused by ``LegQuote.usable_for``.
+    """
+    from .ladder import LegQuote
+
+    if not legs:
+        return {}
+    try:
+        tickers = ib.reqTickers(*[leg.contract for leg in legs])
+    except Exception:  # noqa: BLE001 - a failed re-quote must hold, never walk a stale book
+        return {}
+    by_con = {getattr(t.contract, "conId", None): t for t in tickers}
+    out: dict[str, LegQuote | None] = {}
+    for leg in legs:
+        tick = by_con.get(getattr(leg.contract, "conId", None))
+        if tick is None:
+            out[leg.key] = None
+            continue
+        when = getattr(tick, "time", None)
+        out[leg.key] = LegQuote(
+            bid=_nan_if_missing(tick.bid),
+            ask=_nan_if_missing(tick.ask),
+            bid_size=_nan_if_missing(getattr(tick, "bidSize", None)),
+            ask_size=_nan_if_missing(getattr(tick, "askSize", None)),
+            ts=pd.Timestamp(when) if when is not None else None,
+        )
+    return out
+
+
+def next_ex_dividend(ib: IB, underlying: UnderlyingQuote, wait_s: float = 3.0) -> object:
+    """Next ex-dividend date from IB's dividend tick (generic tick 456).
+
+    Returns a ``pandas.Timestamp``, ``None`` when IB reports no upcoming dividend, or
+    the string ``"unreadable"`` when the tick never arrived. The caller must treat
+    ``"unreadable"`` as unknown, never as "no dividend".
+    """
+    ticker = ib.reqMktData(underlying.contract, "456", False, False)
+    try:
+        ib.sleep(wait_s)
+        div = getattr(ticker, "dividends", None)
+    finally:
+        ib.cancelMktData(underlying.contract)
+    if div is None:
+        return "unreadable"
+    nxt = getattr(div, "nextDate", None)
+    return pd.Timestamp(nxt).normalize() if nxt else None
+
+
 def snapshot_chain(
     ib: IB,
     underlying: UnderlyingQuote,
@@ -152,9 +240,16 @@ def snapshot_chain(
     qualified = [c for c in ib.qualifyContracts(*contracts) if getattr(c, "conId", 0)]
     if not qualified:
         return pd.DataFrame(columns=CHAIN_COLUMNS)
+    return _tickers_to_chain(ib.reqTickers(*qualified))
 
+
+# ── helpers ──────────────────────────────────────────────────────────────────
+
+
+def _tickers_to_chain(tickers) -> pd.DataFrame:
+    """IB tickers to the canonical chain schema (model IV, live touches)."""
     rows = []
-    for tick in ib.reqTickers(*qualified):
+    for tick in tickers:
         con: Option = tick.contract  # type: ignore[assignment]
         iv = tick.modelGreeks.impliedVol if tick.modelGreeks else float("nan")
         rows.append(
@@ -169,9 +264,6 @@ def snapshot_chain(
             }
         )
     return pd.DataFrame(rows, columns=CHAIN_COLUMNS)
-
-
-# ── helpers ──────────────────────────────────────────────────────────────────
 
 
 def _first_finite(*values: float | None) -> float:

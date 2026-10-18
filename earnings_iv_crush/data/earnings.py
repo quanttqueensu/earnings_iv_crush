@@ -133,6 +133,46 @@ def trade_dates_for_session(
 # ── Yahoo: historical announcement dates ─────────────────────────────────────
 
 
+_NASDAQ_URL = "https://api.nasdaq.com/api/calendar/earnings"
+_NASDAQ_SESSION = {"time-pre-market": "bmo", "time-after-hours": "amc"}
+
+
+def fetch_nasdaq_calendar(day: str) -> pd.DataFrame:
+    """Scheduled earnings for one date from the Nasdaq calendar (free, no key).
+
+    Nasdaq reports the session as ``time-pre-market`` or ``time-after-hours``;
+    anything else (``time-not-supplied``) is left NaN so the 2-of-3 rule never reads
+    an unknown session as a vote.
+
+    Parameters
+    ----------
+    day : str
+        The date, ``YYYY-MM-DD``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        ``ticker``, ``announce_date``, ``session``.
+    """
+    r = requests.get(
+        _NASDAQ_URL,
+        params={"date": day},
+        headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
+        timeout=30,
+    )
+    r.raise_for_status()
+    rows = ((r.json() or {}).get("data") or {}).get("rows") or []
+    out = pd.DataFrame(
+        {
+            "ticker": [str(x.get("symbol", "")).replace(".", "-") for x in rows],
+            "announce_date": pd.Timestamp(day).normalize(),
+            "session": [_NASDAQ_SESSION.get(str(x.get("time", "")), float("nan")) for x in rows],
+        },
+        columns=["ticker", "announce_date", "session"],
+    )
+    return out
+
+
 def fetch_earnings_dates(tickers, start: str, end: str, limit: int = 40) -> pd.DataFrame:
     """Historical earnings announcement dates per ticker, via Yahoo (yfinance).
 

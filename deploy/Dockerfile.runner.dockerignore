@@ -1,0 +1,15 @@
+# Allowlist: everything is excluded unless named below. Keeps .env, _private/,
+# data caches and the research outputs out of the build context and the image.
+*
+!requirements.txt
+!pyproject.toml
+!README.md
+!earnings_iv_crush/**
+!scripts/paper_trade_ibkr.py
+!scripts/forward_report.py
+!scripts/sweep_term_panel.py
+!outputs/research/events_megacap_v2.parquet
+!outputs/research/events_broad_oos_2025.parquet
+!deploy/run_paper_daily.sh
+!deploy/session_check.py
+**/__pycache__

@@ -47,6 +47,18 @@ OPEN_COLUMNS = [
     "margin",
     "skew_25d",
     "iv_term_spread",
+    # Entry-time features recorded on every position whatever rule opened it, so
+    # a candidate selector can later be scored on the same forward trades.
+    "selection_rule",
+    "iv_term_spread_nearest",
+    "implied_move",
+    "entry_mid_ps",
+    "entry_rel_spread",
+    # Booking provenance: a transmitted entry carries the broker fill (the sum of the
+    # two leg averages per share), never the model credit; a dry entry is flagged.
+    "entry_fill_ps",
+    "transmitted",
+    "position_key",
     "status",
 ]
 

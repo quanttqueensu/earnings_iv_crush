@@ -1,0 +1,51 @@
+# docker-compose.yml -- unattended forward paper book on a cloud VM.
+#
+# Two services on one private network:
+#   ib-gateway  IB Gateway + IBC, logged into the PAPER account, always running.
+#               IBC types the credentials, restarts the gateway nightly without
+#               re-authentication and logs back in after the weekly session expiry.
+#   runner      One-shot container that runs the daily pass and exits. It is not
+#               a daemon: the VM's crontab starts it at 15:35 ET on weekdays with
+#               `docker compose run --rm runner` (see deploy/crontab).
+#
+# No port is published to the internet. The runner reaches the gateway by service
+# name on the paper relay port 4004; 4003 (the live relay) is on the harness's
+# refused-port list and TRADING_MODE is pinned to paper, so the live side never
+# logs in. VNC is bound to the VM's loopback for debugging over an SSH tunnel only.
+
+name: ivcrush
+
+services:
+  ib-gateway:
+    image: ghcr.io/gnzsnz/ib-gateway:stable
+    restart: always
+    env_file: gateway.env
+    environment:
+      TRADING_MODE: paper
+      READ_ONLY_API: "no"
+      TIME_ZONE: America/New_York
+      TZ: America/New_York
+      # Nightly soft restart reuses the session (no login prompt); it must fall
+      # outside the 15:35 run and the 16:00 close.
+      AUTO_RESTART_TIME: "11:45 PM"
+      TWOFA_TIMEOUT_ACTION: restart
+      RELOGIN_AFTER_TWOFA_TIMEOUT: "yes"
+      JAVA_HEAP_SIZE: "1024"
+    ports:
+      - "127.0.0.1:5900:5900"
+
+  runner:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.runner
+    env_file: runner.env
+    environment:
+      IB_HOST: ib-gateway
+      IB_PORT: "4004"
+      TZ: America/New_York
+    volumes:
+      - ./state/live:/app/outputs/live
+      - ./state/control:/app/control
+    depends_on:
+      - ib-gateway
+    profiles: ["run"]

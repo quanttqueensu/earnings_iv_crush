@@ -5,8 +5,8 @@ Guarded connection to a TWS / IB Gateway **paper** account.
 Two safety rails sit between this code and a broker:
 
 1. a **paper-port guard** - the connection refuses any port listed as a live
-   port in ``LiveConfig.ib_live_ports`` (TWS 7496, IB Gateway 4001), so a typo
-   can never point the loop at a funded account; and
+   port in ``LiveConfig.ib_live_ports`` (TWS 7496, IB Gateway 4001, docker relay
+   4003), so a typo can never point the loop at a funded account; and
 2. a **kill-switch file** - ``kill_switch_active`` reports whether the sentinel
    file exists, so the orchestrator can stop opening new positions without
    stopping the scheduled task or touching open ones.

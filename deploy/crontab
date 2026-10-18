@@ -1,0 +1,11 @@
+# crontab -- install on the VM with `crontab deploy/crontab` (as the deploy user).
+# The VM clock is set to America/New_York (see README), so these times are
+# exchange time and follow daylight saving automatically.
+#
+# 15:20 ET Mon-Fri: the daily pass; its order ladder runs 15:45-15:59 inside it.
+# Holidays and early closes are filtered inside the container by session_check.py.
+20 15 * * 1-5 cd /opt/ivcrush/deploy && /usr/bin/docker compose --profile run run --rm runner >> state/control/cron.log 2>&1
+
+# 18:00 ET Sunday: prune build cache and dangling images so the boot volume
+# does not fill over months of rebuilds.
+0 18 * * 0 /usr/bin/docker system prune -f >> /opt/ivcrush/deploy/state/control/cron.log 2>&1
