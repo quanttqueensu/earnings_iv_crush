@@ -1,0 +1,9 @@
+{
+  "trial_id": "kalshi_macro_tails_pilot",
+  "declared_utc": "2026-10-09",
+  "prereg_file": "_private/kalshi_macro_tails_prereg.md",
+  "prereg_sha256": "82e8aff18499450236524e5cbc7357bcbd324a427b417d8d41b710fbe5aecc09",
+  "n_trials_declared": 1,
+  "market": "Kalshi",
+  "prices_pulled_before_freeze": false
+}

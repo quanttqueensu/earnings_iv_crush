@@ -1,0 +1,22 @@
+{
+  "trial_id": "section21_peer_informed",
+  "declared_utc": "2026-10-05",
+  "prereg_file": "_private/section21_peer_prereg.md",
+  "prereg_sha256": "04c3a43b7bada0c9955404b337b281a58ed1c6203478e22073f3fd5a84b6b764",
+  "n_trials_declared": 3,
+  "trials": [
+    "A_peer_relative_jump_kmeans",
+    "B_peer_realisation_kmeans",
+    "B_peer_realisation_sic2"
+  ],
+  "trial_ledger_base": 1486,
+  "dsr_trial_count": 1489,
+  "candidate_values_computed_before_freeze": false,
+  "primary_outcome": "moneyness-adjusted residual value, sigma = back_atm_iv at entry, r = 0",
+  "blocks": {
+    "discovery": "2019-2024 megacap",
+    "validation": "2013-2018 megacap",
+    "confirmation_primary": "2025-2026 megacap subset",
+    "confirmation_secondary": "2025-2026 broad"
+  }
+}

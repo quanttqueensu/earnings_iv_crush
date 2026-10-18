@@ -1,0 +1,12 @@
+{
+  "trial_id": "parity_spread",
+  "declared_utc": "2026-10-15",
+  "prereg_file": "_private/parity_spread_prereg.md",
+  "prereg_sha256": "0657a7456c28124d264d342516239bddaeef159bd469bf01368ee84046dd8a5d",
+  "n_trials_declared": 1,
+  "prices_pulled_before_freeze": false,
+  "note": "P1 price file (yfinance daily closes) already exists from P1; no signal or 15:59 price computed before freeze",
+  "amendment_01_file": "_private/parity_spread_amendment_01.md",
+  "amendment_01_sha256": "17a3fe0b6ea7de3a3498325f2a509be55333387971623d2fdac58321e283fea9",
+  "amendment_01_before_outcomes": true
+}

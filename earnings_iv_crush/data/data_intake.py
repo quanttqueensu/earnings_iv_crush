@@ -29,10 +29,6 @@ full weekly/monthly expiry ladder. It is the one to inject as `fetch_chain` for
 the pre-2024 out-of-sample backtest; it marks off the daily close with locally
 inverted IV (no NBBO pre-2023) and no open interest (see databento_options).
 
-fetch_lse_option_chain is the free historical provider backed by London
-Strategic Edge daily option bars (back to 2014, 3100+ underlyings). Like
-Databento, it uses close-as-bid/ask with locally inverted IV. See lse_options.
-
 fetch_analyst_dispersion follows the same free-first stack: Finnhub's
 eps-estimate endpoint when the plan allows it (403 on the free tier), then a
 yfinance analyst-estimate snapshot. The snapshot is current-only, so for past
@@ -57,7 +53,6 @@ from .databento_options import fetch_option_chain as fetch_databento_option_chai
 from .dolthub_options import fetch_option_chain as fetch_dolthub_option_chain
 from .earnings import fetch_earnings_calendar, fetch_earnings_calendar_wrds
 from .equities import fetch_equity_ohlcv, fetch_equity_ohlcv_crsp
-from .lse_options import fetch_option_chain as fetch_lse_option_chain
 from .options import fetch_option_chain
 from .vix import fetch_index_vol
 
@@ -72,7 +67,6 @@ __all__ = [
     "fetch_historical_option_chain",
     "fetch_dolthub_option_chain",
     "fetch_databento_option_chain",
-    "fetch_lse_option_chain",
     "fetch_analyst_dispersion",
 ]
 

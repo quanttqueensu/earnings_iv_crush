@@ -39,7 +39,7 @@ def chain_key(ticker: str, asof: str, variant: str, source: str = "alpaca") -> s
     """Cache key for one chain snapshot.
 
     ``source`` tags the provider so snapshots from different chain sources (e.g.
-    Alpaca vs the NSE bhavcopy) never collide. Defaults to ``"alpaca"`` so keys
+    Alpaca vs DoltHub) never collide. Defaults to ``"alpaca"`` so keys
     written before the source tag existed still resolve. If the variant's
     geometry has drifted from the canonical values its existing cache was
     built under, the key carries the live geometry so old snapshots miss.

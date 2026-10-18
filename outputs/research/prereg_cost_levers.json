@@ -1,0 +1,21 @@
+{
+  "trial_id": "cost_levers_hold_and_spread_gate",
+  "declared_utc": "2026-10-07",
+  "prereg_file": "_private/cost_levers_prereg.md",
+  "prereg_sha256": "86977d26470eda7a7a39b0ab9eff0d0a45db26308c890a85749292e45266009c",
+  "n_trials_declared": 2,
+  "trials": [
+    "H_conditional_hold_p70_2013_2018",
+    "S_causal_spread_gate_q50_both_blocks"
+  ],
+  "dsr_trial_count": 1491,
+  "outcomes_computed_before_freeze": false,
+  "decision_rule": "if H and S both fail their primary criteria, the single-name earnings straddle stops being the vehicle; work moves to scheduled-event volatility elsewhere, starting with the Deribit macro-event pilot",
+  "amendments": [
+    {
+      "file": "_private/cost_levers_prereg_amendment_01.md",
+      "sha256": "b6ec694d245f4f153a17daa10f95be84c14751f802c434f587659d44eea4fe4d",
+      "made_before_outcomes": true
+    }
+  ]
+}

@@ -75,7 +75,11 @@ class FakeFillIB:
     def __init__(self, fill_at: dict[str, float] | None = None) -> None:
         self.fill_at = fill_at or {}
         self.placed: list[object] = []
+        self.cancelled: list[object] = []
         self.slept = 0.0
+
+    def cancelOrder(self, order: object) -> None:
+        self.cancelled.append(order)
 
     def sleep(self, seconds: float) -> None:
         self.slept += seconds
@@ -125,16 +129,20 @@ def test_managed_buyback_fills_at_first_rung():
     assert ib.slept > 0  # rested at the rung
 
 
-def test_managed_buyback_crosses_to_touch_when_unfilled():
+def test_managed_buyback_unfilled_is_incomplete_not_booked():
     call, put = _legs()
     q = _quote()
-    # Thresholds above the touch: never fills, books the conservative touch.
+    # Thresholds above the touch: never fills. An unfilled close must not be booked as
+    # if it had filled at the touch; it is reported incomplete and its orders cancelled.
     ib = FakeFillIB(fill_at={"C": 99.0, "P": 99.0})
     fill = place_managed_buyback(
         ib, call, put, 1, q, transmit=True, cross_frac=0.5, reprice_steps=2
     )
-    assert fill.fill_price_ps == pytest.approx(q.touch_buy)
+    assert fill.complete is False
+    assert fill.legs_filled == 0
+    assert fill.fill_price_ps != fill.fill_price_ps  # NaN
     assert fill.filled_at_limit is False
+    assert len(ib.cancelled) == 2
 
 
 def test_managed_buyback_rejects_nonpositive_contracts():

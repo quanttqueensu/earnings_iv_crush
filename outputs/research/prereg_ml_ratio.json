@@ -1,0 +1,11 @@
+{
+  "trial_id": "ml_ratio",
+  "declared_utc": "2026-10-16",
+  "prereg_file": "_private/ml_ratio_prereg.md",
+  "prereg_sha256": "e84cefb34031f337f32f98c2d90d30bced797f2892fdf79a54b6aa72222236b5",
+  "n_trials_declared": 9,
+  "outcomes_viewed_before_freeze": "test and confirmation sets: viewed for other selectors, never for this model",
+  "amendment_01_file": "_private/ml_ratio_amendment_01.md",
+  "amendment_01_sha256": "fec41e55dc6055ee4d1d8b5b1108333976ac020f254654dfe2bd75addd6925a6",
+  "amendment_01_before_training": true
+}

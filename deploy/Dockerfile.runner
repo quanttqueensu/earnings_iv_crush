@@ -1,0 +1,33 @@
+# Dockerfile.runner -- the daily forward-book pass, built for amd64 or arm64.
+#
+# Built from the repository root (see docker-compose.yml) with the allowlist in
+# Dockerfile.runner.dockerignore, so only the package, the three live scripts,
+# the universe seeds and deploy/ enter the image. Runtime state is not baked in:
+# outputs/live and the control folder are mounted volumes.
+
+FROM python:3.12-slim
+
+# tzdata: the harness dates its entries with the container's local clock, which
+# must be exchange time. curl: success/failure pings to the health monitor.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tzdata curl \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV TZ=America/New_York \
+    PYTHONIOENCODING=utf-8 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY requirements.txt pyproject.toml README.md ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY earnings_iv_crush ./earnings_iv_crush
+RUN pip install --no-cache-dir --no-deps .
+
+COPY scripts/paper_trade_ibkr.py scripts/forward_report.py scripts/sweep_term_panel.py ./scripts/
+COPY outputs/research/events_megacap_v2.parquet outputs/research/events_broad_oos_2025.parquet ./outputs/research/
+COPY deploy/run_paper_daily.sh deploy/session_check.py ./deploy/
+RUN chmod +x deploy/run_paper_daily.sh
+
+CMD ["deploy/run_paper_daily.sh"]

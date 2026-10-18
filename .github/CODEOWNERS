@@ -1,0 +1,13 @@
+# Changes to the order path, the frozen specification and the research record need the team
+# lead's review (docs/decisions/0001).
+/earnings_iv_crush/live/        @jordanodorico
+/earnings_iv_crush/config.py    @jordanodorico
+/earnings_iv_crush/frozen.py    @jordanodorico
+/scripts/paper_trade_ibkr.py    @jordanodorico
+/scripts/run_paper_daily.ps1    @jordanodorico
+/deploy/                        @jordanodorico
+/research/*/preregs/            @jordanodorico
+/outputs/research/prereg_*.json @jordanodorico
+/.github/                       @jordanodorico
+/CLAUDE.md                      @jordanodorico
+/.claude/                       @jordanodorico

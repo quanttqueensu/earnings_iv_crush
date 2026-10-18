@@ -1,0 +1,15 @@
+{
+  "trial_id": "spy_macro_straddle",
+  "declared_utc": "2026-10-15",
+  "prereg_file": "_private/spy_macro_straddle_prereg.md",
+  "prereg_sha256": "97169169e999ccefb2c54d79e18700914f21391e80d54c967b0079e9f9bf4921",
+  "release_calendar_sha256": "f0c36526a4d31c9164af3bdc1e21271367a1867181d4bc8ad2963a0fde272e8b",
+  "n_trials_declared": 2,
+  "prices_pulled_before_freeze": false,
+  "amendment_01_file": "_private/spy_macro_and_runup_amendment_01.md",
+  "amendment_01_sha256": "0a704387e86acabf3409581177590eb385ec2bff04f2c5f4c4acb1b3c2f8040e",
+  "amendment_01_before_outcomes": true,
+  "amendment_02_file": "_private/spy_macro_and_runup_amendment_02.md",
+  "amendment_02_sha256": "193197b8cd516199a26c5e924cdfd74cf432c25521b6c7fbbadd13967d765045",
+  "amendment_02_before_outcomes": true
+}

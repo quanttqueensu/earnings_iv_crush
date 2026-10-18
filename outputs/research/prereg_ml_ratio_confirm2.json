@@ -1,0 +1,9 @@
+{
+  "trial_id": "ml_ratio_confirm2",
+  "declared_utc": "2026-10-16",
+  "prereg_file": "_private/ml_ratio_confirm2_prereg.md",
+  "prereg_sha256": "2fc1496cfbbe31db1160e8ee9406d67154cdb29666a543c4103b12ae0004aec2",
+  "model_sha256": "884e149d3c0ad3aefb35c91fceea2485dbabffb9610f02c1ad04e5fad974a1fc",
+  "n_trials_declared": 1,
+  "outcomes_viewed_before_freeze": false
+}

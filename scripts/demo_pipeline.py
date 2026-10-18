@@ -22,7 +22,7 @@ measured cost stack does to a book with no gross edge. Every line of output is l
 What to read afterwards
 -----------------------
 ``earnings_iv_crush/engine/pnl.py`` for the reference valuation, ``engine/screen.py`` for
-the reporting contract, and ``documentation/STRATEGY.md`` for the rules the real book
+the reporting contract, and ``docs/SYSTEM.md`` for the rules the real book
 follows.
 
 Usage
@@ -210,7 +210,7 @@ def main() -> None:
 
     print("\n" + "=" * 78)
     print(f"  {BANNER}")
-    print("  The pipeline is wired correctly. For real results see documentation/STRATEGY.md.")
+    print("  The pipeline is wired correctly. For real results see docs/SYSTEM.md.")
     print("=" * 78)
 
 

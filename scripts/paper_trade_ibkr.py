@@ -1,17 +1,19 @@
 """
 paper_trade_ibkr.py
-Forward paper-trading loop for the filtered earnings IV-crush strategy.
+Forward paper-trading loop for the earnings IV-crush book on an IB **paper** account.
 
-Runs the *same* causal selection the backtest validated against a live IB
-**paper** account, on the locked baseline: the term gate at the 0.80 percentile
-with the move and low-skew gates OFF (term-only selection). Three sub-commands:
+``session`` is the daily pass and the only path that transmits entries. It runs the
+forward-test specification end to end (``earnings_iv_crush.live.session``): 2-of-3
+calendar confirmation, exits on the stored contracts, entries admitted in hash order
+under the name and contract caps, one mid-to-touch ladder for every leg from 15:45 to
+15:55 ET, a hard cancel at 15:58, the 15:59 NBBO record, and booking from broker fills.
+Every order event goes to ``outputs/live/order_events.csv`` before it is acted on.
 
-* ``enter`` - find names reporting on the next business day (Finnhub calendar, or
-  ``--names`` for a manual test), snapshot each chain from IB, compute the entry
-  signal, apply the term gate (the skew gate only binds if the forward config
-  re-enables it), size with the backtest's own ``size_contracts``, and either log
-  the would-be trade (``--dry-run``, the default) or transmit the two
-  short-straddle legs to the paper account;
+The other sub-commands are manual tools:
+
+* ``enter`` - preview today's entry decisions with the legacy single-pass logic
+  (Finnhub calendar, or ``--names`` for a manual test). It never transmits: entries
+  reach the broker only through the ``session`` ladder;
 * ``exit`` - re-snapshot the chain for each open position due to close, read the
   post-event spot and front ATM implied vol (the crush), and mark the trade into
   the paper ledger via the backtest's ``build_trade``; and
@@ -24,15 +26,21 @@ with the move and low-skew gates OFF (term-only selection). Three sub-commands:
   actually places the managed buy-back and books the realised broker fill, and
   ``--offline`` runs the booking from an injected quote with no gateway.
 
-Safety: ``--dry-run`` is the default; transmitting requires ``--transmit``; the
-connection refuses any live-account port; the kill-switch file blocks new
-entries; and ``forward-exit`` transmits an order only under ``--transmit``.
-Intended to run daily from Windows Task Scheduler with TWS / IB Gateway logged
-into the paper account.
+Safety: nothing transmits without ``--transmit`` (the daily drivers pass it only when
+``_private/TRANSMIT_OK`` exists), and ``--dry-run`` always wins; the connection
+refuses any live-account port; ``outputs/live/STOP`` blocks new entries while exits
+still run; ``outputs/live/HALT`` stops every transmission on every path. A dry pass
+writes only to ``outputs/live/dry/``. Intended to run daily from 15:20 ET against a
+gateway logged into the paper account, from Windows Task Scheduler
+(``scripts/run_paper_daily.ps1``) or the cloud compose stack in ``deploy/``.
 
 Usage
 -----
+    python -m scripts.paper_trade_ibkr session
+    python -m scripts.paper_trade_ibkr session --transmit
+    python -m scripts.paper_trade_ibkr session --names NVDA --announce 2026-10-21 --hour amc
     python scripts/paper_trade_ibkr.py enter --dry-run
+    python scripts/paper_trade_ibkr.py enter --rule term_q80 --dry-run
     python scripts/paper_trade_ibkr.py enter --names NVDA --announce 2026-06-22 --transmit
     python scripts/paper_trade_ibkr.py exit --dry-run
     python scripts/paper_trade_ibkr.py forward-exit
@@ -51,7 +59,7 @@ from pathlib import Path
 import pandas as pd
 from pandas.tseries.offsets import BDay
 
-from earnings_iv_crush.config import GLOBAL, LIVE, STRATEGY
+from earnings_iv_crush.config import GLOBAL, LIVE, SELECTION_RULES, STRATEGY
 from earnings_iv_crush.data.earnings import fetch_earnings_calendar, trade_dates_for_session
 from earnings_iv_crush.data.features import (
     atm_iv,
@@ -73,8 +81,10 @@ from earnings_iv_crush.live.ib_connection import (
     connect_paper,
     kill_switch_active,
 )
+from earnings_iv_crush.live.session import Stores, run_session
 
 R = GLOBAL.risk_free_rate
+EXCHANGE_TZ = "America/New_York"
 
 
 @dataclass(frozen=True)
@@ -89,6 +99,19 @@ class EntrySignal:
     iv_term_spread_nearest: float
     skew_25d: float
     implied_move: float
+
+
+def exchange_today(now: pd.Timestamp | None = None) -> pd.Timestamp:
+    """The session date in exchange time, as a tz-naive midnight timestamp.
+
+    The run date decides which announcements are due and which positions exit, so it
+    must be the New York date whatever clock the host keeps; a laptop on another
+    time zone would otherwise enter or exit a day early or late.
+    """
+    stamp = pd.Timestamp.now(tz="UTC") if now is None else pd.Timestamp(now)
+    if stamp.tzinfo is None:
+        stamp = stamp.tz_localize("UTC")
+    return pd.Timestamp(stamp.tz_convert(EXCHANGE_TZ).date())
 
 
 # ── signal ───────────────────────────────────────────────────────────────────
@@ -226,26 +249,55 @@ def candidate_events(
 
 
 def validated_universe() -> set[str]:
-    """Tickers the backtest actually validated, read from the research seed.
+    """Tickers the backtest actually validated, read from ``LiveConfig.universe_path``.
 
-    Returns an empty set if the seed is missing, in which case the caller does not
+    Returns an empty set if the file is missing, in which case the caller does not
     filter - a missing seed should not silently halt the loop, but the unfiltered
     pass is then off-spec and the log says so.
     """
-    seed = Path(LIVE.skew_seed_path)
+    seed = Path(LIVE.universe_path)
     if not seed.exists():
         print(f"  warning: universe seed {seed} not found; entry pass is UNFILTERED (off-spec).")
         return set()
     return set(pd.read_parquet(seed, columns=["ticker"])["ticker"].unique())
 
 
+# ── transmission rule ────────────────────────────────────────────────────────
+
+# Entries transmit only through the session ladder (order-event log, HALT switch,
+# booking from fills, separate dry stores; forward-test spec T1 to T5).
+# `tests/live/test_w0_safety.py` fails if this is True while any of those is missing.
+# The legacy `enter` command never transmits whatever this says.
+ENTRY_TRANSMIT_READY = True
+
+
+def halt_active() -> bool:
+    """Whether the ``HALT`` switch is present (stops every transmission)."""
+    return Path(LIVE.halt_file).exists()
+
+
+def transmit_requested(args: argparse.Namespace) -> bool:
+    """One rule for every sub-command: ``--transmit`` sends unless ``--dry-run`` is set.
+
+    The outer gate is the ``TRANSMIT_OK`` file checked by the daily drivers, which
+    decide whether ``--transmit`` is passed at all.
+    """
+    return bool(getattr(args, "transmit", False)) and not bool(getattr(args, "dry_run", False))
+
+
 # ── enter ────────────────────────────────────────────────────────────────────
 
 
 def run_enter(args: argparse.Namespace) -> None:
-    """Snapshot, gate, size and (optionally) transmit entries for the day."""
-    asof = pd.Timestamp(args.asof).normalize() if args.asof else pd.Timestamp.today().normalize()
-    transmit = bool(args.transmit) and not args.dry_run
+    """Preview the day's entry decisions. Never transmits; use ``session`` to trade."""
+    asof = pd.Timestamp(args.asof).normalize() if args.asof else exchange_today()
+    transmit = False
+    if transmit_requested(args):
+        print(
+            "  WARNING: `enter` is a preview and never transmits. Entries reach the broker "
+            "only through `session`, which runs the order ladder; continuing as a preview."
+        )
+    rule = args.rule or LIVE.selection_rule
     if transmit and kill_switch_active():
         print(f"Kill-switch present ({LIVE.kill_switch_file}); no new entries. Exiting.")
         return
@@ -266,7 +318,7 @@ def run_enter(args: argparse.Namespace) -> None:
     ib = connect_paper()
     print(
         f"Connected to paper IB on {LIVE.ib_host}:{LIVE.ib_paper_port}. "
-        f"Mode: {'TRANSMIT' if transmit else 'DRY-RUN (no orders)'}"
+        f"Rule: {rule}. Mode: {'TRANSMIT' if transmit else 'DRY-RUN (no orders)'}"
     )
     outcomes: list[str] = []
     try:
@@ -283,6 +335,7 @@ def run_enter(args: argparse.Namespace) -> None:
                     prior_skews,
                     costs,
                     transmit,
+                    rule,
                 )
             )
     finally:
@@ -305,7 +358,33 @@ def run_enter(args: argparse.Namespace) -> None:
         )
 
 
-def _process_entry(ib, ticker, announce_date, exit_date, asof, prior_skews, costs, transmit) -> str:
+def passes_rule(
+    rule: str, ticker: str, announce_date: pd.Timestamp, sig: EntrySignal, prior_skews
+) -> tuple[bool, str]:
+    """Apply the selection rule to one priced candidate.
+
+    Returns whether the event is traded and a short reason for the log.
+    ``unconditional`` admits every priced event: the gate-free book is the
+    population whose net premium any selector has to improve on.
+    """
+    if rule == "unconditional":
+        return True, "unconditional"
+    if rule == "term_q80":
+        # Gated on the nearest-expiry (panel-definition) spread, not the executed
+        # one: the panel it is quantiled against is built that way.
+        term_ok = paper_book.passes_term_gate(ticker, announce_date, sig.iv_term_spread_nearest)
+        skew_ok = (
+            paper_book.passes_skew_gate(sig.skew_25d, prior_skews)
+            if FORWARD.use_skew_gate
+            else True
+        )
+        return term_ok and skew_ok, f"term={term_ok}, skew={skew_ok}"
+    raise ValueError(f"unknown selection rule {rule!r}; expected one of {SELECTION_RULES}")
+
+
+def _process_entry(
+    ib, ticker, announce_date, exit_date, asof, prior_skews, costs, transmit, rule
+) -> str:
     """Evaluate and (optionally) place one candidate; log every decision.
 
     Returns the outcome as one of ``"unpriced"``, ``"gated_out"``,
@@ -340,18 +419,10 @@ def _process_entry(ib, ticker, announce_date, exit_date, asof, prior_skews, cost
     # gate quantiles over and pushes the threshold against the strategy.
     paper_book.record_skew_observation(ticker, announce_date, sig.skew_25d)
 
-    # Locked baseline: term-only at q=0.80, skew and move gates OFF. The skew
-    # observation is still recorded above so the history keeps accumulating, but
-    # the gate only binds when the forward config re-enables it.
-    # Gated on the nearest-expiry (panel-definition) spread, not the executed one:
-    # the panel it is quantiled against is built that way.
-    term_ok = paper_book.passes_term_gate(ticker, announce_date, sig.iv_term_spread_nearest)
-    skew_ok = (
-        paper_book.passes_skew_gate(sig.skew_25d, prior_skews) if FORWARD.use_skew_gate else True
-    )
-    if not (term_ok and skew_ok):
+    traded, reason = passes_rule(rule, ticker, announce_date, sig, prior_skews)
+    if not traded:
         print(
-            f"  {ticker}: no trade (term={term_ok}, skew={skew_ok}; "
+            f"  {ticker}: no trade ({reason}; "
             f"term_spread_nearest={sig.iv_term_spread_nearest:+.3f} [gated], "
             f"term_spread_executed={sig.iv_term_spread:+.3f}, skew={sig.skew_25d:+.3f})."
         )
@@ -363,6 +434,13 @@ def _process_entry(ib, ticker, announce_date, exit_date, asof, prior_skews, cost
         print(f"  {ticker}: no trade (sizes to zero contracts).")
         return "sized_zero"
 
+    # The quoted touch at entry, recorded so the cost-aware candidate (a causal
+    # per-name spread cut) can later be scored on these same trades. A missing
+    # quote is recorded as NaN rather than blocking the entry.
+    entry_quote = _atm_quote(chain, sig.front_expiry, sig.strike)
+    entry_mid_ps = entry_quote.mid if entry_quote is not None else float("nan")
+    entry_rel_spread = entry_quote.relative_spread if entry_quote is not None else float("nan")
+
     mult = GLOBAL.contract_multiplier
     entry_credit = credit_ps * mult * contracts
     margin = regt_straddle_margin(underlying.spot, sig.strike, credit_ps, contracts)
@@ -372,11 +450,10 @@ def _process_entry(ib, ticker, announce_date, exit_date, asof, prior_skews, cost
         f"(term_spread={sig.iv_term_spread:+.3f}, skew={sig.skew_25d:+.3f})."
     )
 
-    if transmit:
-        legs = ib_orders.build_straddle_legs(ib, underlying, chain, sig.front_expiry)
-        trades = ib_orders.place_short_straddle(ib, legs, contracts, transmit=True)
-        print(f"    transmitted {len(trades)} legs to paper account.")
+    if transmit:  # unreachable from the CLI; kept so a caller cannot book a model fill
+        raise RuntimeError("entries transmit only through the session ladder")
 
+    # A preview books into the dry store only, never the store a transmitting exit reads.
     paper_book.record_entry(
         {
             "ticker": ticker,
@@ -393,7 +470,14 @@ def _process_entry(ib, ticker, announce_date, exit_date, asof, prior_skews, cost
             "margin": float(margin),
             "skew_25d": sig.skew_25d,
             "iv_term_spread": sig.iv_term_spread,
-        }
+            "selection_rule": rule,
+            "iv_term_spread_nearest": sig.iv_term_spread_nearest,
+            "implied_move": sig.implied_move,
+            "entry_mid_ps": float(entry_mid_ps),
+            "entry_rel_spread": float(entry_rel_spread),
+            "transmitted": False,
+        },
+        path=Stores.for_mode(transmit=False).open_positions,
     )
     return "entered"
 
@@ -403,7 +487,7 @@ def _process_entry(ib, ticker, announce_date, exit_date, asof, prior_skews, cost
 
 def run_exit(args: argparse.Namespace) -> None:
     """Mark every open position due to close into the paper ledger."""
-    asof = pd.Timestamp(args.asof).normalize() if args.asof else pd.Timestamp.today().normalize()
+    asof = pd.Timestamp(args.asof).normalize() if args.asof else exchange_today()
     book = paper_book.load_open_positions()
     if book.empty:
         print("No open positions.")
@@ -458,10 +542,17 @@ def _process_exit(ib, pos: pd.Series, asof: pd.Timestamp, costs: CostModel) -> N
 
 
 def _atm_quote(
-    chain: pd.DataFrame, front_expiry: pd.Timestamp, strike: float
+    chain: pd.DataFrame, front_expiry: pd.Timestamp, strike: float, *, exact: bool = False
 ) -> StraddleQuote | None:
-    """Build the two-leg ATM straddle quote from a snapshot chain, or ``None``."""
+    """Build the two-leg straddle quote from a snapshot chain, or ``None``.
+
+    With ``exact=True`` (exits) only the given strike is accepted: marking or closing a
+    neighbouring strike after an earnings move is a different contract, so the caller
+    defers instead.
+    """
     rows = chain[(chain["expiry"] == front_expiry) & (chain["strike"].sub(strike).abs() < 1e-6)]
+    if rows.empty and exact:
+        return None
     if rows.empty:
         rows = chain[chain["expiry"] == front_expiry]
         if rows.empty:
@@ -484,6 +575,13 @@ def _atm_quote(
     )
     if not (q.mid > 0 and q.half_spread >= 0):
         return None
+    # The package test sums the legs, so a crossed or empty leg can pass it; an exit
+    # books and trades each leg on its own touch.
+    legs_ok = ib_orders._leg_book_usable(q.call_bid, q.call_ask) and (
+        ib_orders._leg_book_usable(q.put_bid, q.put_ask)
+    )
+    if exact and not legs_ok:
+        return None
     return q
 
 
@@ -499,7 +597,7 @@ def run_forward_exit(args: argparse.Namespace) -> None:
     - the conservative slippage upper bound the live book replaces with its
     realised gapped fill.
     """
-    asof = pd.Timestamp(args.asof).normalize() if args.asof else pd.Timestamp.today().normalize()
+    asof = pd.Timestamp(args.asof).normalize() if args.asof else exchange_today()
     book = paper_book.load_open_positions()
     if book.empty:
         print("No open positions.")
@@ -513,19 +611,32 @@ def run_forward_exit(args: argparse.Namespace) -> None:
         _run_forward_exit_offline(args, asof, due)
         return
 
-    transmit = bool(args.transmit)
+    transmit = transmit_requested(args)
+    if transmit and halt_active():
+        print(f"  ALARM: HALT present ({LIVE.halt_file}); forward-exit sends nothing.")
+        raise SystemExit(1)
     ib = connect_paper()
     print(
         f"Connected to paper IB. Forward-marking {len(due)} position(s); "
         f"exit_limit_cross_frac={FORWARD.exit_limit_cross_frac}, stop_rom={FORWARD.stop_loss_rom}. "
         f"Mode: {'TRANSMIT (managed buy-back)' if transmit else 'DRY-MARK (assume fill)'}"
     )
+    failed: list[str] = []
     try:
         for _, pos in due.iterrows():
-            _process_forward_exit(ib, pos, asof, transmit)
+            # One bad position (an expired or unqualifiable leg, a dropped re-quote)
+            # must not leave every later position unexited; it is named and the pass
+            # exits non-zero so the driver reports it.
+            try:
+                _process_forward_exit(ib, pos, asof, transmit)
+            except Exception as exc:  # noqa: BLE001 - isolate and report each position
+                failed.append(str(pos["ticker"]))
+                print(f"  ALARM: {pos['ticker']} exit raised {type(exc).__name__}: {exc}")
     finally:
         if ib.isConnected():
             ib.disconnect()
+    if failed:
+        raise SystemExit(f"forward-exit: {len(failed)} position(s) raised: {sorted(failed)}")
 
 
 def _run_forward_exit_offline(
@@ -582,9 +693,10 @@ def _process_forward_exit(ib, pos: pd.Series, asof: pd.Timestamp, transmit: bool
         return
 
     front = pd.Timestamp(pos["front_expiry"])
-    quote = _atm_quote(chain, front, float(pos["strike"]))
+    strike = float(pos["strike"])
+    quote = _atm_quote(chain, front, strike, exact=True)
     if quote is None:
-        print(f"  {ticker}: cannot mark (no ATM call/put quote on {front.date()}).")
+        print(f"  {ticker}: deferred (no quote at the held strike {strike} on {front.date()}).")
         return
     iv_exit = atm_iv(chain, front, nearest_strike(chain, front, underlying.spot))
     t_exit = max((front - asof).days / 365.0, 0.0)
@@ -592,16 +704,37 @@ def _process_forward_exit(ib, pos: pd.Series, asof: pd.Timestamp, transmit: bool
     filled_at_limit = True
     transmitted_fill_ps: float | None = None
     if transmit:
-        legs = ib_orders.build_straddle_legs(ib, underlying, chain, front)
+        call, put = ib_orders.qualify_straddle_legs(ib, underlying.contract.symbol, strike, front)
+        need = int(pos["contracts"])
+        held = {c.right: ib_orders.broker_short_qty(ib, c) for c in (call, put)}
+        if any(q > -need for q in held.values()):
+            print(
+                f"  ALARM: {ticker} broker holds {held} at strike {strike}, ledger expects "
+                f"-{need} per leg; exit NOT transmitted, position left open for review."
+            )
+            return
+
+        def _requote() -> StraddleQuote | None:
+            return _atm_quote(ib_market.snapshot_chain(ib, underlying), front, strike, exact=True)
+
         fill = ib_orders.place_managed_buyback(
             ib,
-            legs.call,
-            legs.put,
-            int(pos["contracts"]),
+            call,
+            put,
+            need,
             quote,
             transmit=True,
             cross_frac=FORWARD.exit_limit_cross_frac,
+            requote=_requote,
         )
+        if not fill.complete:
+            call_qty, put_qty = fill.filled_qty
+            print(
+                f"  ALARM: {ticker} buy-back incomplete ({fill.legs_filled}/2 legs filled; "
+                f"call {call_qty}/{need}, put {put_qty}/{need} contracts bought); "
+                "working orders cancelled, nothing booked, position left open for review."
+            )
+            return
         transmitted_fill_ps = fill.fill_price_ps
         filled_at_limit = fill.filled_at_limit
         print(
@@ -639,6 +772,30 @@ def _print_forward_exit(ticker: str, nostop_row: dict, stop_row: dict, recon: di
     )
 
 
+# ── session (the daily transmitting pass) ────────────────────────────────────
+
+
+def run_session_cmd(args: argparse.Namespace) -> None:
+    """Run the daily session pass; exit non-zero when any alarm was raised."""
+    asof = pd.Timestamp(args.asof).normalize() if args.asof else exchange_today()
+    votes = None
+    if args.names:
+        if not (args.announce and args.hour):
+            raise SystemExit("--names requires --announce YYYY-MM-DD and --hour bmo|amc")
+        # A manual run is the operator's own confirmation, recorded as two votes so the
+        # 2-of-3 rule is satisfied explicitly rather than bypassed.
+        votes = pd.DataFrame(
+            [
+                {"source": src, "ticker": t, "announce_date": args.announce, "session": args.hour}
+                for t in args.names
+                for src in ("manual", "manual_check")
+            ]
+        )
+    result = run_session(asof, transmit=transmit_requested(args), votes=votes)
+    if result.alarms:
+        raise SystemExit(f"session: {len(result.alarms)} alarm(s); see the log above.")
+
+
 # ── cli ──────────────────────────────────────────────────────────────────────
 
 
@@ -647,14 +804,31 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Earnings IV-crush paper trading via IB.")
     sub = p.add_subparsers(dest="command", required=True)
 
+    ses = sub.add_parser(
+        "session", help="the daily pass: confirm, plan, ladder every leg, book from fills"
+    )
+    ses.add_argument("--asof", default=None, help="session date YYYY-MM-DD (default today, ET)")
+    ses.add_argument("--transmit", action="store_true", help="send orders to the PAPER account")
+    ses.add_argument("--dry-run", action="store_true", default=False, help="never transmit")
+    ses.add_argument("--names", nargs="*", default=None, help="manual tickers (skip the calendar)")
+    ses.add_argument("--announce", default=None, help="announcement date for --names")
+    ses.add_argument("--hour", choices=("bmo", "amc"), default=None, help="session for --names")
+    ses.set_defaults(func=run_session_cmd)
+
     enter = sub.add_parser("enter", help="snapshot, gate, size and optionally transmit entries")
     enter.add_argument("--asof", default=None, help="entry date YYYY-MM-DD (default today)")
     enter.add_argument(
         "--names", nargs="*", default=None, help="manual ticker list (bypass calendar)"
     )
     enter.add_argument("--announce", default=None, help="announcement date for --names")
+    enter.add_argument(
+        "--rule",
+        choices=SELECTION_RULES,
+        default=None,
+        help="selection rule (default LiveConfig.selection_rule, env SELECTION_RULE)",
+    )
     enter.add_argument("--transmit", action="store_true", help="actually send orders to paper")
-    enter.add_argument("--dry-run", action="store_true", default=True, help="log only (default)")
+    enter.add_argument("--dry-run", action="store_true", default=False, help="never transmit")
     enter.add_argument("--no-dry-run", dest="dry_run", action="store_false")
     enter.set_defaults(func=run_enter)
 
@@ -670,6 +844,7 @@ def build_parser() -> argparse.ArgumentParser:
     fex.add_argument(
         "--transmit", action="store_true", help="place the managed buy-back and book the real fill"
     )
+    fex.add_argument("--dry-run", action="store_true", default=False, help="never transmit")
     fex.add_argument(
         "--offline", action="store_true", help="book from an injected quote, no gateway"
     )

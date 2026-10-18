@@ -20,7 +20,37 @@ API keys and secrets are a separate concern and live in ``data/config.py``
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
+
+# ── environment overrides ────────────────────────────────────────────────────
+# Only the deployment wiring of ``LiveConfig`` reads the environment: a container
+# reaches the gateway at a different host and port than a desktop TWS, and the
+# cloud book trades a different universe. Research parameters never do, so a
+# stray variable cannot change a backtest.
+
+
+def _env_str(name: str, default: str) -> str:
+    return os.environ.get(name, default)
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.environ.get(name, "").strip()
+    return int(raw) if raw else default
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name, "").strip().lower()
+    if not raw:
+        return default
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    if raw in ("0", "false", "no", "off"):
+        return False
+    raise ValueError(f"{name}={raw!r} is not a boolean (use true/false).")
+
+
+SELECTION_RULES = ("unconditional", "term_q80")
 
 
 @dataclass(frozen=True)
@@ -115,7 +145,7 @@ class GlobalConfig:
     # ── Data providers ───────────────────────────────────────────────────────
     earnings_source: str = "finnhub"
     spot_source: str = "yfinance"
-    option_source: str = "databento"  # "databento", "databento_quotes", "lse", "alpaca"
+    option_source: str = "databento"  # "databento", "databento_quotes", "alpaca"
     # What the bid/ask columns of a chain actually contain. "close" means the
     # adapter wrote the daily closing *trade* on both sides (bid == ask == close),
     # which is what every trade-based provider here does; "quote" means a genuine
@@ -128,8 +158,7 @@ class GlobalConfig:
     # Market bundle and chain provider (see data/providers.py). ``market``
     # selects the calendar/spot/chain trio; ``chain_source`` overrides just the
     # chain provider ("alpaca" or "dolthub") or takes the market default when
-    # None. The live universe is US: the "india" and "brazil" bundles exist only
-    # to reproduce the closed cross-market result, not to be traded.
+    # None. The only registered market is "us".
     market: str = "us"
     chain_source: str | None = None
 
@@ -242,14 +271,18 @@ class LiveConfig:
     Attributes
     ----------
     ib_host : str
-        Host the TWS / IB Gateway API listens on. Defaults to ``"127.0.0.1"``.
+        Host the TWS / IB Gateway API listens on. Defaults to ``"127.0.0.1"``;
+        override with ``IB_HOST`` (``ib-gateway`` inside the cloud compose stack).
     ib_paper_port : int
-        Socket port for the **paper** account. TWS paper is ``7497`` (IB Gateway
-        paper is ``4002``). Defaults to ``7497``.
+        Socket port for the **paper** account. TWS paper is ``7497``, IB Gateway
+        paper is ``4002``, and the dockerised gateway relays paper on ``4004``
+        because the gateway itself only accepts loopback connections. Defaults to
+        ``7497``; override with ``IB_PORT``.
     ib_live_ports : tuple of int
         Ports that belong to a **live** account (TWS ``7496``, IB Gateway
-        ``4001``). The connection guard refuses to connect to any of these so the
-        loop can never reach a funded account. Defaults to ``(7496, 4001)``.
+        ``4001``, dockerised relay ``4003``). The connection guard refuses to
+        connect to any of these so the loop can never reach a funded account.
+        Not overridable from the environment by design.
     ib_client_id : int
         API client id for this session. Any integer unique among connected API
         clients. Defaults to ``17``.
@@ -261,7 +294,24 @@ class LiveConfig:
         last delayed snapshot after the close, so the harness accrues a book on an
         unsubscribed account. Defaults to ``4``. Set to ``1`` once real-time
         entitlements are in place - delayed quotes are adequate for the signal but
-        not for the fill-quality study.
+        not for the fill-quality study. Override with ``IB_MARKET_DATA_TYPE``.
+    selection_rule : str
+        Which entry rule the forward book applies, one of ``SELECTION_RULES``.
+        ``"unconditional"`` trades every eligible universe event; ``"term_q80"``
+        applies the term gate at ``term_pctl``. Defaults to ``"unconditional"``:
+        the term gate's pre-registered 2025-26 out-of-sample per-trade Sharpe is
+        -0.21 with a date-clustered CI excluding zero, so it is kept only for
+        comparison, while the unconditional book (+0.043, CI containing zero) is
+        the baseline any new selector is measured against. Override with
+        ``SELECTION_RULE``.
+    universe_path : str
+        File whose ``ticker`` column defines the tradable universe (CSV or
+        parquet). Defaults to ``data/universe_broad.csv``, the 346 names of the
+        2025-26 broad block on which the unconditional baseline was measured. It
+        is a plain ticker list, tracked in the repository so a fresh clone trades
+        the specified population; the session pass refuses to run without it
+        rather than falling back to the whole calendar tape. Override with
+        ``UNIVERSE_PATH``.
     kill_switch_file : str
         Path to a sentinel file; when it exists the loop places no new orders
         (existing positions are untouched). Lets you halt entries without killing
@@ -301,10 +351,10 @@ class LiveConfig:
         fixed offset applies the ``bmo`` entry and the ``amc`` exit to every
         name, so both cases hold two sessions instead of one, doubling exposure
         to post-print drift and to the day of decay the crush does not pay for.
-        Defaults to ``False`` to preserve the deployed behaviour; set it to
-        ``True`` to match the backtest. Names whose session is unknown are
-        skipped rather than guessed, so enabling this can reduce the candidate
-        count.
+        Defaults to ``True``, which matches the backtest and the forward-test
+        specification; the fixed offset survives only for the legacy ``enter``
+        preview. Names whose session is unknown are skipped rather than guessed.
+        Override with ``SESSION_AWARE_TIMING``.
     skew_keep_frac : float
         Keep an event only if its ``skew_25d`` is at or below this quantile of the
         prior skew cross-section (the validated low-skew gate). Defaults to
@@ -326,13 +376,63 @@ class LiveConfig:
     exit_step_wait_s : float
         Seconds the managed buy-back rests at each price step waiting for a fill
         before repricing. Defaults to ``10.0``.
+    exit_cancel_settle_s : float
+        Seconds the managed buy-back waits after cancelling its unfilled orders
+        before re-reading their status. A fill can reach the exchange ahead of the
+        cancel; reading the status straight after sending the cancel books that leg
+        as unfilled while the broker has in fact closed it. Defaults to ``2.0``,
+        several gateway round trips.
+    halt_file : str
+        Second switch. When it exists, nothing transmits on any path (entry, exit,
+        flatten), and working orders are cancelled at the next rung. ``STOP``
+        blocks entries only, so the book can still be flattened; ``HALT`` is for
+        incidents in which the ladder itself is suspect. Defaults to
+        ``"outputs/live/HALT"``.
+    dry_dir : str
+        Directory for every store a dry-run pass writes. A dry pass must never
+        write to the stores a transmitting exit reads, or it could mark a short
+        the broker still holds as closed. Defaults to ``"outputs/live/dry"``.
+    order_events_path : str
+        Append-only CSV of every order state change (forward-test specification
+        section 6), written before the harness acts on the event. CSV rather than
+        parquet because a parquet append rewrites the file, which loses the log if
+        the process dies mid-write. Defaults to ``"outputs/live/order_events.csv"``.
+    intended_path : str
+        Append-only CSV of every admitted event and its outcome, filled or not.
+        The paired-improvement measure counts unfilled entries at zero, so they
+        must be recorded. Defaults to ``"outputs/live/intended_trades.csv"``.
+    ladder_rungs : tuple of (str, float)
+        Rung schedule, ``(HH:MM:SS ET, fraction of the way from mid to the
+        touch)``. The ladder finishes before the 15:59 mark the backtest uses, in
+        the tightest part of the option session. Defaults to the specification's
+        five rungs from 15:45:00 at mid to 15:55:00 at the touch.
+    ladder_cancel_at, ladder_nbbo_at : str
+        Times (ET) at which every working order is cancelled, and at which the
+        NBBO of every held or intended leg is recorded as the backtest's
+        counterfactual basis. Defaults to ``"15:58:00"`` and ``"15:59:00"``.
+    ladder_latest_start : str
+        Latest time (ET) a pass may begin pricing. A pass that starts after the
+        final rung cannot run the ladder and must not improvise one, so it raises
+        an alarm and sends nothing. Defaults to ``"15:54:00"``.
+    max_names_per_day : int
+        Entry cap. The specification's value is 12 (keeps 81.7% of 2025-26
+        trades); the default of 3 is the shakedown value, held until 20
+        consecutive sessions run with zero reconciliation breaks, so a ladder
+        defect touches at most three names. Override with ``MAX_NAMES_PER_DAY``.
+    max_contracts_per_leg : int
+        Fat-finger guard on the per-leg quantity. Return on margin is scale-free,
+        so the cap changes no reported figure except through integer rounding. The
+        specification's value is 20; the shakedown default is 5. No environment
+        override, because it protects the account.
     """
 
-    ib_host: str = "127.0.0.1"
-    ib_paper_port: int = 7497
-    ib_live_ports: tuple[int, ...] = (7496, 4001)
+    ib_host: str = field(default_factory=lambda: _env_str("IB_HOST", "127.0.0.1"))
+    ib_paper_port: int = field(default_factory=lambda: _env_int("IB_PORT", 7497))
+    ib_live_ports: tuple[int, ...] = (7496, 4001, 4003)
     ib_client_id: int = 17
-    ib_market_data_type: int = 4
+    ib_market_data_type: int = field(default_factory=lambda: _env_int("IB_MARKET_DATA_TYPE", 4))
+
+    selection_rule: str = field(default_factory=lambda: _env_str("SELECTION_RULE", "unconditional"))
 
     kill_switch_file: str = "outputs/live/STOP"
     open_positions_path: str = "outputs/live/open_positions.parquet"
@@ -341,11 +441,16 @@ class LiveConfig:
     skew_history_path: str = "outputs/live/skew_history.parquet"
     term_panel_path: str = "outputs/live/term_panel_live.parquet"
     skew_seed_path: str = "outputs/research/events_megacap_v2.parquet"
+    universe_path: str = field(
+        default_factory=lambda: _env_str("UNIVERSE_PATH", "data/universe_broad.csv")
+    )
 
     strike_window: float = 0.20
     horizon_days: int = 90
     entry_offset_days: int = 1
-    session_aware_timing: bool = False
+    session_aware_timing: bool = field(
+        default_factory=lambda: _env_bool("SESSION_AWARE_TIMING", True)
+    )
 
     skew_keep_frac: float = 0.67
     term_pctl: float = 0.80
@@ -354,6 +459,36 @@ class LiveConfig:
     limit_cross_frac: float = 0.5
     exit_reprice_steps: int = 2
     exit_step_wait_s: float = 10.0
+    exit_cancel_settle_s: float = 2.0
+
+    halt_file: str = "outputs/live/HALT"
+    dry_dir: str = "outputs/live/dry"
+    order_events_path: str = "outputs/live/order_events.csv"
+    intended_path: str = "outputs/live/intended_trades.csv"
+
+    ladder_rungs: tuple[tuple[str, float], ...] = (
+        ("15:45:00", 0.0),
+        ("15:47:30", 0.25),
+        ("15:50:00", 0.50),
+        ("15:52:30", 0.75),
+        ("15:55:00", 1.0),
+    )
+    ladder_cancel_at: str = "15:58:00"
+    ladder_nbbo_at: str = "15:59:00"
+    ladder_latest_start: str = "15:54:00"
+
+    max_names_per_day: int = field(default_factory=lambda: _env_int("MAX_NAMES_PER_DAY", 3))
+    max_contracts_per_leg: int = 5
+
+    def __post_init__(self) -> None:
+        if self.selection_rule not in SELECTION_RULES:
+            raise ValueError(
+                f"selection_rule={self.selection_rule!r} is not one of {SELECTION_RULES}."
+            )
+        if self.ib_paper_port in self.ib_live_ports:
+            raise ValueError(
+                f"ib_paper_port={self.ib_paper_port} is a live-account port {self.ib_live_ports}."
+            )
 
 
 # Canonical singletons. Domain modules import these and re-export the individual

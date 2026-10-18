@@ -28,16 +28,15 @@ dependencies = [
     "python-dotenv>=1.0",
     "yfinance>=0.2",
     "databento>=0.80",
-    "lse-data>=0.14",
     "ib_async>=2.0",
 ]
 
 [project.optional-dependencies]
-dev = ["ruff>=0.6", "black>=24.0", "mypy>=1.8", "pytest>=8.0", "pre-commit>=3.5"]
+dev = ["ruff>=0.6", "black>=24.0", "mypy>=1.8", "pytest>=8.0", "pre-commit>=3.5", "py_vollib>=1.0"]
 
 [project.urls]
 Repository = "https://github.com/quanttqueensu/earnings_iv_crush"
-Documentation = "https://github.com/quanttqueensu/earnings_iv_crush/tree/main/documentation"
+Documentation = "https://github.com/quanttqueensu/earnings_iv_crush/tree/main/docs"
 
 [tool.setuptools.packages.find]
 include = ["earnings_iv_crush*"]
@@ -50,6 +49,10 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
 ignore = ["E501"]   # line length is owned by black
+
+# The repository's own top-level packages, so import sorting is identical locally and in CI.
+[tool.ruff.lint.isort]
+known-first-party = ["earnings_iv_crush", "research", "scripts", "tests"]
 
 [tool.ruff.lint.per-file-ignores]
 # Test fixtures build equal-length columns by construction, so the strict-zip
@@ -68,6 +71,19 @@ ignore_missing_imports = true
 check_untyped_defs = true
 namespace_packages = true
 explicit_package_bases = true
+
+# Promoted verbatim from the research scripts, where they were never type-checked. Their
+# logic is frozen (the twelve-year book reproduces through them byte for byte), so the
+# pandas-stub overload complaints are silenced here rather than fixed by editing the code.
+[[tool.mypy.overrides]]
+module = [
+    "earnings_iv_crush.research.market_marks",
+    "earnings_iv_crush.research.gates",
+    "earnings_iv_crush.research.chains",
+]
+disable_error_code = [
+    "call-overload", "operator", "arg-type", "assignment", "index", "union-attr", "attr-defined",
+]
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 [tool.pytest.ini_options]

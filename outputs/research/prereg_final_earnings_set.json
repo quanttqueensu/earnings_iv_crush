@@ -1,0 +1,15 @@
+{
+  "trial_id": "final_earnings_set",
+  "declared_utc": "2026-10-09",
+  "prereg_file": "_private/final_earnings_set_prereg.md",
+  "prereg_sha256": "f21d01c0308a42bb910271a00f50177ded41cbaa55a1c7e420433e30f351948a",
+  "n_trials_declared": 3,
+  "trials": [
+    "T1_spread_gate_broad_2025_26",
+    "T2_risk_normalised_sizing",
+    "T3_retail_ownership_selector"
+  ],
+  "dsr_trial_count": 1494,
+  "outcomes_computed_before_freeze": false,
+  "decision_rule_amendment": "final set for the single-name earnings vehicle; if none passes, the vehicle changes"
+}

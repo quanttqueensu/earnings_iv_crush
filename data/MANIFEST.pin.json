@@ -1,0 +1,91 @@
+{
+  "manifest_sha256": "6ba8f5a4708b95ac565d6122f242c836e14ff1287041cccb5f5ae78c06a299af",
+  "files": 123465,
+  "bytes": 12431195727,
+  "by_folder": {
+    "data/cache/backfill_chains": {
+      "files": 27353,
+      "bytes": 752148783
+    },
+    "data/cache/deribit": {
+      "files": 237,
+      "bytes": 27673481
+    },
+    "data/cache/dolthub_p2": {
+      "files": 6083,
+      "bytes": 33894805
+    },
+    "data/cache/dolthub_runup": {
+      "files": 11789,
+      "bytes": 64181710
+    },
+    "data/cache/dolthub_spread": {
+      "files": 2842,
+      "bytes": 18168099
+    },
+    "data/cache/edgar": {
+      "files": 2516,
+      "bytes": 88061497
+    },
+    "data/cache/fills": {
+      "files": 162,
+      "bytes": 76372767
+    },
+    "data/cache/fills_et": {
+      "files": 162,
+      "bytes": 73686231
+    },
+    "data/cache/flow": {
+      "files": 2926,
+      "bytes": 9005867580
+    },
+    "data/cache/kalshi": {
+      "files": 3438,
+      "bytes": 20109423
+    },
+    "data/cache/kalshi_rep": {
+      "files": 3065,
+      "bytes": 17763558
+    },
+    "data/cache/postea_chain": {
+      "files": 36,
+      "bytes": 147159
+    },
+    "data/cache/postea_quotes": {
+      "files": 1002,
+      "bytes": 7227277
+    },
+    "data/cache/postea_spots": {
+      "files": 2406,
+      "bytes": 112483155
+    },
+    "data/cache/postea_spots_crsp": {
+      "files": 2411,
+      "bytes": 42281987
+    },
+    "data/cache/spy_macro": {
+      "files": 1566,
+      "bytes": 8672631
+    },
+    "data/processed": {
+      "files": 45026,
+      "bytes": 282122742
+    },
+    "data/processed/databento": {
+      "files": 2180,
+      "bytes": 333777170
+    },
+    "data/processed/databento_quotes": {
+      "files": 4426,
+      "bytes": 39811066
+    },
+    "data/processed/wrds": {
+      "files": 3084,
+      "bytes": 225456866
+    },
+    "outputs/research": {
+      "files": 755,
+      "bytes": 1201287740
+    }
+  }
+}
