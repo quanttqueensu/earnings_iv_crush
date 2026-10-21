@@ -3,6 +3,7 @@
 # bytes on Windows clones and break every hash, so these files are stored and checked out
 # exactly as committed.
 research/**/preregs/*.md -text
+research/**/prereg.md -text
 outputs/research/prereg_*.json -text
 
 # Shell scripts run inside Linux containers and must keep LF endings everywhere.
