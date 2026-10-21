@@ -1,0 +1,8 @@
+{
+  "trial_id": "2026-10-20-jump-richness-amendment-01",
+  "declared_utc": "2026-10-21",
+  "prereg_file": "research/selection/2026-10-20-jump-richness/prereg_amendment_01.md",
+  "prereg_sha256": "58fdf265479a887e65a192cc300c55894ac13fab517252fdba4324365259b400",
+  "n_trials_declared": 0,
+  "amends": "outputs/research/prereg_2026-10-20-jump-richness.json"
+}

@@ -26,7 +26,6 @@ import pandas as pd  # noqa: E402
 from earnings_iv_crush.config import HEDGED  # noqa: E402
 from earnings_iv_crush.engine.stats import deflated_sharpe_ratio  # noqa: E402
 from earnings_iv_crush.research import hedged_hold as hh  # noqa: E402
-from earnings_iv_crush.research.chains import _parse_chain  # noqa: E402
 from earnings_iv_crush.research.protocol import (  # noqa: E402
     date_clustered_ci,
     matched_random_null,
@@ -37,6 +36,8 @@ from earnings_iv_crush.research.protocol import (  # noqa: E402
 HERE = Path(__file__).resolve().parent
 PREREG = HERE / "prereg.md"
 RECORD = ROOT / "outputs" / "research" / f"prereg_{HERE.name}.json"
+AMEND = HERE / "prereg_amendment_01.md"
+AMEND_RECORD = ROOT / "outputs" / "research" / f"prereg_{HERE.name}_amendment_01.json"
 OUT = ROOT / "outputs" / "research" / HERE.name
 FEATS = ROOT / "outputs" / "research" / "2026-10-20-hedged-hold"
 EVENTS = ROOT / "outputs" / "research" / "ml_zoo" / "events_full.parquet"
@@ -51,18 +52,41 @@ N_TRIALS = 1539
 SR_TRIALS_STD = 0.127475
 
 
-def exit_mark(row: tuple[str, pd.Timestamp, float, pd.Timestamp]) -> float:
-    """Mid of the front contract sold at entry, on the exit session's 15:59 chain."""
+def exit_mark(row: tuple[str, pd.Timestamp, float, pd.Timestamp]) -> tuple[float, int]:
+    """Exit mark of the front contract sold at entry, per amendment 01.
+
+    Each leg at its mid when the bid is positive, at half its ask when the bid is zero (the
+    out-of-the-money leg after a large move); returns the mark and how many legs took the
+    half-ask rule. ``_parse_chain`` cannot be used here because it drops zero-bid rows.
+    """
     ticker, exit_d, strike, expiry = row
     f = CHAINS / f"{ticker}_{exit_d.date()}.parquet"
     if not f.exists() or not np.isfinite(strike):
-        return float("nan")
-    d = _parse_chain(pd.read_parquet(f))
-    if d is None:
-        return float("nan")
-    leg = d[(d["strike"] == strike) & (d["expiry"] == expiry)]
-    c, p = leg[leg["right"] == "C"]["mid"], leg[leg["right"] == "P"]["mid"]
-    return float(c.iloc[0] + p.iloc[0]) if len(c) and len(p) else float("nan")
+        return float("nan"), 0
+    d = pd.read_parquet(f)
+    body = d["symbol"].astype(str).str.replace(" ", "", regex=False).str[-15:]
+    d = d.assign(
+        right=body.str[6],
+        strike=pd.to_numeric(body.str[7:], errors="coerce") / 1000.0,
+        expiry=pd.to_datetime(body.str[:6], format="%y%m%d", errors="coerce"),
+        bid=pd.to_numeric(d["bid_px_00"], errors="coerce"),
+        ask=pd.to_numeric(d["ask_px_00"], errors="coerce"),
+    )
+    d = d[(d["strike"] == strike) & (d["expiry"] == expiry)].sort_values("ts_recv")
+    total, n_half = 0.0, 0
+    for right in ("C", "P"):
+        leg = d[d["right"] == right]
+        if leg.empty:
+            return float("nan"), 0
+        bid, ask = float(leg["bid"].iloc[-1]), float(leg["ask"].iloc[-1])
+        if not ask > 0:
+            return float("nan"), 0
+        if bid > 0:
+            total += (bid + ask) / 2.0
+        else:
+            total += ask / 2.0
+            n_half += 1
+    return total, n_half
 
 
 def prior_moves(ev: pd.DataFrame, crsp: pd.DataFrame) -> list[np.ndarray]:
@@ -131,8 +155,13 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--workers", type=int, default=8)
     args = ap.parse_args(argv)
     print(f"pre-registration verified, sha256 {verify_prereg(PREREG, RECORD)[:12]}")
+    print(f"amendment 01 verified, sha256 {verify_prereg(AMEND, AMEND_RECORD)[:12]}")
     feat = pd.read_parquet(FEATS / "features.parquet")
     crsp = pd.read_parquet(FEATS / "crsp_paths.parquet")
+    # the mirror stores CRSP numerics as Decimal; cast once so arithmetic is float throughout
+    crsp[["prc", "ret", "cfacpr", "bid", "ask"]] = crsp[
+        ["prc", "ret", "cfacpr", "bid", "ask"]
+    ].astype(float)
     y = pd.to_datetime(feat["entry_date"]).dt.year
     feat["block"] = "other"
     for name, (a, b) in BLOCKS.items():
@@ -155,8 +184,14 @@ def main(argv: list[str] | None = None) -> None:
         )
     )
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
-        ev["exit_mark"] = list(pool.map(exit_mark, jobs, chunksize=64))
-    print(f"  exit mark found: {int(np.isfinite(ev['exit_mark']).sum())} of {len(ev)}")
+        marks = list(pool.map(exit_mark, jobs, chunksize=64))
+    ev["exit_mark"] = [m for m, _ in marks]
+    ev["half_ask_legs"] = [n for _, n in marks]
+    print(
+        f"  exit mark found: {int(np.isfinite(ev['exit_mark']).sum())} of {len(ev)};"
+        f" legs marked at half the ask: {int(ev['half_ask_legs'].sum())}"
+        f" on {int((ev['half_ask_legs'] > 0).sum())} events"
+    )
 
     spot = crsp.assign(prc=crsp["prc"].abs()).set_index(["permno", "date"])["prc"]
     keys = list(

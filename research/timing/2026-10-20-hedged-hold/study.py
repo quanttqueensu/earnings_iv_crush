@@ -292,6 +292,10 @@ def main(argv: list[str] | None = None) -> None:
     print(f"pre-registration verified, sha256 {verify_prereg(PREREG, RECORD)[:12]}")
     feat = pd.read_parquet(OUT / "features.parquet")
     crsp = pd.read_parquet(OUT / "crsp_paths.parquet")
+    # the mirror stores CRSP numerics as Decimal; cast once so arithmetic is float throughout
+    crsp[["prc", "ret", "cfacpr", "bid", "ask"]] = crsp[
+        ["prc", "ret", "cfacpr", "bid", "ask"]
+    ].astype(float)
     paths = Paths(crsp)
     feat["block"] = block_of(feat["entry_date"])
     ev = feat[feat["block"].isin(list(BLOCKS))].reset_index(drop=True)

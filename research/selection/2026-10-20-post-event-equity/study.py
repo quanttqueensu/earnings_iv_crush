@@ -88,6 +88,10 @@ def main(argv: list[str] | None = None) -> None:
     print(f"pre-registration verified, sha256 {verify_prereg(PREREG, RECORD)[:12]}")
     feat = pd.read_parquet(FEATS / "features.parquet")
     crsp = pd.read_parquet(FEATS / "crsp_paths.parquet")
+    # the mirror stores CRSP numerics as Decimal; cast once so arithmetic is float throughout
+    crsp[["prc", "ret", "cfacpr", "bid", "ask"]] = crsp[
+        ["prc", "ret", "cfacpr", "bid", "ask"]
+    ].astype(float)
     y = pd.to_datetime(feat["exit_date"]).dt.year
     feat["block"] = "other"
     for name, (a, b) in BLOCKS.items():
