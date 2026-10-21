@@ -491,9 +491,81 @@ class LiveConfig:
             )
 
 
+@dataclass(frozen=True)
+class HedgedHoldConfig:
+    """
+    Parameters of the delta-hedged hold-to-expiry studies and their HAR selector.
+
+    Every value is fixed by the 2026-10-20 pre-registrations
+    (``research/timing/2026-10-20-hedged-hold/prereg.md`` and siblings); none was swept.
+
+    Attributes
+    ----------
+    pre_event_dte : tuple[int, int]
+        Calendar days to expiry for the pre-event sale. ``(20, 45)``: long enough that a single
+        half-spread is spread over several weeks of diffusive premium, short enough to stay in
+        the liquid monthly expiries.
+    post_event_dte : tuple[int, int]
+        The same window for the post-event sale. ``(14, 45)``, matching the unhedged post-event
+        study so the hedge is the only difference.
+    split_min_gap_days : int
+        Minimum days between the two expiries of the jump split when the sold expiry is the
+        front one. ``14``: below this the variance difference is dominated by quote noise.
+    jump_split_min_gap_days : int
+        The same gap for the next-session jump-richness book. ``7``: the weekly after the front.
+    fee_per_contract_leg : float
+        Option commission per contract per leg, USD. ``0.65``, the book's broker rate.
+    disposal_bps : float
+        Cost of disposing of delivered stock at settlement, bp of spot. ``5``.
+    equity_cost_floor_bps : float
+        Floor on the per-side equity half-spread, bp. ``1``: CRSP closing quotes on megacaps can
+        be a cent wide, which understates impact.
+    hedge_margin_frac : float
+        Reg-T margin on the stock hedge. ``0.5``.
+    har_lags : tuple[int, int, int]
+        HAR-RV regressor windows in trading days (Corsi 2009). ``(1, 5, 22)``.
+    har_min_rows : int
+        Minimum complete regression rows before a HAR forecast is issued. ``500``, about two
+        years.
+    tercile_min_prior : int
+        Minimum strictly earlier events before a causal tercile is assigned. ``200``.
+    decile_min_prior : int
+        The same for the equity decile sorts. ``300``.
+    jump_hist_windows : tuple[int, int, int]
+        Prior announcements averaged in the HAR-style jump forecast. ``(1, 4, 8)``.
+    jump_hist_min : int
+        Minimum prior announcements for a jump forecast. ``4``.
+    equity_hold_days : int
+        Holding period of the post-event equity signals, trading days. ``20``.
+    put_delta_target : float
+        Delta of the skew leg. ``-0.25``.
+    slope_min_gap_days : int
+        Days beyond the sold expiry for the far leg of the post-event term slope. ``21``.
+    """
+
+    pre_event_dte: tuple[int, int] = (20, 45)
+    post_event_dte: tuple[int, int] = (14, 45)
+    split_min_gap_days: int = 14
+    jump_split_min_gap_days: int = 7
+    fee_per_contract_leg: float = 0.65
+    disposal_bps: float = 5.0
+    equity_cost_floor_bps: float = 1.0
+    hedge_margin_frac: float = 0.5
+    har_lags: tuple[int, int, int] = (1, 5, 22)
+    har_min_rows: int = 500
+    tercile_min_prior: int = 200
+    decile_min_prior: int = 300
+    jump_hist_windows: tuple[int, int, int] = (1, 4, 8)
+    jump_hist_min: int = 4
+    equity_hold_days: int = 20
+    put_delta_target: float = -0.25
+    slope_min_gap_days: int = 21
+
+
 # Canonical singletons. Domain modules import these and re-export the individual
 # fields under their established names, so this file stays the single source of
 # truth without altering any public API.
 GLOBAL = GlobalConfig()
 STRATEGY = StrategyConfig()
 LIVE = LiveConfig()
+HEDGED = HedgedHoldConfig()

@@ -1,0 +1,8 @@
+{
+  "trial_id": "2026-10-20-hedged-hold",
+  "declared_utc": "2026-10-21",
+  "prereg_file": "research/timing/2026-10-20-hedged-hold/prereg.md",
+  "prereg_sha256": "ada873dfb99958a35adf651443604f3b770197d114f718af0743b61e198a9d8d",
+  "n_trials_declared": 4,
+  "dsr_trial_count": 1539
+}
