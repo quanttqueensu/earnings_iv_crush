@@ -6,7 +6,9 @@ A pre-registration is frozen by recording the SHA-256 of its text before any out
 viewed (``outputs/research/prereg_*.json``). The records name the file where it was written
 at the time; the files now live under ``research/<line>/preregs/``. This test resolves each
 recorded file by name, hashes it, and fails on any difference, so an edit to a frozen text,
-or a line-ending conversion on checkout, cannot pass unnoticed.
+or a line-ending conversion on checkout, cannot pass unnoticed. Studies started from
+``research/_template/`` keep their text at ``research/<line>/<slug>/prereg.md``, where every
+file shares a name, so a record whose path exists as written is resolved by that path.
 """
 
 from __future__ import annotations
@@ -45,7 +47,7 @@ def _pairs(node: Any) -> Iterator[tuple[str, str]]:
 
 RECORDS = sorted(
     {
-        (rec.name, Path(f).name, h)
+        (rec.name, Path(f).as_posix(), h)
         for rec in (ROOT / "outputs" / "research").glob("prereg_*.json")
         for f, h in _pairs(json.loads(rec.read_text(encoding="utf-8")))
     }
@@ -56,7 +58,15 @@ def test_records_are_present() -> None:
     assert RECORDS, "no pre-registration hash records found under outputs/research"
 
 
-@pytest.mark.parametrize("record, name, sha", RECORDS, ids=[f"{r[0]}:{r[1]}" for r in RECORDS])
+@pytest.mark.parametrize(
+    "record, name, sha", RECORDS, ids=[f"{r[0]}:{Path(r[1]).name}" for r in RECORDS]
+)
 def test_recorded_hash_matches_shipped_text(record: str, name: str, sha: str) -> None:
-    assert name in SHIPPED, f"{record} declares {name}, which is not under research/*/preregs"
-    assert hashlib.sha256(SHIPPED[name].read_bytes()).hexdigest() == sha
+    as_written = ROOT / name
+    if as_written.is_file() and "preregs" not in as_written.parts:
+        path = as_written
+    else:
+        base = Path(name).name
+        assert base in SHIPPED, f"{record} declares {base}, which is not under research/*/preregs"
+        path = SHIPPED[base]
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == sha

@@ -312,6 +312,70 @@ def har_annual_variance(
     return har_forecast_sum(rv, coef, h, cfg.har_lags) / h * 252.0
 
 
+# ── GARCH(1,1) with an announcement dummy ────────────────────────────────────
+
+_GARCH_STATIONARITY_CAP = 0.999  # alpha + beta strictly below one keeps the forecast finite
+
+
+def garch_variance_path(
+    r: np.ndarray, dummy: np.ndarray, params: np.ndarray, init: float
+) -> np.ndarray:
+    """Conditional variances ``s2_t = w + a r_{t-1}^2 + b s2_{t-1} + d D_t`` for every t.
+
+    The recursion is linear in ``s2``, so it runs as one first-order filter rather than a
+    Python loop.
+    """
+    from scipy.signal import lfilter
+
+    w, a, b, d = (float(x) for x in params)
+    lagged = np.concatenate([[init], np.asarray(r, float)[:-1] ** 2])
+    drive = w + a * lagged + d * np.asarray(dummy, float)
+    s2, _ = lfilter([1.0], [1.0, -b], drive, zi=[b * init])
+    return np.maximum(s2, 1e-12)
+
+
+def garch_fit(r: np.ndarray, dummy: np.ndarray) -> np.ndarray:
+    """Gaussian QMLE of ``(omega, alpha, beta, delta)``; NaNs if the optimiser fails."""
+    from scipy.optimize import minimize
+
+    r = np.asarray(r, float)
+    dummy = np.asarray(dummy, float)
+    var0 = float(np.var(r))
+
+    # omega and delta are optimised in units of the sample variance so every coordinate is of
+    # order one; unscaled, the finite-difference gradient leaves alpha and beta at their start
+    scale = np.array([var0, 1.0, 1.0, var0])
+
+    def nll(q: np.ndarray) -> float:
+        p = q * scale
+        if p[1] + p[2] >= _GARCH_STATIONARITY_CAP:
+            return 1e12
+        s2 = garch_variance_path(r, dummy, p, var0)
+        return float(0.5 * np.sum(np.log(s2) + r * r / s2))
+
+    q0 = np.array([0.05, 0.05, 0.90, 1.0])
+    bounds = [(1e-8, None), (0.0, 1.0), (0.0, 1.0), (0.0, None)]
+    res = minimize(nll, q0, method="L-BFGS-B", bounds=bounds)
+    return res.x * scale if np.isfinite(res.fun) and res.fun < 1e11 else np.full(4, np.nan)
+
+
+def garch_annual_variance(r: np.ndarray, dummy: np.ndarray, params: np.ndarray, h: int) -> float:
+    """Filter through the last return, then the summed ``h``-step forecast with ``D = 0``, annualised.
+
+    ``r`` and ``dummy`` end with the last return before the decision date.
+    """
+    if h <= 0 or not np.isfinite(params).all():
+        return float("nan")
+    w, a, b, _ = (float(x) for x in params)
+    s2 = garch_variance_path(r, dummy, params, float(np.var(r)))
+    nxt = w + a * float(r[-1]) ** 2 + b * float(s2[-1])
+    total, cur = 0.0, nxt
+    for _ in range(int(h)):
+        total += cur
+        cur = w + (a + b) * cur
+    return total / h * 252.0
+
+
 # ── jump forecast ────────────────────────────────────────────────────────────
 
 

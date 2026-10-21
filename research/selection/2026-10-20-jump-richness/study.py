@@ -116,7 +116,9 @@ def prior_moves(ev: pd.DataFrame, crsp: pd.DataFrame) -> list[np.ndarray]:
             stock = (1 + r.iloc[pos]) * (1 + r.iloc[pos + 1]) - 1
             mk = (1 + m.get(d0, np.nan)) * (1 + m.get(d1, np.nan)) - 1
             out[d0] = stock - mk
-        moves[int(p)] = pd.Series(out).sort_index()
+        moves[int(p)] = pd.Series(
+            list(out.values()), index=pd.DatetimeIndex(list(out.keys())), dtype=float
+        ).sort_index()
     res = []
     for p, d in zip(ev["permno"], ev["entry_date"], strict=True):
         s = moves.get(int(p)) if np.isfinite(p) else None

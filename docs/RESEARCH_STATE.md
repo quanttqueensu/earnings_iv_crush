@@ -17,6 +17,9 @@ Ratio, Bailey and Lopez de Prado 2014). Abandoned branches count.
   zoo (375 walk-forward strategies, reported as one zoo verdict), the nested walk-forward (1), and
   the section 2.1 peer test (3, declared earlier at 1,489). Earlier working notes put the total at
   about 1,506 and at about 1,532; they disagree, and nothing on disk resolves the difference.
+- The hedged-hold, jump-richness, post-event-equity and inversion studies added 12 trials on top
+  of 1,532 (`outputs/research/prereg_2026-10-21-inversion-confirm.json`, `dsr_trial_count` 1,544). The
+  1,532 base inherits the disagreement above.
 - `python -m earnings_iv_crush.ops.orient` reports the largest count found in the hash records.
 - **Open item:** rebuild the count as one tracked ledger file (`docs/ROADMAP.md`). Until then,
   quote "about 1,500" and use 1,532 as the conservative deflation input.
@@ -60,6 +63,10 @@ Evidence paths are under `research/` unless marked.
 | Crush forecasting | real skill, no monetisation | | `selection/findings/crush_forecast.md` |
 | P5 short strangle against the straddle | no difference | paired +0.42% [-1.04%, +1.53%], N=94, sample biased by exit attrition | `selection/findings/p5_strangle.md` |
 | Cross-sectional long-short | the long leg pays its own crush | edge only in the top quintile | `docs/reference/RESEARCH_RECORD.md` 6.4 |
+| Ex-diffusive implied jump over a causal jump forecast (two-expiry split) | fails discovery | top minus bottom R_adj -0.0013 [-0.0037, +0.0013], N=2,041, null percentile 84.2 | `selection/2026-10-20-jump-richness/findings.md` |
+| Post-event 25-delta put skew predicts the next 20 sessions | fails discovery | -0.28% per position [-0.96%, +0.36%], N=451 | `selection/2026-10-20-post-event-equity/findings.md` |
+| Post-event term slope predicts the next 20 sessions | sign reversed | -0.91% [-1.64%, -0.18%], N=486 (2013-18) | same |
+| Reversed slope: inverted names outperform | fails validation and confirmation | long-short 2019-24 +0.37% [-0.29%, +1.02%], N=1,137; beta-hedged 2025-26 +0.18% [-1.08%, +1.37%], N=210, underpowered | `selection/2026-10-21-post-event-inversion/findings.md` |
 
 ### Execution and cost
 
@@ -82,6 +89,8 @@ Evidence paths are under `research/` unless marked.
 | Post-announcement overpricing | underpowered, controls disagree | 119/110 pairs against 1,200 designed | `timing/findings/post_announcement_overpricing.md` |
 | Pre-announcement vega run-up (D-5 to D-1) | loses at the touch | -11.72% [-13.09%, -10.34%] of premium, N=922 | `timing/findings/vega_runup.md` |
 | Hard stop | cannot fire inside the gap | one overnight mark | |
+| Delta-hedged short straddle held to expiry, pre-event (20-45 and 46-120 days) and post-event (14-45 days) | fails discovery at the touch | net RoM -0.36% [-0.59%, -0.14%] (N=2,230), -0.39% [-0.73%, -0.10%] (N=2,428), -0.36% [-0.53%, -0.19%] (N=2,604); positive at the mid, one half-spread is 4-6% of premium | `timing/2026-10-20-hedged-hold/findings.md` |
+| HAR, GARCH and post-event slope selectors on the hedged hold | fail discovery | top minus bottom vol points per vega between -0.73 and +0.16, every interval spans zero | same |
 
 ### Away from earnings, and other markets
 

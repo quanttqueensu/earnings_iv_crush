@@ -268,3 +268,49 @@ def test_top_minus_bottom_point_and_interval() -> None:
     p, lo, hi = hh.top_minus_bottom_ci(v, top, bot, keys, n_boot=500)
     assert p == pytest.approx(v[:200].mean() - v[400:].mean())
     assert lo < p < hi and lo > 0
+
+
+# ── GARCH ────────────────────────────────────────────────────────────────────
+
+
+def _simulate_garch(n: int, p: tuple[float, float, float, float], seed: int):
+    rng = np.random.default_rng(seed)
+    w, a, b, d = p
+    dummy = np.zeros(n)
+    dummy[::63] = 1.0
+    r, s2 = np.zeros(n), np.zeros(n)
+    s2_prev, r_prev = w / (1 - a - b), 0.0
+    for t in range(n):
+        s2[t] = w + a * r_prev**2 + b * s2_prev + d * dummy[t]
+        r[t] = np.sqrt(s2[t]) * rng.standard_normal()
+        s2_prev, r_prev = s2[t], r[t]
+    return r, dummy, s2
+
+
+def test_garch_filter_matches_loop() -> None:
+    r, dummy, _ = _simulate_garch(500, (1e-6, 0.08, 0.9, 4e-4), seed=0)
+    p = np.array([1e-6, 0.08, 0.9, 4e-4])
+    init = float(np.var(r))
+    got = hh.garch_variance_path(r, dummy, p, init)
+    ref, prev = [], init
+    for t in range(r.size):
+        rlag = init if t == 0 else r[t - 1] ** 2
+        prev = p[0] + p[1] * rlag + p[2] * prev + p[3] * dummy[t]
+        ref.append(prev)
+    np.testing.assert_allclose(got, ref, rtol=1e-10)
+
+
+def test_garch_fit_recovers_parameters() -> None:
+    planted = (2e-6, 0.08, 0.88, 6e-4)
+    r, dummy, _ = _simulate_garch(12000, planted, seed=4)
+    p = hh.garch_fit(r, dummy)
+    assert p[1] == pytest.approx(0.08, abs=0.03)
+    assert p[2] == pytest.approx(0.88, abs=0.04)
+    assert p[3] == pytest.approx(6e-4, rel=0.35)
+
+
+def test_garch_forecast_long_horizon_is_unconditional() -> None:
+    p = np.array([2e-6, 0.08, 0.88, 0.0])
+    r = np.full(50, 0.01)
+    long = hh.garch_annual_variance(r, np.zeros(50), p, 20000)
+    assert long == pytest.approx(p[0] / (1 - 0.96) * 252, rel=0.02)
