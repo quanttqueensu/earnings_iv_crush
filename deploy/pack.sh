@@ -12,13 +12,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 files=(
-    requirements.txt pyproject.toml README.md
+    requirements.txt pyproject.toml README.md data/universe_broad.csv
     earnings_iv_crush
     scripts/paper_trade_ibkr.py scripts/forward_report.py scripts/sweep_term_panel.py
     outputs/research/events_megacap_v2.parquet
     outputs/research/events_broad_oos_2025.parquet
     deploy/docker-compose.yml deploy/Dockerfile.runner deploy/Dockerfile.runner.dockerignore
     deploy/run_paper_daily.sh deploy/session_check.py deploy/crontab
+    deploy/gateway_probe.py deploy/gateway_preflight.sh
     deploy/gateway.env.example deploy/runner.env.example deploy/README.md
 )
 for f in "${files[@]}"; do

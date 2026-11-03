@@ -2,6 +2,10 @@
 # The VM clock is set to America/New_York (see README), so these times are
 # exchange time and follow daylight saving automatically.
 #
+# 15:00 ET Mon-Fri: confirm the gateway is logged in, restarting it once if not,
+# so the 15:20 pass starts against a live session.
+0 15 * * 1-5 /opt/ivcrush/deploy/gateway_preflight.sh >> /opt/ivcrush/deploy/state/control/cron.log 2>&1
+
 # 15:20 ET Mon-Fri: the daily pass; its order ladder runs 15:45-15:59 inside it.
 # Holidays and early closes are filtered inside the container by session_check.py.
 20 15 * * 1-5 cd /opt/ivcrush/deploy && /usr/bin/docker compose --profile run run --rm runner >> state/control/cron.log 2>&1

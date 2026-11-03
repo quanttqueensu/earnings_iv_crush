@@ -4,6 +4,7 @@
 !requirements.txt
 !pyproject.toml
 !README.md
+!data/universe_broad.csv
 !earnings_iv_crush/**
 !scripts/paper_trade_ibkr.py
 !scripts/forward_report.py
@@ -12,4 +13,5 @@
 !outputs/research/events_broad_oos_2025.parquet
 !deploy/run_paper_daily.sh
 !deploy/session_check.py
+!deploy/gateway_probe.py
 **/__pycache__
