@@ -10,6 +10,7 @@ defining property (random draws of the same size centre on the population statis
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -260,3 +261,16 @@ def test_block_ledger_marks_descendants_dirty_and_others_clean(tmp_path) -> None
         led, panel="hedged_hold", period="2020-24", outcome_family="anything", feature_family="new"
     )
     assert not clean and len(hits) == 1
+
+
+def test_freeze_records_repository_relative_paths() -> None:
+    root = Path(pr.__file__).resolve().parents[2]
+    inside = root / "research" / "_template" / "prereg.md"
+    assert pr._repo_relative(inside) == "research/_template/prereg.md"
+    assert pr._recorded_file("research/_template/prereg.md") == inside
+
+
+@pytest.mark.parametrize("outside", ["elsewhere/x.md", "/tmp/elsewhere/x.md"])
+def test_paths_outside_the_repository_are_kept_as_given(outside: str) -> None:
+    assert pr._repo_relative(Path(outside).resolve()).endswith("elsewhere/x.md")
+    assert pr._recorded_file(outside) == Path(outside)
