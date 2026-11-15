@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from earnings_iv_crush.live import paper_book
 from scripts.forward_report import (
     MIN_TRADES_FOR_CI,
     MIN_TRADES_FOR_DECISION,
@@ -19,8 +20,29 @@ from scripts.forward_report import (
     book_stats,
     clustered_ci,
     derived_periods_per_year,
+    open_position_lines,
     reconciliation_stats,
 )
+
+
+def test_open_positions_are_listed_and_an_overdue_one_is_an_alarm(tmp_path) -> None:
+    path = tmp_path / "open_positions.parquet"
+    assert "None." in open_position_lines(path)
+    for ticker, exit_date in (("LATE", "2026-11-10"), ("FINE", "2026-11-12")):
+        paper_book.record_entry(
+            {
+                "ticker": ticker,
+                "entry_date": pd.Timestamp("2026-11-09"),
+                "exit_date": pd.Timestamp(exit_date),
+                "front_expiry": pd.Timestamp("2026-11-13"),
+                "strike": 55.0,
+                "contracts": 5,
+            },
+            path=path,
+        )
+    text = "\n".join(open_position_lines(path, today=pd.Timestamp("2026-11-11")))
+    assert "LATE: 5x 55 straddle" in text and "FINE: 5x 55 straddle" in text
+    assert text.count("ALARM:") == 1 and "ALARM: LATE" in text
 
 
 def _ledger(n: int, seed: int = 0) -> pd.DataFrame:
@@ -243,3 +265,21 @@ def test_quiet_day_does_not_alarm(monkeypatch):
 def test_healthy_pass_does_not_alarm(monkeypatch):
     """Candidates seen and priced is the normal state; no false positive."""
     assert "ALARM" not in _health(monkeypatch, _heartbeat(days_ago=0, candidates=5, priced=5))
+
+
+def test_harness_health_reads_the_heartbeat_it_is_given(tmp_path):
+    # A dry pass writes its heartbeat under dry/; the report must read that store,
+    # not the empty transmit store, or a running harness reads as one that never ran.
+    from earnings_iv_crush.live import paper_book
+    from scripts.forward_report import harness_health
+
+    hb = tmp_path / "dry" / "entry_heartbeat.parquet"
+    hb.parent.mkdir()
+    paper_book.record_heartbeat(pd.Timestamp.today().normalize(), 4, 3, 3, 3, path=hb)
+    assert not any(
+        "ever recorded a heartbeat" in line for line in harness_health(heartbeat_path=hb)
+    )
+    missing = tmp_path / "entry_heartbeat.parquet"
+    assert any(
+        "ever recorded a heartbeat" in line for line in harness_health(heartbeat_path=missing)
+    )

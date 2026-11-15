@@ -11,6 +11,11 @@ Every order event goes to ``outputs/live/order_events.csv`` before it is acted o
 
 The other sub-commands are manual tools:
 
+* ``reconcile-exit`` - record an exit leg that was closed by hand in TWS or expired,
+  after checking the broker's position agrees. It appends one dated fill row with the
+  operator's price and reason, books the exit when both legs are then accounted for,
+  and sends nothing to the broker;
+
 * ``enter`` - preview today's entry decisions with the legacy single-pass logic
   (Finnhub calendar, or ``--names`` for a manual test). It never transmits: entries
   reach the broker only through the ``session`` ladder;
@@ -39,6 +44,8 @@ Usage
     python -m scripts.paper_trade_ibkr session
     python -m scripts.paper_trade_ibkr session --transmit
     python -m scripts.paper_trade_ibkr session --names NVDA --announce 2026-10-21 --hour amc
+    python -m scripts.paper_trade_ibkr reconcile-exit --ticker OXY --leg P --qty 5 \
+        --price 0.31 --reason "closed by hand in TWS after an incomplete exit"
     python scripts/paper_trade_ibkr.py enter --dry-run
     python scripts/paper_trade_ibkr.py enter --rule term_q80 --dry-run
     python scripts/paper_trade_ibkr.py enter --names NVDA --announce 2026-06-22 --transmit
@@ -796,6 +803,28 @@ def run_session_cmd(args: argparse.Namespace) -> None:
         raise SystemExit(f"session: {len(result.alarms)} alarm(s); see the log above.")
 
 
+def run_reconcile_exit_cmd(args: argparse.Namespace) -> None:
+    """Record a leg closed outside the harness; sends nothing to the broker."""
+    from earnings_iv_crush.live.ib_connection import connect_paper
+    from earnings_iv_crush.live.session import record_manual_exit_fill
+
+    asof = pd.Timestamp(args.asof).normalize() if args.asof else exchange_today()
+    ib = connect_paper()
+    try:
+        outcome = record_manual_exit_fill(
+            ib, args.ticker, args.leg, args.qty, args.price, args.reason, asof
+        )
+    except ValueError as exc:
+        raise SystemExit(f"reconcile-exit refused: {exc}") from exc
+    finally:
+        if ib.isConnected():
+            ib.disconnect()
+    print(
+        f"{args.ticker} {args.leg} x{args.qty} @ {args.price:g}: {outcome}"
+        + ("" if outcome == "booked" else "; the next pass works what is still short")
+    )
+
+
 # ── cli ──────────────────────────────────────────────────────────────────────
 
 
@@ -814,6 +843,18 @@ def build_parser() -> argparse.ArgumentParser:
     ses.add_argument("--announce", default=None, help="announcement date for --names")
     ses.add_argument("--hour", choices=("bmo", "amc"), default=None, help="session for --names")
     ses.set_defaults(func=run_session_cmd)
+
+    rec = sub.add_parser(
+        "reconcile-exit",
+        help="record an exit leg closed by hand (or expired); verifies the broker, sends nothing",
+    )
+    rec.add_argument("--ticker", required=True, help="ticker of the open position")
+    rec.add_argument("--leg", required=True, choices=("C", "P"), help="the leg closed by hand")
+    rec.add_argument("--qty", required=True, type=int, help="contracts closed by hand")
+    rec.add_argument("--price", required=True, type=float, help="average price paid per share")
+    rec.add_argument("--reason", required=True, help="why it was closed outside the harness")
+    rec.add_argument("--asof", default=None, help="date of the close YYYY-MM-DD (default today)")
+    rec.set_defaults(func=run_reconcile_exit_cmd)
 
     enter = sub.add_parser("enter", help="snapshot, gate, size and optionally transmit entries")
     enter.add_argument("--asof", default=None, help="entry date YYYY-MM-DD (default today)")

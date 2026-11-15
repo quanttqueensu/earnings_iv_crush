@@ -29,7 +29,8 @@ here is the Interactive Brokers **paper** account. The harness refuses every liv
 | 15:20 | Session guard (closed day or 13:00 early close: skip). Gateway check. Calendar votes from Finnhub, Nasdaq and Yahoo; a name trades only if two agree on date and session. |
 | 15:20-15:44 | Due exits are qualified on their stored strike and expiry; a transmitting exit checks the broker holds both short legs. Entries are admitted in hash order up to the cap, priced on the first expiry after the exit date, filtered for ex-dividend dates and sized. The funnel is printed. |
 | 15:45-15:55 | One ladder for every leg: rung 0 at mid, then 25%, 50%, 75% of the way to the touch, then the touch. |
-| 15:58 | Every working order cancelled; status re-read after the settle time. A legged entry is bought back at the touch. |
+| 15:56:30 | Unfilled exit legs re-priced once through the ask; a sweep the broker cancels at its price cap is re-placed once under the cap, after the cancel is confirmed (up to 30 s). Entry orders still resting are cancelled, so their cancels are final before any buy-back. |
+| 15:58 | Every working order cancelled; status re-read until the broker confirms the entry cancels (up to 30 s). A legged entry is bought back through the ask. |
 | 15:59 | NBBO of every leg recorded, filled or not. Fills booked. |
 
 Without `--transmit`, or without the `_private\TRANSMIT_OK` marker the drivers check, the pass
@@ -65,8 +66,13 @@ Any line beginning `ALARM:` makes the driver exit non-zero.
 | Alarm | Meaning | Do |
 |---|---|---|
 | `entry legged_open` | One entry leg filled, the buy-back did not: the account holds a naked leg | Close the leg by hand in TWS at once; record the resolution in the intended-trades log |
-| `exit incomplete` | An exit did not fully close | Check broker positions; the next session's exit refuses until the ledger and broker agree, so close or reconcile by hand |
-| `exit not placed (broker_mismatch...)` | The broker does not hold the legs the ledger expects | Reconcile in TWS before the next pass; never edit the ledger to match without a note |
+| `exit incomplete` | An exit did not fully close even after the 15:56:30 sweep | Check broker positions. The next session's ladder buys back only what is still short, provided the broker's position equals the ledger quantity less the exit fills in the order-event log, and books the exit at the blended price with a `resumed_exit` reason. Until then the account holds a naked leg. If you close it by hand, record it with `reconcile-exit` (below) |
+| `exit unfilled; position still open` | No leg of a due exit filled | The straddle is still short, a day past its rule. The next pass retries; check quotes were arriving (see the 10197 row) |
+| `exit not placed (broker_mismatch...)` | The broker does not hold the legs the ledger expects, after allowing for earlier exit fills in the order-event log | A leg was closed outside the harness. Record it: `python -m scripts.paper_trade_ibkr reconcile-exit --ticker T --leg P --qty N --price X --reason "..."`. It checks the broker agrees, appends one dated fill row, books the exit when both legs are accounted for, and sends nothing. Never edit the ledger by hand |
+| `broker holds ... which no open ledger position explains` | An option position exists that the ledger does not know: a lost entry booking, a leg left by a failed flatten, or a hand trade | Close it in TWS unless it is deliberate; the harness will never exit it |
+| `order still working after the ladder, now cancelled` | An order outlived the 15:58 cancel | It has been cancelled; check the order log for a late fill on that contract |
+| `market data was cut by a competing live session` | IB error 10197: the paper login lost its quotes because the same user was signed in to live IBKR | Stay signed out of live TWS, web and mobile from 15:15 to 16:00 ET |
+| `... booking failed` | An order filled but the ledger write raised | The fills are in the order log; the next pass books a completed exit from them without sending an order |
 | `candidates today and none admitted` | Every candidate was filtered or failed to price | Read the funnel; a data or entitlement fault is likely |
 | `ladder reached ... after the latest start` | The pass began too late to run the ladder | Nothing was sent; find why the task started late |
 | `HALT present` / `STOP present` | A switch is on | Intended, or forgotten? |

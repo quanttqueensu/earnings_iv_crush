@@ -21,6 +21,7 @@ Usage
 -----
     python scripts/forward_report.py
     python scripts/forward_report.py --out _private/reports/forward_report.md
+    python scripts/forward_report.py --dry    # the dry-run book's own stores
 """
 
 from __future__ import annotations
@@ -36,10 +37,12 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from earnings_iv_crush.config import LIVE  # noqa: E402
 from earnings_iv_crush.engine.alpha_adjudication import add_return_measures  # noqa: E402
 from earnings_iv_crush.engine.event_study import cluster_bootstrap_ci  # noqa: E402
 from earnings_iv_crush.live import paper_book  # noqa: E402
 from earnings_iv_crush.live.forward_test import BREAKEVEN_ROUND_TRIP, FORWARD  # noqa: E402
+from earnings_iv_crush.live.session import Stores  # noqa: E402
 
 PROJECT = Path(__file__).resolve().parents[1]
 MIN_TRADES_FOR_CI = 8  # below this a bootstrap CI is noise dressed as inference
@@ -217,7 +220,7 @@ def _load(path: Path) -> pd.DataFrame:
     return pd.read_parquet(path)
 
 
-def harness_health(stale_days: int = 5) -> list[str]:
+def harness_health(stale_days: int = 5, heartbeat_path: str | Path | None = None) -> list[str]:
     """Report whether the entry pass is alive, before reporting what it found.
 
     An empty book has three causes that read identically in a results table: the
@@ -227,7 +230,11 @@ def harness_health(stale_days: int = 5) -> list[str]:
     The heartbeat separates them and this section states which one holds, so an
     empty book is never mistaken for a patient one.
     """
-    hb = paper_book.load_heartbeat()
+    hb = (
+        paper_book.load_heartbeat()
+        if heartbeat_path is None
+        else paper_book.load_heartbeat(heartbeat_path)
+    )
     out = ["### Harness health", ""]
     if hb.empty:
         out += [
@@ -268,27 +275,67 @@ def harness_health(stale_days: int = 5) -> list[str]:
     return out
 
 
+def open_position_lines(open_path: str | Path, today: pd.Timestamp | None = None) -> list[str]:
+    """List what the book still holds, and raise an alarm on anything past its exit date.
+
+    The ledgers hold completed trades only, so a straddle (or the one leg an incomplete
+    exit left behind) is invisible in every table below until it closes. A report that
+    says "book is empty" while the account is short is the wrong way round.
+    """
+    today = (today or pd.Timestamp.today()).normalize()
+    book = paper_book.load_open_positions(open_path)
+    out = ["### Open positions", ""]
+    if book.empty:
+        return out + ["None.", ""]
+    for _, pos in book.sort_values("exit_date").iterrows():
+        exit_date = pd.Timestamp(pos["exit_date"]).normalize()
+        out.append(
+            f"- {pos['ticker']}: {int(pos['contracts'])}x {float(pos['strike']):g} straddle "
+            f"exp {pd.Timestamp(pos['front_expiry']):%Y-%m-%d}, entered "
+            f"{pd.Timestamp(pos['entry_date']):%Y-%m-%d}, exit due {exit_date:%Y-%m-%d}"
+        )
+        if exit_date <= today:
+            out.append(
+                f"  **ALARM: {pos['ticker']} is still open on or after its exit date.** The "
+                "exit did not complete; read the pass log for the legs still short at the "
+                "broker and see the runbook, section 5."
+            )
+    return out + [""]
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", type=Path, default=None, help="also write the report here")
+    ap.add_argument(
+        "--dry",
+        action="store_true",
+        help="report the dry-run book (the stores a non-transmitting pass writes)",
+    )
     args = ap.parse_args()
 
-    nostop = _load(PROJECT / FORWARD.nostop_ledger_path)
-    stop = _load(PROJECT / FORWARD.stop_ledger_path)
-    recon = _load(PROJECT / FORWARD.reconciliation_path)
+    # The pass and the report must resolve stores the same way, or a dry book is
+    # reported from the empty transmit stores and reads as a harness that never ran.
+    stores = Stores.for_mode(transmit=not args.dry)
+    nostop = _load(PROJECT / stores.nostop)
+    stop = _load(PROJECT / stores.stop)
+    recon = _load(PROJECT / stores.reconciliation)
 
+    mode = "DRY RUN (no orders sent; fills are simulated)" if args.dry else "paper orders"
     lines = [
         f"# Forward paper-book report, {datetime.now():%Y-%m-%d}",
         "",
-        "Locked baseline: term gate q=0.80, move/skew gates off, naked short straddle.",
+        f"Book: selection rule `{LIVE.selection_rule}`, naked short straddle, {mode}.",
+        f"Market data type {LIVE.ib_market_data_type} (1 = real time; anything else is "
+        "operational evidence only, not P&L evidence).",
         "All returns are per-trade return on margin, net of commission; fills per the",
-        "managed mid-seeking exit. Backtest prior: per-trade Sharpe ~+0.1, CI through zero.",
+        "managed mid-seeking exit.",
         "",
     ]
-    lines += harness_health()
+    lines += harness_health(heartbeat_path=PROJECT / stores.heartbeat)
+    lines += open_position_lines(PROJECT / stores.open_positions)
     if len(nostop) == 0 and len(stop) == 0:
         lines += [
-            "**Book is empty: the forward test has not recorded a completed trade yet.**",
+            "**No completed trade yet: the forward test has nothing to measure.**",
             "No inference is possible; this is a status report, not evidence.",
             "",
         ]

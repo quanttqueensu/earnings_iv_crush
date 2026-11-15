@@ -104,6 +104,7 @@ in the tightest part of the day.
 | 15:50:00 | Rung 2: 50% |
 | 15:52:30 | Rung 3: 75% |
 | 15:55:00 | Rung 4: the touch (bid for a sell, ask for a buy) |
+| 15:56:30 | Sweep: every unfilled exit leg is re-priced once through the displayed ask |
 | 15:58:00 | Cancel every working order; re-read status after `exit_cancel_settle_s` |
 | 15:59:00 | NBBO snapshot of every held leg, filled or not (the counterfactual basis) |
 
@@ -114,11 +115,31 @@ not priced. Every limit is rounded to a legal tick away from the far touch
 (`ib_orders.round_to_tick`). All entry and exit legs run concurrently in one ladder engine, so
 an exit day with many names does not push entries out of the window.
 
+**Sweep.** The touch rung bids the displayed ask. On a delayed feed that ask is about fifteen
+minutes old and can sit under the real offer, which is how the first transmitted exit
+(2026-11-10) bought back its call and left its put short. At 15:56:30 every exit leg still
+unfilled is therefore re-priced once to the displayed ask plus the larger of
+`exit_sweep_frac` (20%) of the ask and `exit_sweep_min` (0.10 per share), rounded up to 0.05
+below 3.00 and 0.10 above so the order is legal in every option class. The broker fills a
+marketable limit at the real offer, so the allowance bounds the price rather than setting it. A
+leg whose order was rejected with nothing filled gets one fresh order at the sweep; a leg that
+cannot be re-quoted is priced from the last book the ladder read; a leg never quoted is not
+priced. Entry legs never sweep. A fill at the sweep is recorded as not filled at the limit, and
+on any feed other than real time it is operational evidence only (section 11).
+
 **Legging.** If one leg of an entry fills and the other does not by 15:58:00, the filled leg
-is bought back at the touch before 15:59:00 and the event is logged as `legged_flattened`. An
-exit that ends legged is not forced: the working order is cancelled, the event raises an alarm,
-and the remaining leg is closed by the next session's ladder. A naked single leg carries more
-directional risk than the straddle, so the operator is paged either way.
+is bought back at the sweep price before 15:59:00 and the event is logged as
+`legged_flattened`. An exit still incomplete after the sweep has its working orders cancelled
+and raises an alarm. The next session buys back only what is still short, provided the
+broker's position equals the ledger quantity less the exit fills in the order-event log, and
+books the exit at the blended price. A naked single leg carries more directional risk than the
+straddle, so the operator is paged either way.
+
+**Guards around the ladder.** A transmitting pass reports any option position at the broker
+that no open ledger position explains, any exit that did not fill at all, any order still
+working after the cancel (which it cancels), and a pass whose market data was cut by a
+competing live session (IB error 10197). One position's fault never stops another's exit, and
+an entry that fails to price never stops the exits.
 
 **Schedule change.** The current driver starts at 15:35, which leaves no room for a 13-minute
 ladder after snapshots and confirmation. The start moves to 15:20 ET on both hosts:

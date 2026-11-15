@@ -229,3 +229,28 @@ def test_broker_short_qty_sums_matching_contract() -> None:
     ib = FakeIB(positions={7: -2, 8: 1})
     assert ib_orders.broker_short_qty(ib, SimpleNamespace(conId=7)) == -2
     assert ib_orders.broker_short_qty(ib, SimpleNamespace(conId=9)) == 0
+
+
+def test_broker_check_asks_the_broker_not_the_startup_cache():
+    # The connect-time sync can time out and leave the positions cache empty while
+    # the account is short; the exit check must see the fresh broker answer.
+    import asyncio
+
+    from earnings_iv_crush.live import ib_orders
+
+    class _Pos:
+        def __init__(self, con_id: int, qty: int) -> None:
+            self.contract = SimpleNamespace(conId=con_id)
+            self.position = qty
+
+    class CacheMissIB:
+        def positions(self):
+            return []
+
+        async def reqPositionsAsync(self):
+            return [_Pos(1000, -2)]
+
+        def run(self, aw):
+            return asyncio.run(aw)
+
+    assert ib_orders.broker_short_qty(CacheMissIB(), SimpleNamespace(conId=1000)) == -2

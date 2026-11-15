@@ -173,7 +173,8 @@ def _run(tmp_path, legs, gw, *, quote_fn=None, clock=None, transmit=True, halted
     "purpose, expected",
     [
         ("entry", [1.10, 1.07, 1.05, 1.02, 1.00]),  # sells walk down to the bid
-        ("exit", [1.10, 1.13, 1.15, 1.18, 1.20]),  # buys walk up to the ask
+        # buys walk up to the ask, then sweep through it once
+        ("exit", [1.10, 1.13, 1.15, 1.18, 1.20, 1.45]),
     ],
 )
 def test_rung_prices_follow_the_schedule(tmp_path, purpose, expected) -> None:
@@ -215,7 +216,9 @@ def test_legged_entry_is_flattened(tmp_path) -> None:
     assert outcomes[0].status == "legged_flattened"
     flatten = events[events["purpose"] == "flatten"]
     assert (flatten["event"] == "submit").sum() == 1
-    assert ("C", "BUY", 1.20) in [(r, a, p) for r, a, p, _ in gw.placed]
+    # Through the 1.20 ask by max(0.10, 20%), on the coarse tick: a stale ask must
+    # not leave the filled leg naked.
+    assert ("C", "BUY", 1.45) in [(r, a, p) for r, a, p, _ in gw.placed]
 
 
 def test_legged_entry_with_no_flatten_fill_is_an_alarm(tmp_path) -> None:
@@ -224,18 +227,73 @@ def test_legged_entry_with_no_flatten_fill_is_an_alarm(tmp_path) -> None:
     assert outcomes[0].status == "legged_open" and outcomes[0].alarm
 
 
-def test_incomplete_exit_is_not_forced(tmp_path) -> None:
+def test_exit_unfilled_even_by_the_sweep_is_incomplete_and_an_alarm(tmp_path) -> None:
     gw = FakeGateway(buy_fill={"C": 1.10})
     outcomes, events = _run(tmp_path, [_leg("exit", "C"), _leg("exit", "P")], gw)
     assert outcomes[0].status == "incomplete" and outcomes[0].alarm
     assert not (events["purpose"] == "flatten").any()
 
 
+@pytest.mark.parametrize(
+    "bid, ask, expected",
+    [
+        (0.18, 0.29, 0.40),  # the 0.10 floor governs a cheap wing
+        (2.16, 2.45, 2.95),  # 20% of the ask, rounded up to 0.05
+        (2.70, 2.90, 3.50),  # crosses 3.00: rounded up to 0.10
+        (float("nan"), 0.05, 0.15),  # no bid is still closable
+    ],
+)
+def test_sweep_limit_is_bounded_and_on_a_tick_legal_in_every_class(bid, ask, expected) -> None:
+    assert ld.LegQuote(bid, ask).sweep_limit(0.20, 0.10) == pytest.approx(expected)
+
+
+def test_sweep_refuses_a_book_with_no_ask() -> None:
+    with pytest.raises(ValueError):
+        ld.LegQuote(1.0, float("nan")).sweep_limit(0.20, 0.10)
+
+
+def test_sweep_closes_an_exit_leg_sitting_under_a_stale_ask(tmp_path) -> None:
+    gw = FakeGateway(buy_fill={"C": 1.10, "P": 1.30})  # the real put offer is above 1.20
+    clock = FakeClock()
+    outcomes, events = _run(tmp_path, [_leg("exit", "C"), _leg("exit", "P")], gw, clock=clock)
+    assert outcomes[0].status == "filled"
+    assert outcomes[0].fill_ps == pytest.approx(1.10 + 1.45)
+    assert pd.Timestamp("2026-10-19 15:56:30", tz=TZ) in clock.waits
+    sweep = events[events["reason"].fillna("").str.startswith("sweep")]
+    assert len(sweep) == 1 and sweep["leg"].iloc[0] == "P"
+    assert check_completeness(events).empty
+
+
+def test_entries_never_sweep(tmp_path) -> None:
+    gw = FakeGateway()
+    _, events = _run(tmp_path, [_leg("entry", "C"), _leg("entry", "P")], gw)
+    assert min(px for _, _, px, _ in gw.placed) == pytest.approx(1.00)  # never below the bid
+    assert not events["reason"].fillna("").str.startswith("sweep").any()
+
+
+def test_sweep_sends_nothing_under_halt(tmp_path) -> None:
+    gw = FakeGateway()
+    n = {"calls": 0}
+
+    def halted() -> bool:
+        n["calls"] += 1
+        return n["calls"] > 5  # clear for the five rungs, set before the sweep
+
+    _run(tmp_path, [_leg("exit", "C")], gw, halted=halted)
+    assert max(px for _, _, px, _ in gw.placed) == pytest.approx(1.20)
+
+
+def test_orders_state_their_own_time_in_force(tmp_path) -> None:
+    gw = FakeGateway()
+    _run(tmp_path, [_leg("exit", "C")], gw)
+    assert {t.order.tif for t in gw._trades.values()} == {"DAY"}
+
+
 def test_fill_racing_the_cancel_is_booked(tmp_path) -> None:
     gw = FakeGateway(buy_fill={"C": 1.10}, fill_on_cancel={"P"})
     outcomes, _ = _run(tmp_path, [_leg("exit", "C"), _leg("exit", "P")], gw)
     assert outcomes[0].status == "filled"
-    assert outcomes[0].fill_ps == pytest.approx(1.10 + 1.20)
+    assert outcomes[0].fill_ps == pytest.approx(1.10 + 1.45)  # resting at the sweep limit
 
 
 def test_exception_at_a_rung_cancels_everything(tmp_path) -> None:
@@ -293,24 +351,249 @@ def test_failed_requote_holds_the_resting_order(tmp_path) -> None:
         return _quotes()(legs) if calls["n"] == 1 else {}
 
     _, events = _run(tmp_path, [_leg("exit", "C")], gw, quote_fn=first_only)
-    assert len(gw.placed) == 1
+    # The rungs hold at the first price; only the sweep moves, off the last book read.
+    assert [px for _, _, px, _ in gw.placed] == pytest.approx([1.10, 1.45])
     assert (events["event"] == "hold_stale_quote").sum() == 4
+    assert events["reason"].fillna("").str.contains("last book read").sum() == 1
 
 
-def test_rejected_leg_is_logged_and_never_re_placed(tmp_path) -> None:
+def test_exit_never_quoted_is_not_swept_blind(tmp_path) -> None:
+    gw = FakeGateway()
+    _, events = _run(tmp_path, [_leg("exit", "C")], gw, quote_fn=lambda legs: {})
+    assert gw.placed == []
+    assert (events["event"] == "alarm").sum() == 1
+
+
+def test_rejected_exit_leg_gets_one_fresh_order_at_the_sweep(tmp_path) -> None:
+    class RejectsFinePrices(FakeGateway):
+        """Refuses a penny-tick price, as a class outside the penny programme does."""
+
+        def placeOrder(self, contract, order):
+            trade = super().placeOrder(contract, order)
+            if contract.right == "P" and round(order.lmtPrice * 100) % 5:
+                trade.orderStatus.status = "Inactive"
+                trade.log = [SimpleNamespace(message="Order price is not a legal tick")]
+            return trade
+
+    gw = RejectsFinePrices(buy_fill={"C": 1.10, "P": 1.30})
+    quotes = _quotes({"P": (1.01, 1.21)})  # rung 0 lands on 1.11, off the coarse tick
+    outcomes, events = _run(tmp_path, [_leg("exit", "C"), _leg("exit", "P")], gw, quote_fn=quotes)
+    assert [px for r, _, px, _ in gw.placed if r == "P"] == pytest.approx([1.11, 1.50])
+    assert len({oid for r, _, _, oid in gw.placed if r == "P"}) == 2  # a new order, not a modify
+    rejects = events[events["event"] == "reject"]
+    assert len(rejects) == 1 and "legal tick" in rejects["reason"].iloc[0]
+    assert outcomes[0].status == "filled" and check_completeness(events).empty
+
+
+class PriceCapped(FakeGateway):
+    """Cancels a buy priced at or above ``cap`` with IB's price-protection message."""
+
+    def __init__(self, cap: float, **kw) -> None:
+        super().__init__(**kw)
+        self.cap = cap
+
+    def placeOrder(self, contract, order):
+        if order.action == "BUY" and order.lmtPrice >= self.cap - 1e-9:
+            saved, self.buy_fill = self.buy_fill, {}  # a capped order never reaches the book
+            try:
+                trade = super().placeOrder(contract, order)
+            finally:
+                self.buy_fill = saved
+            trade.orderStatus.status = "Cancelled"
+            trade.log = [
+                SimpleNamespace(
+                    message="Error 202, reqId 268: Order Canceled - reason:We cannot accept an "
+                    f"order at a limit price at or more aggressive than {self.cap}. Please "
+                    "submit your order using a <br>limit price that is closer to the current "
+                    "market price"
+                )
+            ]
+            return trade
+        return super().placeOrder(contract, order)
+
+
+def test_sweep_cancelled_at_the_price_cap_is_re_placed_under_it(tmp_path) -> None:
+    # 2026-11-12 CTVA: displayed ask 3.30, sweep 4.00, IB refused anything at or over 3.70.
+    gw = PriceCapped(3.7, buy_fill={"C": 0.05, "P": 3.40})  # real offer over the delayed ask
+    quotes = _quotes({"C": (0.0, 0.05), "P": (3.00, 3.30)})
+    outcomes, events = _run(tmp_path, [_leg("exit", "C"), _leg("exit", "P")], gw, quote_fn=quotes)
+    puts = [px for r, _, px, _ in gw.placed if r == "P"]
+    assert puts[-2:] == pytest.approx([4.00, 3.60])
+    assert len({oid for r, _, _, oid in gw.placed if r == "P"}) == 2  # a fresh order
+    assert outcomes[0].status == "filled"
+    assert events["reason"].fillna("").str.contains("price cap 3.7").sum() == 1
+    assert check_completeness(events).empty
+
+
+def test_price_cap_retry_happens_once(tmp_path) -> None:
+    gw = PriceCapped(3.7, buy_fill={"C": 0.05, "P": 9.99})  # the retry does not fill either
+    quotes = _quotes({"C": (0.0, 0.05), "P": (3.00, 3.30)})
+    outcomes, _ = _run(tmp_path, [_leg("exit", "C"), _leg("exit", "P")], gw, quote_fn=quotes)
+    assert [px for r, _, px, _ in gw.placed if r == "P"][-2:] == pytest.approx([4.00, 3.60])
+    assert outcomes[0].status == "incomplete" and outcomes[0].alarm
+
+
+def test_flatten_cancelled_at_the_price_cap_is_re_placed_under_it(tmp_path) -> None:
+    gw = PriceCapped(1.4, sell_fill={"C": 1.10}, buy_fill={"C": 1.20})  # put never sells
+    outcomes, _ = _run(tmp_path, [_leg("entry", "C"), _leg("entry", "P")], gw)
+    assert [px for r, a, px, _ in gw.placed if a == "BUY"] == pytest.approx([1.45, 1.35])
+    assert outcomes[0].status == "legged_flattened"
+
+
+class SlowCancels(FakeGateway):
+    """Cancels confirm only after ``lag`` sleeps, as the paper account did near the close.
+
+    A buy at or over ``cap`` is cancelled by the broker with the price-protection
+    message, which also arrives ``lag`` sleeps late (the order shows PendingCancel
+    first). A SELL put fills ``put_partial`` contracts and rests for the remainder. A
+    BUY never fills while a SELL on the same contract is not final, which is IB's
+    "repriced so as not to cross a related resting order".
+    """
+
+    def __init__(self, lag: int, cap: float = 99.0, put_partial: int = 0, **kw) -> None:
+        super().__init__(**kw)
+        self.lag, self.cap, self.put_partial = lag, cap, put_partial
+        self._pending: list[tuple[int, SimpleNamespace, list]] = []
+
+    def _resting_sell(self, right: str) -> bool:
+        return any(
+            t.contract.right == right
+            and t.order.action == "SELL"
+            and t.orderStatus.status not in ("Filled", "Cancelled")
+            for t in self._trades.values()
+        )
+
+    def placeOrder(self, contract, order):
+        if order.action == "BUY" and order.lmtPrice >= self.cap - 1e-9:
+            saved, self.buy_fill = self.buy_fill, {}
+            try:
+                trade = super().placeOrder(contract, order)
+            finally:
+                self.buy_fill = saved
+            trade.orderStatus.status = "PendingCancel"
+            msg = SimpleNamespace(
+                message=f"Error 202: Order Canceled - reason:at or more aggressive than {self.cap}."
+            )
+            self._pending.append((self.lag, trade, [msg]))
+            return trade
+        if order.action == "BUY" and self._resting_sell(contract.right):
+            saved, self.buy_fill = self.buy_fill, {}
+            try:
+                return super().placeOrder(contract, order)
+            finally:
+                self.buy_fill = saved
+        if order.action == "SELL" and contract.right == "P" and self.put_partial:
+            trade = super().placeOrder(contract, order)
+            if not trade.fills:
+                trade.orderStatus.filled = float(self.put_partial)
+                trade.orderStatus.remaining = order.totalQuantity - self.put_partial
+                trade.orderStatus.avgFillPrice = float(order.lmtPrice)
+                trade.fills.append(
+                    SimpleNamespace(
+                        execution=SimpleNamespace(
+                            execId=f"p{order.orderId}",
+                            shares=self.put_partial,
+                            price=order.lmtPrice,
+                        ),
+                        commissionReport=SimpleNamespace(commission=0.65),
+                        time=pd.Timestamp("2026-10-19 19:50", tz="UTC"),
+                    )
+                )
+            return trade
+        return super().placeOrder(contract, order)
+
+    def cancelOrder(self, order):
+        self.cancelled.append(order)
+        trade = self._trades[id(order)]
+        trade.orderStatus.status = "PendingCancel"
+        self._pending.append((self.lag, trade, []))
+
+    def sleep(self, _s):
+        still = []
+        for n, trade, log in self._pending:
+            if n <= 1:
+                trade.orderStatus.status = "Cancelled"
+                trade.log = list(getattr(trade, "log", [])) + log
+            else:
+                still.append((n - 1, trade, log))
+        self._pending = still
+
+
+def test_slow_price_cap_cancel_is_still_re_placed_under_the_cap(tmp_path) -> None:
+    # 2026-11-13 CSCO: the capped sweep showed PendingCancel at +2 s, so the re-price
+    # never ran and the put stayed short.
+    gw = SlowCancels(lag=5, cap=3.7, buy_fill={"C": 0.05, "P": 3.40})
+    quotes = _quotes({"C": (0.0, 0.05), "P": (3.00, 3.30)})
+    outcomes, events = _run(tmp_path, [_leg("exit", "C"), _leg("exit", "P")], gw, quote_fn=quotes)
+    assert [px for r, _, px, _ in gw.placed if r == "P"][-2:] == pytest.approx([4.00, 3.60])
+    assert outcomes[0].status == "filled"
+    assert check_completeness(events).empty
+
+
+def test_entries_stop_resting_at_the_sweep(tmp_path) -> None:
+    class Timed(FakeGateway):
+        def __init__(self, clock, **kw) -> None:
+            super().__init__(**kw)
+            self.clock, self.cancel_times = clock, []
+
+        def cancelOrder(self, order):
+            self.cancel_times.append(self.clock.now())
+            super().cancelOrder(order)
+
+    clock = FakeClock()
+    gw = Timed(clock, sell_fill={"C": 1.10}, buy_fill={"C": 1.20})  # put never sells
+    outcomes, _ = _run(tmp_path, [_leg("entry", "C"), _leg("entry", "P")], gw, clock=clock)
+    sched = ld.LadderSchedule.for_session(DAY)
+    assert gw.cancel_times[0] == sched.sweep_at
+    assert outcomes[0].status == "legged_flattened"
+
+
+def test_flatten_waits_for_a_slow_entry_cancel_on_the_same_contract(tmp_path) -> None:
+    # 2026-11-13 TSN: 3 of 5 puts sold; the remainder's cancel was still pending when
+    # the buy-back was sent, IB repriced it so as not to cross, and it never filled.
+    gw = SlowCancels(lag=20, put_partial=1, sell_fill={"C": 1.10}, buy_fill={"C": 1.20, "P": 1.20})
+    outcomes, events = _run(tmp_path, [_leg("entry", "C"), _leg("entry", "P")], gw)
+    buys = [(r, px) for r, a, px, _ in gw.placed if a == "BUY"]
+    assert {r for r, _ in buys} == {"C", "P"}
+    assert outcomes[0].status == "legged_flattened"
+    assert not events["reason"].fillna("").str.contains("not confirmed").any()
+
+
+def test_unconfirmed_entry_cancel_is_an_alarm(tmp_path) -> None:
+    gw = SlowCancels(lag=10_000, put_partial=1, sell_fill={"C": 1.10}, buy_fill={"C": 1.20})
+    outcomes, events = _run(tmp_path, [_leg("entry", "C"), _leg("entry", "P")], gw)
+    assert events["reason"].fillna("").str.contains("entry cancel not confirmed").any()
+    assert outcomes[0].status == "legged_open" and outcomes[0].alarm
+
+
+@pytest.mark.parametrize(
+    "cap, expected",
+    [(3.7, 3.6), (3.0, 2.95), (3.05, 3.0), (0.4, 0.35), (1.42, 1.4), (0.05, float("nan"))],
+)
+def test_under_price_cap_is_strictly_below_on_a_coarse_tick(cap, expected) -> None:
+    got = ld.under_price_cap(cap)
+    assert got == pytest.approx(expected, nan_ok=True)
+
+
+def test_price_cap_is_read_from_the_broker_message() -> None:
+    trade = SimpleNamespace(
+        log=[SimpleNamespace(message="more aggressive than 3.7. Please submit")]
+    )
+    assert ld.price_cap_from(trade) == pytest.approx(3.7)
+    assert ld.price_cap_from(SimpleNamespace(log=[SimpleNamespace(message="legal tick")])) is None
+
+
+def test_rejected_entry_leg_is_never_re_placed(tmp_path) -> None:
     class Rejecting(FakeGateway):
         def placeOrder(self, contract, order):
             trade = super().placeOrder(contract, order)
             if contract.right == "P":
                 trade.orderStatus.status = "Inactive"
-                trade.log = [SimpleNamespace(message="Order price is not a legal tick")]
             return trade
 
     gw = Rejecting()
-    _, events = _run(tmp_path, [_leg("exit", "C"), _leg("exit", "P")], gw)
+    _run(tmp_path, [_leg("entry", "C"), _leg("entry", "P")], gw)
     assert sum(1 for r, *_ in gw.placed if r == "P") == 1
-    rejects = events[events["event"] == "reject"]
-    assert len(rejects) == 1 and "legal tick" in rejects["reason"].iloc[0]
 
 
 # ── books ────────────────────────────────────────────────────────────────────
@@ -320,8 +603,9 @@ def test_no_bid_exit_leg_walks_from_one_tick_to_the_ask(tmp_path) -> None:
     gw = FakeGateway()
     _run(tmp_path, [_leg("exit", "P")], gw, quote_fn=_quotes({"P": (float("nan"), 0.05)}))
     prices = [px for _, _, px, _ in gw.placed]
-    assert prices[-1] == pytest.approx(0.05)
-    assert all(0.01 <= p <= 0.05 for p in prices)
+    assert prices[-2] == pytest.approx(0.05)  # the touch rung
+    assert all(0.01 <= p <= 0.05 for p in prices[:-1])
+    assert prices[-1] == pytest.approx(0.15)  # the sweep: the ask plus the 0.10 floor
 
 
 def test_sell_leg_with_no_bid_is_never_priced(tmp_path) -> None:

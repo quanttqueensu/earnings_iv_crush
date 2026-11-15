@@ -18,6 +18,7 @@ them as two single-leg SELL orders. Two safety properties:
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -166,14 +167,74 @@ def round_to_tick(
     return out
 
 
+POSITIONS_TIMEOUT_S = 20.0  # a fresh positions request answers in about a second; hang = fault
+
+
+def _fresh_positions(ib: IB) -> list:
+    """Positions as the broker reports them now, not the connect-time cache.
+
+    ``ib.positions()`` returns whatever the start-up sync delivered, and that sync
+    times out on some passes (the gateway logs "account updates ... timed out"), so
+    the cache can be empty while the account is short. Read from the cache, a real
+    position would look absent and its exit would be skipped as a mismatch. A
+    request that does not answer raises, so the exit fails loudly instead.
+    """
+    req = getattr(ib, "reqPositionsAsync", None)
+    if req is None:  # offline fakes expose only the cache
+        return list(ib.positions())
+    return list(ib.run(asyncio.wait_for(req(), POSITIONS_TIMEOUT_S)))
+
+
 def broker_short_qty(ib: IB, contract: Contract) -> int:
     """Signed position the broker holds in ``contract`` (negative when short)."""
     con_id = getattr(contract, "conId", None)
     total = 0
-    for p in ib.positions():
+    for p in _fresh_positions(ib):
         if getattr(p.contract, "conId", None) == con_id:
             total += int(p.position)
     return total
+
+
+def broker_option_positions(ib: IB) -> list[tuple[Contract, int]]:
+    """Every non-zero option position the broker reports now, as ``(contract, signed qty)``.
+
+    The session pass compares these with the ledger so a position the ledger does not
+    know (an entry whose booking was lost, a leg left by a failed flatten, a trade made
+    by hand) is reported instead of sitting in the account unseen.
+    """
+    out: list[tuple[Contract, int]] = []
+    for p in _fresh_positions(ib):
+        qty = int(p.position)
+        if qty != 0 and getattr(p.contract, "secType", "") == "OPT":
+            out.append((p.contract, qty))
+    return out
+
+
+OPEN_ORDERS_TIMEOUT_S = 20.0  # same reasoning as POSITIONS_TIMEOUT_S
+
+
+def cancel_resting_orders(ib: IB) -> list[str]:
+    """Cancel anything this client still has working at the broker and describe it.
+
+    Called after the ladder's own cancel. Nothing should be left, so every entry in
+    the returned list is a fault the caller raises as an alarm: an order resting past
+    the pass could fill with nobody watching and never be booked.
+    """
+    req = getattr(ib, "reqOpenOrdersAsync", None)
+    if req is None:  # offline fakes hold no order book of their own
+        return []
+    left: list[str] = []
+    for trade in ib.run(asyncio.wait_for(req(), OPEN_ORDERS_TIMEOUT_S)):
+        status = getattr(trade.orderStatus, "status", "")
+        if status in ("Filled", "Cancelled", "ApiCancelled", "Inactive"):
+            continue
+        c, o = trade.contract, trade.order
+        left.append(
+            f"{o.action} {o.totalQuantity:g} {getattr(c, 'localSymbol', '') or c.symbol} "
+            f"@ {o.lmtPrice:g} ({status})"
+        )
+        ib.cancelOrder(o)
+    return left
 
 
 def place_short_straddle(
