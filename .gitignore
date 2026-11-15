@@ -50,6 +50,13 @@ outputs/research/*
 # Their run logs (timestamp, event and scorer SHA-256 only), which the same test reads to check
 # that a pinned scorer is the code that produced the outcomes.
 !outputs/research/prereg_*.runs.jsonl
+# Every study's and programme's own code and reports (briefs, lane reports, reviews, freeze
+# notes), so a clone can read how each result was produced. Git descends only into folders that
+# are re-included, hence the folder line. Their data files stay ignored and come from the bucket.
+!outputs/research/**/
+!outputs/research/**/*.md
+!outputs/research/**/*.py
+outputs/research/**/__pycache__/
 
 # Python
 __pycache__/
