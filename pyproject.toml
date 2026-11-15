@@ -45,6 +45,9 @@ include = ["earnings_iv_crush*"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+# outputs/research holds each programme's scripts as they ran; their hashes are pinned in freeze
+# notes, so they are records, not code to restyle.
+extend-exclude = ["outputs"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B"]
@@ -69,6 +72,7 @@ known-first-party = ["earnings_iv_crush", "research", "scripts", "tests"]
 [tool.black]
 line-length = 100
 target-version = ["py310"]
+extend-exclude = "^/outputs/"
 
 [tool.mypy]
 # Match the version CI runs on (3.12): modern numpy ships stubs using 3.12-only
