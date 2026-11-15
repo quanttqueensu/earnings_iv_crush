@@ -12,6 +12,7 @@ backtest uses:
 15:50:00    rung 2, 50%
 15:52:30    rung 3, 75%
 15:55:00    rung 4, the touch (bid for a sell, ask for a buy)
+15:56:30    sweep: every unfilled exit leg is re-priced through the displayed ask
 15:58:00    cancel every working order; re-read status after the settle time
 15:59:00    NBBO of every leg, filled or not (the counterfactual basis)
 ==========  ===========================================================
@@ -21,12 +22,22 @@ Each rung re-quotes the open legs. A failed re-quote holds the resting order rat
 than walking a stale book, and a leg whose book is unusable is not priced. Every limit
 is rounded to a legal tick away from the far touch (``ib_orders.round_to_tick``).
 
+**Sweep.** The touch rung bids the displayed ask, which on a delayed feed is minutes
+old and can sit under the real offer. An exit left there is a short the rule no longer
+wants, and one leg of it is a naked short. So at ``exit_sweep_at`` every unfilled exit
+leg is re-priced once to the displayed ask plus a bounded allowance
+(:meth:`LegQuote.sweep_limit`), on a tick legal in every option class, and a leg whose
+order was rejected or cancelled with nothing filled gets one fresh order. IB's price
+protection cancels a limit it judges too far through the market and states the cap; such
+a sweep or flatten is re-placed once, one coarse tick under that cap. Entry legs never
+sweep: an unfilled sale costs nothing.
+
 **Legging.** An entry is complete only when both legs fill in full. If one leg (or
 part of one) fills and the other does not by the cancel time, the filled quantity is
-bought back at the touch before 15:59 and the event is reported ``legged_flattened``.
-An exit that ends incomplete is not forced: its working orders are cancelled and the
-caller raises an alarm, because a naked leg is closed by the next session's ladder or
-by the operator.
+bought back at the sweep price before 15:59 and the event is reported
+``legged_flattened``. An exit still incomplete after the sweep has its working orders
+cancelled and the caller raises an alarm; the next session's ladder buys back what is
+left (``session.plan_exit``).
 
 **Switches.** ``halted()`` is checked before every rung and before the flatten. When it
 returns ``True`` every working order is cancelled and nothing further is sent on any
@@ -42,6 +53,7 @@ tests against a fake gateway.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -54,6 +66,15 @@ from .ib_orders import round_to_tick
 from .order_events import OrderEventLog
 
 EXCHANGE_TZ = "America/New_York"
+# US equity options tick in 0.01 / 0.05 (penny programme) or 0.05 / 0.10 (the rest),
+# switching at 3.00. A multiple of the coarse pair is legal under both schedules.
+_TICK_BREAK = 3.0
+_COARSE_TICK_LOW = 0.05
+_COARSE_TICK_HIGH = 0.10
+# IB's price protection cancels a limit too far through the market (error 202) and states
+# the cap: "We cannot accept an order at a limit price at or more aggressive than 3.7."
+# The band is not published, so the sweep learns it from the cancel.
+_PRICE_CAP_RE = re.compile(r"more aggressive than\s+\$?(\d+(?:\.\d+)?)")
 
 
 # ── quotes ───────────────────────────────────────────────────────────────────
@@ -106,6 +127,44 @@ class LegQuote:
         mid = 0.5 * (bid + self.ask)
         raw = mid + frac * 0.5 * (self.ask - bid)
         return round_to_tick(raw, "BUY", None, self.ask)
+
+    def sweep_limit(self, frac: float, floor: float) -> float:
+        """Buy limit through the displayed ask by ``max(floor, frac * ask)`` per share.
+
+        Rounded up to 0.05 below 3.00 and to 0.10 at or above, the coarser of the two
+        listed tick schedules, so the order is legal whether or not the class is in
+        the penny programme and cannot be rejected for its tick.
+
+        Raises
+        ------
+        ValueError
+            If the book has no positive ask: a sweep is never priced off a hole.
+        """
+        if not self.usable_for("BUY"):
+            raise ValueError(f"Cannot price a sweep from bid {self.bid!r} ask {self.ask!r}.")
+        raw = self.ask + max(float(floor), float(frac) * self.ask)
+        tick = _COARSE_TICK_LOW if raw < _TICK_BREAK else _COARSE_TICK_HIGH
+        return float(round(np.ceil(raw / tick - 1e-9) * tick, 2))
+
+
+def under_price_cap(cap: float) -> float:
+    """Highest coarse-tick price strictly below a broker price cap (``nan`` if none).
+
+    The cap is exclusive ("at or more aggressive than"), so a price on the cap itself
+    is refused again.
+    """
+    tick = _COARSE_TICK_LOW if cap <= _TICK_BREAK else _COARSE_TICK_HIGH
+    px = float(round((np.ceil(cap / tick - 1e-9) - 1) * tick, 2))
+    return px if px > 0 else float("nan")
+
+
+def price_cap_from(trade: Any) -> float | None:
+    """The price cap stated in a trade's log by an IB price-protection cancel, if any."""
+    for entry in reversed(list(getattr(trade, "log", []) or [])):
+        m = _PRICE_CAP_RE.search(str(getattr(entry, "message", "") or ""))
+        if m:
+            return float(m.group(1))
+    return None
 
 
 # ── legs ─────────────────────────────────────────────────────────────────────
@@ -210,6 +269,7 @@ class LadderSchedule:
     cancel_at: pd.Timestamp
     nbbo_at: pd.Timestamp
     latest_start: pd.Timestamp
+    sweep_at: pd.Timestamp | None = None
 
     @classmethod
     def for_session(cls, session_date: pd.Timestamp, config: Any = LIVE) -> LadderSchedule:
@@ -220,13 +280,15 @@ class LadderSchedule:
             return pd.Timestamp(f"{day} {hhmmss}", tz=EXCHANGE_TZ)
 
         rungs = tuple((at(t), float(f)) for t, f in config.ladder_rungs)
+        sweep_at = at(config.exit_sweep_at)
         sched = cls(
             rungs=rungs,
             cancel_at=at(config.ladder_cancel_at),
             nbbo_at=at(config.ladder_nbbo_at),
             latest_start=at(config.ladder_latest_start),
+            sweep_at=sweep_at,
         )
-        times = [t for t, _ in rungs] + [sched.cancel_at, sched.nbbo_at]
+        times = [t for t, _ in rungs] + [sweep_at, sched.cancel_at, sched.nbbo_at]
         if any(b <= a for a, b in zip(times, times[1:], strict=False)):
             raise ValueError("Ladder times must be strictly increasing.")
         return sched
@@ -350,6 +412,7 @@ def _place(
     *,
     transmit: bool,
     quote: LegQuote,
+    reason: str | None = None,
 ) -> None:
     """Submit or modify one leg's limit, logging the intent before sending it.
 
@@ -370,6 +433,11 @@ def _place(
         if leg.order is None:
             leg.order = LimitOrder(leg.side, qty, float(limit))
             leg.order.transmit = True
+            # Stated, not left to the account preset: when the preset fills it in,
+            # the gateway answers with notice 10349 and ib_async marks the live
+            # order Cancelled locally, which would stop the ladder working it and,
+            # at the cancel time, stop it being cancelled.
+            leg.order.tif = "DAY"
             # Reserve the id now so the submit row, written before sending, carries
             # it; ib_async's placeOrder keeps an id that is already set.
             leg.order.orderId = ib.client.getReqId()
@@ -388,6 +456,7 @@ def _place(
         nbbo_ask_size=quote.ask_size,
         nbbo_ts_utc=quote.ts.isoformat() if quote.ts is not None else None,
         status="intent" if not transmit else None,
+        reason=reason,
     )
     if transmit:
         leg.trade = ib.placeOrder(leg.contract, leg.order)
@@ -396,10 +465,52 @@ def _place(
 
 
 def _cancel_working(ib: Any, legs: Iterable[LadderLeg], log: OrderEventLog) -> None:
+    # An order already PendingCancel is not cancelled twice: the broker answers a
+    # second cancel with an error, and ib_async marks any order error Cancelled,
+    # which would let the ladder act on an order the broker has not yet confirmed.
     for leg in legs:
-        if leg.working():
+        if leg.working() and not _pending_cancel(leg):
             log.record("cancel_req", **leg.base_fields(), limit_price=leg.limit_price)
             ib.cancelOrder(leg.order)
+
+
+def _pending_cancel(leg: LadderLeg) -> bool:
+    status = getattr(getattr(leg.trade, "orderStatus", None), "status", "")
+    return leg.trade is not None and status == "PendingCancel"
+
+
+def _await_status(
+    ib: Any,
+    legs: list[LadderLeg],
+    log: OrderEventLog,
+    pending: Callable[[LadderLeg], bool],
+    *,
+    timeout_s: float,
+    poll_s: float,
+) -> list[LadderLeg]:
+    """Re-read status until no leg is ``pending`` or ``timeout_s`` has passed.
+
+    A cancel is not final until the broker confirms it, and on the paper account that
+    took over a minute near the close. Acting on an order still being cancelled
+    either skips it (the price-cap re-price) or crosses it (a flatten on the same
+    contract, which IB reprices so as not to trade against the resting order).
+
+    Returns
+    -------
+    list of LadderLeg
+        The legs still pending when the wait ended.
+    """
+    if poll_s <= 0:
+        raise ValueError(f"poll_s must be positive, got {poll_s!r}")
+    waited = 0.0
+    while True:
+        for leg in legs:
+            _observe(leg, log)
+        left = [leg for leg in legs if pending(leg)]
+        if not left or waited >= timeout_s:
+            return left
+        ib.sleep(poll_s)
+        waited += poll_s
 
 
 def run_ladder(
@@ -413,6 +524,10 @@ def run_ladder(
     transmit: bool,
     halted: Callable[[], bool] = lambda: False,
     settle_s: float = LIVE.exit_cancel_settle_s,
+    sweep_frac: float = LIVE.exit_sweep_frac,
+    sweep_min: float = LIVE.exit_sweep_min,
+    confirm_s: float = LIVE.cancel_confirm_s,
+    confirm_poll_s: float = LIVE.cancel_confirm_poll_s,
 ) -> list[GroupOutcome]:
     """Work every leg through the rung schedule and report each group's outcome.
 
@@ -438,6 +553,12 @@ def run_ladder(
     settle_s : float, optional
         Seconds to wait after cancelling before re-reading status, because a fill can
         reach the exchange ahead of the cancel.
+    sweep_frac, sweep_min : float, optional
+        Allowance of the exit sweep and the flatten above the displayed ask
+        (:meth:`LegQuote.sweep_limit`).
+    confirm_s, confirm_poll_s : float, optional
+        Longest wait, and poll interval, for the broker to confirm a cancel before
+        the ladder acts on that order (:func:`_await_status`).
 
     Returns
     -------
@@ -495,6 +616,33 @@ def run_ladder(
                     ib, leg, q.limit(leg.side, frac), rung, frac, log, transmit=transmit, quote=q
                 )
 
+        if not was_halted and schedule.sweep_at is not None:
+            clock.wait_until(schedule.sweep_at)
+            for leg in legs:
+                _observe(leg, log)
+            if halted():
+                was_halted = True
+                log.record("halt", reason="HALT present before the sweep; cancelling all")
+                _cancel_working(ib, legs, log)
+            else:
+                # Entries stop resting here, not at the cancel time, so that the
+                # broker has confirmed every entry cancel before a legged entry is
+                # flattened at 15:58. No entry fill in the book has come after 15:55.
+                _cancel_working(ib, [leg for leg in legs if leg.purpose == "entry"], log)
+                _sweep(
+                    ib,
+                    legs,
+                    quote_fn,
+                    log,
+                    rung=len(schedule.rungs),
+                    transmit=transmit,
+                    frac=sweep_frac,
+                    floor=sweep_min,
+                    settle_s=settle_s,
+                    confirm_s=confirm_s,
+                    confirm_poll_s=confirm_poll_s,
+                )
+
         if not was_halted:
             clock.wait_until(schedule.cancel_at)
         for leg in legs:
@@ -502,6 +650,21 @@ def run_ladder(
         _cancel_working(ib, legs, log)
         if transmit:
             ib.sleep(settle_s)
+            entries = [leg for leg in legs if leg.purpose == "entry"]
+            for leg in _await_status(
+                ib,
+                entries,
+                log,
+                LadderLeg.working,
+                timeout_s=confirm_s,
+                poll_s=confirm_poll_s,
+            ):
+                log.record(
+                    "alarm",
+                    **leg.base_fields(),
+                    reason=f"entry cancel not confirmed after {confirm_s:g} s; "
+                    "a flatten on this contract may be repriced by the broker",
+                )
         for leg in legs:
             _observe(leg, log)
 
@@ -515,6 +678,10 @@ def run_ladder(
             transmit=transmit,
             halted=was_halted or halted(),
             settle_s=settle_s,
+            sweep_frac=sweep_frac,
+            sweep_min=sweep_min,
+            confirm_s=confirm_s,
+            confirm_poll_s=confirm_poll_s,
         )
 
         clock.wait_until(schedule.nbbo_at)
@@ -539,6 +706,113 @@ def run_ladder(
     return _outcomes(legs, flatten_legs, final)
 
 
+def _sweep(
+    ib: Any,
+    legs: list[LadderLeg],
+    quote_fn: QuoteFn,
+    log: OrderEventLog,
+    *,
+    rung: int,
+    transmit: bool,
+    frac: float,
+    floor: float,
+    settle_s: float = 0.0,
+    confirm_s: float = 0.0,
+    confirm_poll_s: float = 1.0,
+) -> None:
+    """Re-price every unfilled exit leg once through the displayed ask.
+
+    A leg that cannot be re-quoted is priced from the last book this ladder read for
+    it, because holding at a stale touch is what leaves the short open; a leg that
+    was never quoted is not priced and is logged as an alarm. A leg whose order ended
+    with nothing filled (a reject, or a cancel the ladder did not ask for) gets one
+    fresh order. One that ended partly filled is left alone: its remainder is the next
+    session's to buy, from the fills in the log. A sweep the broker then cancels for
+    price protection is re-placed once under the cap it states (``_retry_under_cap``).
+    """
+    targets = [leg for leg in legs if leg.purpose == "exit" and not leg.done]
+    if not targets:
+        return
+    quotes = quote_fn(targets)
+    for leg in targets:
+        q = quotes.get(leg.key)
+        stale = q is None or not q.usable_for("BUY")
+        if stale:
+            q = leg.last_quote
+        if q is None or not q.usable_for("BUY"):
+            log.record("alarm", **leg.base_fields(), rung=rung, reason="exit sweep: no book")
+            continue
+        leg.last_quote = q
+        if leg.trade is not None and not leg.working():
+            if leg.filled_qty > 0:
+                log.record(
+                    "alarm",
+                    **leg.base_fields(),
+                    rung=rung,
+                    reason="exit sweep: order ended partly filled; remainder left open",
+                )
+                continue
+            leg.order, leg.trade = None, None
+            leg.limit_price, leg.last_status = float("nan"), ""
+        _place(
+            ib,
+            leg,
+            q.sweep_limit(frac, floor),
+            rung,
+            1.0,
+            log,
+            transmit=transmit,
+            quote=q,
+            reason="sweep through the ask" + (" (last book read)" if stale else ""),
+        )
+    if transmit:
+        ib.sleep(settle_s)
+        # A price-protection cancel shows PendingCancel before the broker's message
+        # arrives; re-pricing is decided only once it has.
+        _await_status(ib, targets, log, _pending_cancel, timeout_s=confirm_s, poll_s=confirm_poll_s)
+        _retry_under_cap(ib, targets, log, rung=rung, reason="sweep")
+
+
+def _retry_under_cap(
+    ib: Any, legs: list[LadderLeg], log: OrderEventLog, *, rung: int, reason: str
+) -> None:
+    """Re-place, once, a buy the broker cancelled for being too far through the market.
+
+    Only an order that ended with nothing filled is re-placed, one coarse tick under the
+    cap the broker stated; a partly filled one is left to the next session, as in the
+    sweep, because a fresh order for the full quantity would over-buy.
+    """
+    for leg in legs:
+        _observe(leg, log)
+        if leg.trade is None or leg.working() or leg.done:
+            continue
+        cap = price_cap_from(leg.trade)
+        if cap is None:
+            continue
+        px = under_price_cap(cap)
+        if leg.filled_qty > 0 or not np.isfinite(px) or leg.last_quote is None:
+            log.record(
+                "alarm",
+                **leg.base_fields(),
+                rung=rung,
+                reason=f"{reason}: cancelled at the broker price cap {cap}; not re-placed",
+            )
+            continue
+        leg.order, leg.trade = None, None
+        leg.limit_price, leg.last_status = float("nan"), ""
+        _place(
+            ib,
+            leg,
+            px,
+            rung,
+            1.0,
+            log,
+            transmit=True,
+            quote=leg.last_quote,
+            reason=f"{reason} re-priced under the broker price cap {cap}",
+        )
+
+
 def _flatten(
     ib: Any,
     legs: list[LadderLeg],
@@ -550,8 +824,12 @@ def _flatten(
     transmit: bool,
     halted: bool,
     settle_s: float,
+    sweep_frac: float,
+    sweep_min: float,
+    confirm_s: float = 0.0,
+    confirm_poll_s: float = 1.0,
 ) -> dict[str, LadderLeg]:
-    """Buy back the filled quantity of every legged entry at the touch.
+    """Buy back the filled quantity of every legged entry at the sweep price.
 
     Returns the flatten legs by group so the outcome can tell a repaired legging from
     an open one. With ``halted`` set nothing is sent, and the legging is reported open.
@@ -590,9 +868,23 @@ def _flatten(
         if q is None or not q.usable_for("BUY"):
             log.record("alarm", **probe.base_fields(), reason="legged entry: no book to flatten")
             continue
+        # The same stale-ask problem as an exit, with one attempt and under a minute
+        # left: priced through the ask so the naked leg is actually closed.
         _place(
-            ib, probe, q.limit("BUY", 1.0), len(schedule.rungs), 1.0, log, transmit=True, quote=q
+            ib,
+            probe,
+            q.sweep_limit(sweep_frac, sweep_min),
+            len(schedule.rungs) + 1,
+            1.0,
+            log,
+            transmit=True,
+            quote=q,
+            reason="flatten through the ask",
         )
+        probe.last_quote = q
+    ib.sleep(settle_s)
+    _await_status(ib, probes, log, _pending_cancel, timeout_s=confirm_s, poll_s=confirm_poll_s)
+    _retry_under_cap(ib, probes, log, rung=len(schedule.rungs) + 1, reason="flatten")
     clock.wait_until(schedule.nbbo_at - pd.Timedelta(seconds=10))
     for probe in probes:
         _observe(probe, log)

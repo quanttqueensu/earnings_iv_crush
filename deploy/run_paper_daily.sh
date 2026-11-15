@@ -63,8 +63,10 @@ done
 log "Gateway logged in."
 
 transmit=""
+report_mode="--dry"
 if [ -f "$CONTROL/TRANSMIT_OK" ]; then
     transmit="--transmit"
+    report_mode=""
     log "TRANSMIT_OK present: orders will be transmitted to the PAPER account."
 else
     log "Dry-run mode (touch $CONTROL/TRANSMIT_OK to transmit paper orders)."
@@ -85,6 +87,15 @@ log "-- significance report --"
 timeout --kill-after=30 600 python scripts/forward_report.py \
     --out "$CONTROL/reports/forward_report.md" >>"$LOG" 2>&1 \
     || { log "report exit $?"; status=1; }
+
+# Shadow book: the hedged-exit alternative and the G1 flag beside every closed trade.
+# Read-only on the stores and never connects to the gateway; a failure here is
+# reported but cannot touch an order.
+log "-- shadow book --"
+shadow_mode=""
+[ -z "$transmit" ] && shadow_mode="--dry"
+timeout --kill-after=30 600 python -m scripts.shadow_book $shadow_mode >>"$LOG" 2>&1 \
+    || { log "shadow book exit $?"; status=1; }
 
 # An entry pass where candidates were seen and none priced is a data fault the
 # harness flags with ALARM while still exiting 0; surface it as a failure.

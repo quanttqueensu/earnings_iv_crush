@@ -56,7 +56,7 @@ from .ladder import (
     LegQuote,
     run_ladder,
 )
-from .order_events import OrderEventLog, position_key
+from .order_events import OrderEventLog, load_order_events, position_key, prior_exit_fills
 
 R = GLOBAL.risk_free_rate
 MULT = GLOBAL.contract_multiplier
@@ -360,6 +360,9 @@ class EntryPlan:
     put: Any
     implied_move: float
     calendar_detail: str = ""
+    # Record-only entry features for the forward gate study; never used to select.
+    iv_term_spread_nearest: float = float("nan")
+    entry_rel_spread: float = float("nan")
 
     @property
     def key(self) -> str:
@@ -375,14 +378,24 @@ class ExitPlan:
     iv_exit: float
     t_exit: float
     extra: dict[str, Any] = field(default_factory=dict)
+    # Contracts and average price already bought back per leg by an earlier session's
+    # incomplete exit (``order_events.prior_exit_fills``); empty for a first attempt.
+    prior: dict[str, tuple[int, float]] = field(default_factory=dict)
 
     @property
     def key(self) -> str:
-        p = self.position
-        return str(
-            p.get("position_key")
-            or position_key(p["ticker"], p["entry_date"], float(p["strike"]), p["front_expiry"])
-        )
+        return _position_key(self.position)
+
+    def remaining(self, right: str) -> int:
+        """Contracts still to buy back on one leg."""
+        return int(self.position["contracts"]) - self.prior.get(right, (0, 0.0))[0]
+
+
+def _position_key(p: pd.Series) -> str:
+    return str(
+        p.get("position_key")
+        or position_key(p["ticker"], p["entry_date"], float(p["strike"]), p["front_expiry"])
+    )
 
 
 def _leg_mid(chain: pd.DataFrame, expiry: pd.Timestamp, strike: float, right: str) -> float:
@@ -399,6 +412,79 @@ def _leg_mid(chain: pd.DataFrame, expiry: pd.Timestamp, strike: float, right: st
     return 0.5 * (bid + ask)
 
 
+def _leg_quote(chain: pd.DataFrame, expiry: pd.Timestamp, strike: float) -> StraddleQuote | None:
+    """Two-sided bid and ask of both legs at one strike, or None."""
+    legs = {}
+    for right in ("C", "P"):
+        rows = chain[
+            (pd.to_datetime(chain["expiry"]) == expiry)
+            & np.isclose(chain["strike"].astype(float), strike)
+            & (chain["right"] == right)
+        ]
+        if rows.empty:
+            return None
+        bid, ask = float(rows["bid"].iloc[0]), float(rows["ask"].iloc[0])
+        if not (np.isfinite(bid) and np.isfinite(ask) and ask >= bid > 0):
+            return None
+        legs[right] = (bid, ask)
+    return StraddleQuote(legs["C"][0], legs["C"][1], legs["P"][0], legs["P"][1])
+
+
+def _atm_iv_at(chain: pd.DataFrame, expiry: pd.Timestamp, spot: float, asof: pd.Timestamp) -> float:
+    """ATM implied volatility of one expiry: the feed's, else solved from the leg mids."""
+    strike = float(nearest_strike(chain, expiry, spot))
+    if not np.isfinite(strike):
+        return float("nan")
+    iv = float(atm_iv(chain, expiry, strike))
+    if np.isfinite(iv):
+        return iv
+    t = max((expiry - asof).days, 1) / 365.0
+    ivs = [
+        implied_vol(_leg_mid(chain, expiry, strike, r), spot, strike, t, R, r) for r in ("C", "P")
+    ]
+    finite = [x for x in ivs if x is not None and np.isfinite(x)]
+    return float(np.mean(finite)) if finite else float("nan")
+
+
+def term_spread_nearest(
+    ib: Any,
+    underlying: Any,
+    expiries: list[pd.Timestamp],
+    strikes: list[float],
+    spot: float,
+    asof: pd.Timestamp,
+    front_chain: pd.DataFrame,
+    front_expiry: pd.Timestamp,
+) -> float:
+    """Front-minus-back ATM IV on the nearest expiries as of the entry day.
+
+    The panel definition (``data.features.nearest_expiries`` with ``asof``): front is the
+    first expiry after the entry date, back the first at least
+    ``GLOBAL.back_month_min_gap_days`` beyond it, else the latest listed. Record-only:
+    any failure returns NaN and never skips the trade.
+    """
+    try:
+        after = sorted(e for e in expiries if e > asof.normalize())
+        if len(after) < 2:
+            return float("nan")
+        n_front = after[0]
+        gap = pd.Timedelta(days=GLOBAL.back_month_min_gap_days)
+        n_back = next((e for e in after[1:] if e >= n_front + gap), after[-1])
+        near = sorted(sorted(strikes, key=lambda k: abs(k - spot))[:2])
+        ivs = []
+        for e in (n_front, n_back):
+            ch = (
+                front_chain
+                if e == front_expiry
+                else ib_market.snapshot_strikes(ib, underlying, e, near)
+            )
+            ivs.append(_atm_iv_at(ch, e, spot, asof) if not ch.empty else float("nan"))
+        return float(ivs[0] - ivs[1])
+    except Exception as exc:  # noqa: BLE001 - a feature request must never block a trade
+        print(f"  term spread unavailable for {getattr(underlying, 'contract', '?')}: {exc!r}")
+        return float("nan")
+
+
 def plan_entry(
     ib: Any,
     cand: pd.Series,
@@ -412,8 +498,9 @@ def plan_entry(
     try:
         underlying = ib_market.qualify_underlying(ib, ticker)
         expiries, strikes = ib_market.option_grid(ib, underlying)
-    except (ValueError, RuntimeError):
-        return "unpriced"
+    except (ValueError, RuntimeError) as exc:
+        print(f"  {ticker}: no underlying or option grid ({exc}).")
+        return "unpriced:underlying"
     later = [e for e in expiries if e > exit_date]
     if not later:
         return "expiry_le_exit"
@@ -422,13 +509,22 @@ def plan_entry(
     near = sorted(sorted(strikes, key=lambda k: abs(k - spot))[:STRIKES_AROUND_SPOT])
     chain = ib_market.snapshot_strikes(ib, underlying, expiry, near)
     if chain.empty:
-        return "unpriced"
+        return "unpriced:no_chain"
     strike = float(nearest_strike(chain, expiry, spot))
     if not np.isfinite(strike):
-        return "unpriced"
+        return "unpriced:no_atm_strike"
     call_mid, put_mid = (_leg_mid(chain, expiry, strike, r) for r in ("C", "P"))
     if not (np.isfinite(call_mid) and np.isfinite(put_mid)):
-        return "unpriced"
+        # A snapshot can return before a slow delayed tick lands, so the pair is asked
+        # for once more on its own before the name is given up. A book that is still
+        # one-sided stays unpriced: a one-sided quote never becomes a mid.
+        again = ib_market.snapshot_strikes(ib, underlying, expiry, [strike])
+        if not again.empty:
+            chain = again
+            call_mid, put_mid = (_leg_mid(chain, expiry, strike, r) for r in ("C", "P"))
+    if not (np.isfinite(call_mid) and np.isfinite(put_mid)):
+        print(f"  {ticker}: no two-sided quote on the {strike:g} pair exp {expiry.date()}.")
+        return "unpriced:one_sided_atm"
     t_entry = max((expiry - asof).days, 1) / 365.0
     iv = float(atm_iv(chain, expiry, strike))
     if not np.isfinite(iv):
@@ -438,7 +534,7 @@ def plan_entry(
         ]
         iv = float(np.nanmean([x for x in ivs if x is not None]))
     if not np.isfinite(iv):
-        return "unpriced"
+        return "unpriced:no_iv"
 
     sources = (exdiv_sources or _exdiv_sources)(ib, underlying, ticker)
     ok, reason = exdiv_decision(sources, asof, exit_date)
@@ -454,7 +550,8 @@ def plan_entry(
     try:
         call, put = ib_orders.qualify_straddle_legs(ib, underlying.contract.symbol, strike, expiry)
     except ValueError:
-        return "unpriced"
+        return "unpriced:legs_unqualified"
+    entry_quote = _leg_quote(chain, expiry, strike)
     return EntryPlan(
         ticker=ticker,
         announce_date=pd.Timestamp(cand["announce_date"]),
@@ -471,6 +568,10 @@ def plan_entry(
         put=put,
         implied_move=(call_mid + put_mid) / spot,
         calendar_detail=str(cand.get("detail", "")),
+        iv_term_spread_nearest=term_spread_nearest(
+            ib, underlying, list(expiries), list(strikes), spot, asof, chain, expiry
+        ),
+        entry_rel_spread=entry_quote.relative_spread if entry_quote else float("nan"),
     )
 
 
@@ -482,8 +583,25 @@ def _exdiv_sources(ib: Any, underlying: Any, ticker: str) -> dict[str, Any]:
     return {"ib": ib_date, "yahoo": _yahoo_exdiv(ticker)}
 
 
-def plan_exit(ib: Any, pos: pd.Series, asof: pd.Timestamp, *, transmit: bool) -> ExitPlan | str:
-    """Qualify the stored contracts of one due position, or return why it cannot exit."""
+def plan_exit(
+    ib: Any,
+    pos: pd.Series,
+    asof: pd.Timestamp,
+    *,
+    transmit: bool,
+    order_events_path: str | Path | None = None,
+) -> ExitPlan | str:
+    """Qualify the stored contracts of one due position, or return why it cannot exit.
+
+    A transmitting exit is sent only when the broker's position is explained. A leg no
+    earlier exit touched must still be short the full ledger quantity. A leg an earlier
+    incomplete exit partly or wholly bought back (its fills are in the order-event log
+    at ``order_events_path``) must be short exactly the remainder, and only that
+    remainder is worked. Anything else, including a leg closed outside the harness and
+    not yet recorded with :func:`record_manual_exit_fill`, is a ``broker_mismatch`` and
+    nothing is sent. When the log already accounts for both legs in full the plan has no
+    legs left to work, and the pass books it without sending an order.
+    """
     ticker = str(pos["ticker"])
     strike = float(pos["strike"])
     expiry = pd.Timestamp(pos["front_expiry"])
@@ -492,11 +610,27 @@ def plan_exit(ib: Any, pos: pd.Series, asof: pd.Timestamp, *, transmit: bool) ->
         call, put = ib_orders.qualify_straddle_legs(ib, underlying.contract.symbol, strike, expiry)
     except (ValueError, RuntimeError) as exc:
         return f"unqualified: {exc}"
+    prior: dict[str, tuple[int, float]] = {}
     if transmit:
         need = int(pos["contracts"])
+        if order_events_path is not None:
+            try:
+                prior = prior_exit_fills(load_order_events(order_events_path), _position_key(pos))
+            except ValueError as exc:
+                return f"prior_fills_unreadable: {exc}"
         held = {c.right: ib_orders.broker_short_qty(ib, c) for c in (call, put)}
-        if any(q > -need for q in held.values()):
-            return f"broker_mismatch: broker holds {held}, ledger expects -{need} per leg"
+        for right in ("C", "P"):
+            done = prior.get(right, (0, 0.0))[0]
+            left = need - done
+            # An untouched leg keeps the original test (short at least the ledger
+            # quantity); a resumed leg must reconcile to the contract.
+            explained = held[right] == -left if done else held[right] <= -need
+            if left < 0 or not explained:
+                bought = {r: q for r, (q, _) in prior.items()}
+                return (
+                    f"broker_mismatch: broker holds {held}, ledger expects -{need} per leg, "
+                    f"earlier exit fills bought {bought or 'nothing'}"
+                )
     chain = ib_market.snapshot_strikes(ib, underlying, expiry, [strike])
     iv_exit = float(atm_iv(chain, expiry, strike)) if not chain.empty else float("nan")
     return ExitPlan(
@@ -506,6 +640,7 @@ def plan_exit(ib: Any, pos: pd.Series, asof: pd.Timestamp, *, transmit: bool) ->
         spot=float(underlying.spot),
         iv_exit=iv_exit,
         t_exit=max((expiry - asof).days, 0) / 365.0,
+        prior=prior,
     )
 
 
@@ -538,11 +673,12 @@ def _legs_for_exit(plan: ExitPlan) -> list[LadderLeg]:
             side="BUY",
             right=right,
             contract=contract,
-            quantity=int(pos["contracts"]),
+            quantity=plan.remaining(right),
             strike=float(pos["strike"]),
             expiry=pd.Timestamp(pos["front_expiry"]),
         )
         for right, contract in (("C", plan.call), ("P", plan.put))
+        if plan.remaining(right) > 0
     ]
 
 
@@ -556,14 +692,6 @@ def _mid_1559(outcome: GroupOutcome) -> float:
             return float("nan")
         mids.append(0.5 * (q.bid + q.ask))
     return float(sum(mids))
-
-
-def _straddle_quote(outcome: GroupOutcome) -> StraddleQuote | None:
-    legs = {leg.right: (outcome.nbbo_1559.get(leg.right) or leg.last_quote) for leg in outcome.legs}
-    c, p = legs.get("C"), legs.get("P")
-    if c is None or p is None:
-        return None
-    return StraddleQuote(call_bid=c.bid, call_ask=c.ask, put_bid=p.bid, put_ask=p.ask)
 
 
 def _book_entry(plan: EntryPlan, outcome: GroupOutcome, stores: Stores, transmit: bool) -> str:
@@ -599,6 +727,8 @@ def _book_entry(plan: EntryPlan, outcome: GroupOutcome, stores: Stores, transmit
             ),
             "selection_rule": "unconditional",
             "implied_move": plan.implied_move,
+            "iv_term_spread_nearest": plan.iv_term_spread_nearest,
+            "entry_rel_spread": plan.entry_rel_spread,
             "entry_mid_ps": _mid_1559(outcome),
             "entry_fill_ps": float(credit_ps),
             "transmitted": bool(transmit),
@@ -609,18 +739,63 @@ def _book_entry(plan: EntryPlan, outcome: GroupOutcome, stores: Stores, transmit
     return "filled" if transmit else "dry_booked_at_mid"
 
 
+def _exit_fill_ps(plan: ExitPlan, outcome: GroupOutcome) -> float:
+    """Per-share straddle buy-back price over every session that worked the exit.
+
+    A first-attempt exit is the ladder's own figure. A resumed exit blends each leg's
+    earlier fills with this session's by quantity, so the booked price is what was
+    actually paid for the whole straddle, not for the legs that happened to trade today.
+    """
+    if not plan.prior or outcome.status != "filled":
+        return outcome.fill_ps
+    need = int(plan.position["contracts"])
+    today = {leg.right: leg for leg in outcome.legs}
+    total = 0.0
+    for right in ("C", "P"):
+        qty, px = plan.prior.get(right, (0, 0.0))
+        paid = qty * px
+        leg = today.get(right)
+        if leg is not None:
+            paid += leg.filled_qty * leg.avg_fill
+            qty += leg.filled_qty
+        if qty != need:
+            raise RuntimeError(
+                f"{plan.key} leg {right}: fills cover {qty} of {need} contracts; not booking"
+            )
+        total += paid / need
+    return float(total)
+
+
+def _exit_resume_note(plan: ExitPlan) -> str:
+    """Intended-trades reason text recording what an earlier session already closed."""
+    if not plan.prior:
+        return ""
+    parts = [f"{r} {q}@{px:.4g}" for r, (q, px) in sorted(plan.prior.items())]
+    return "resumed_exit: earlier fills " + ", ".join(parts)
+
+
 def _book_exit(
     plan: ExitPlan, outcome: GroupOutcome, stores: Stores, transmit: bool, asof: pd.Timestamp
 ) -> str:
     if transmit and outcome.status != "filled":
         return outcome.status
-    quote = _straddle_quote(outcome)
-    if quote is None:
+    fill_ps = _exit_fill_ps(plan, outcome)
+    quotes: dict[str, LegQuote | None] = {
+        leg.right: (outcome.nbbo_1559.get(leg.right) or leg.last_quote) for leg in outcome.legs
+    }
+    for right, (_, px) in plan.prior.items():
+        # A leg closed in an earlier session has no quote today; its own fill stands
+        # in on both sides, so it adds nothing to the measured spread or slippage.
+        quotes.setdefault(right, LegQuote(px, px))
+    c, p = quotes.get("C"), quotes.get("P")
+    if c is None or p is None:
         if not transmit:
             return "unquoted"
         fills = {leg.right: leg.avg_fill for leg in outcome.legs}
-        quote = StraddleQuote(fills["C"], fills["C"], fills["P"], fills["P"])
-    max_rung = max((leg.rung or 0) for leg in outcome.legs)
+        c = c or LegQuote(fills["C"], fills["C"])
+        p = p or LegQuote(fills["P"], fills["P"])
+    quote = StraddleQuote(call_bid=c.bid, call_ask=c.ask, put_bid=p.bid, put_ask=p.ask)
+    max_rung = max(((leg.rung or 0) for leg in outcome.legs), default=0)
     paper_book.forward_exit_from_quote(
         plan.position,
         quote,
@@ -628,8 +803,9 @@ def _book_exit(
         iv_exit=plan.iv_exit,
         exit_date=asof,
         t_exit=plan.t_exit,
-        filled_at_limit=max_rung < len(LIVE.ladder_rungs) - 1,
-        transmitted_fill_ps=outcome.fill_ps if transmit else None,
+        # An exit that needed a second session did not fill at a mid-seeking rung.
+        filled_at_limit=not plan.prior and max_rung < len(LIVE.ladder_rungs) - 1,
+        transmitted_fill_ps=fill_ps if transmit else None,
         nostop_path=stores.nostop,
         stop_path=stores.stop,
         reconciliation_path=stores.reconciliation,
@@ -652,6 +828,52 @@ class SessionResult:
 def _alarm(alarms: list[str], text: str) -> None:
     alarms.append(text)
     print(f"  ALARM: {text}")
+
+
+# IB error 10197, "No market data during competing live session": the paper login
+# shares its market data with the live login of the same user, and loses it while
+# that user is signed in elsewhere. Quotes then come back empty for the whole pass.
+COMPETING_SESSION_ERROR = 10197
+
+
+def _leg_ident(symbol: Any, strike: Any, expiry: Any, right: Any) -> tuple[str, float, str, str]:
+    """Contract identity that needs no gateway round trip and survives expiry."""
+    return (
+        str(symbol).replace("-", " ").upper(),
+        round(float(strike), 4),
+        pd.Timestamp(str(expiry)).strftime("%Y%m%d"),
+        str(right).upper()[:1],
+    )
+
+
+def _orphan_positions(ib: Any, book: pd.DataFrame) -> list[str]:
+    """Option positions at the broker that no open ledger position accounts for."""
+    known = {
+        _leg_ident(pos["ticker"], pos["strike"], pos["front_expiry"], right)
+        for _, pos in book.iterrows()
+        for right in ("C", "P")
+    }
+    out = []
+    for contract, qty in ib_orders.broker_option_positions(ib):
+        ident = _leg_ident(
+            contract.symbol, contract.strike, contract.lastTradeDateOrContractMonth, contract.right
+        )
+        if ident not in known:
+            name = getattr(contract, "localSymbol", "") or " ".join(map(str, ident))
+            out.append(f"broker holds {qty:+d} {name}, which no open ledger position explains")
+    return out
+
+
+def _closed_outcome(plan: ExitPlan) -> GroupOutcome:
+    """Outcome of an exit whose legs were all bought back before this pass."""
+    return GroupOutcome(
+        group=f"{plan.key}:exit",
+        purpose="exit",
+        status="filled",
+        fill_ps=float("nan"),
+        legs=(),
+        nbbo_1559={},
+    )
 
 
 def run_session(
@@ -741,12 +963,26 @@ def run_session(
         from .ib_connection import connect_paper
 
         ib = connect_paper()
+    error_codes: set[int] = set()
+
+    def _on_error(_req_id: int, code: int, *_rest: Any) -> None:
+        error_codes.add(int(code))
+
+    error_event = getattr(ib, "errorEvent", None)
+    if error_event is not None:
+        error_event += _on_error
     try:
         clock = clock or IBClock(ib)
         quote_fn = quote_fn or (lambda legs: ib_market.quote_legs(ib, legs))
 
         # Exits first: they are planned even when STOP blocks entries.
         book = paper_book.load_open_positions(stores.open_positions)
+        if transmit:
+            try:
+                for text in _orphan_positions(ib, book):
+                    _alarm(alarms, text)
+            except Exception as exc:  # noqa: BLE001 - reported; the pass still exits what it can
+                _alarm(alarms, f"broker positions unreadable for the ledger check ({exc!r}).")
         due = (
             book[pd.to_datetime(book["exit_date"]).dt.normalize() <= asof]
             if not book.empty
@@ -755,9 +991,32 @@ def run_session(
         funnel["exits_due"] = len(due)
         exit_plans: list[ExitPlan] = []
         for _, pos in due.iterrows():
-            plan = plan_exit(ib, pos, asof, transmit=transmit)
+            # One position's fault (a positions request that times out, a contract
+            # that will not qualify) must not stop the others from exiting.
+            try:
+                plan = plan_exit(
+                    ib, pos, asof, transmit=transmit, order_events_path=stores.order_events
+                )
+            except Exception as exc:  # noqa: BLE001
+                plan = f"error: {exc!r}"
             if isinstance(plan, str):
                 _alarm(alarms, f"{pos['ticker']} exit not placed ({plan}); position left open.")
+                continue
+            if not _legs_for_exit(plan):
+                # Every contract was bought back earlier (an exit that completed but
+                # was never booked, or legs closed by hand and recorded): nothing to
+                # send, so book it now from the fills in the log.
+                done = _closed_outcome(plan)
+                try:
+                    status = _book_exit(plan, done, stores, transmit, asof)
+                except Exception as exc:  # noqa: BLE001
+                    _alarm(alarms, f"{pos['ticker']} exit booking failed ({exc!r}).")
+                    continue
+                funnel["exited"] += status == "filled"
+                _append_intended(
+                    stores.intended, _intended_row(log.run_id, asof, plan, done, status, transmit)
+                )
+                print(f"    exit  {pos['ticker']}: booked from earlier fills, no order sent")
                 continue
             exit_plans.append(plan)
 
@@ -771,7 +1030,13 @@ def run_session(
                 if len(entry_plans) >= config.max_names_per_day:
                     decision, reason, plan_e = "skip", "cap_names", None
                 else:
-                    res = plan_entry(ib, cand, asof, config, exdiv_sources)
+                    # An entry that cannot be priced is skipped with its reason; it must
+                    # never take the day's exits down with it.
+                    try:
+                        res = plan_entry(ib, cand, asof, config, exdiv_sources)
+                    except Exception as exc:  # noqa: BLE001
+                        res = f"error:{type(exc).__name__}"
+                        print(f"  warning: {ticker} entry planning raised {exc!r}; skipped.")
                     plan_e = res if isinstance(res, EntryPlan) else None
                     decision = "admit" if plan_e else "skip"
                     reason = "" if plan_e else str(res)
@@ -818,28 +1083,68 @@ def run_session(
                 log=log,
                 transmit=transmit,
                 halted=halted,
+                sweep_frac=config.exit_sweep_frac,
+                sweep_min=config.exit_sweep_min,
             )
         except LadderTooLate as exc:
             _alarm(alarms, str(exc))
+            for p in exit_plans:
+                _alarm(alarms, f"{p.position['ticker']} exit not placed; position left open.")
             return SessionResult(log.run_id, funnel, alarms, [])
+        if transmit:
+            try:
+                for text in ib_orders.cancel_resting_orders(ib):
+                    _alarm(alarms, f"order still working after the ladder, now cancelled: {text}")
+            except Exception as exc:  # noqa: BLE001
+                _alarm(alarms, f"could not confirm that no order is left working ({exc!r}).")
     finally:
+        if error_event is not None:
+            error_event -= _on_error
+        if COMPETING_SESSION_ERROR in error_codes:
+            _alarm(
+                alarms,
+                "market data was cut by a competing live session (IB error 10197): quotes "
+                "were missing for part of this pass. Stay signed out of live IBKR "
+                "(TWS, web and mobile) from 15:15 to 16:00 ET.",
+            )
         if own_ib and ib is not None and ib.isConnected():
             ib.disconnect()
 
+    booked = ("filled", "dry_booked_at_mid")
     by_group = {o.group: o for o in outcomes}
     for p in exit_plans:
         o = by_group[f"{p.key}:exit"]
-        status = _book_exit(p, o, stores, transmit, asof)
+        ticker = p.position["ticker"]
+        # A booking fault on one position is reported and the rest are still booked:
+        # the fills are safe in the order log either way.
+        try:
+            status = _book_exit(p, o, stores, transmit, asof)
+        except Exception as exc:  # noqa: BLE001
+            status = "booking_error"
+            _alarm(alarms, f"{ticker} exit booking failed ({exc!r}); fills are in the order log.")
         if o.alarm:
-            _alarm(alarms, f"{p.position['ticker']} exit {o.status}; working orders cancelled.")
-        funnel["exited"] += status in ("filled", "dry_booked_at_mid")
+            _alarm(alarms, f"{ticker} exit {o.status}; working orders cancelled.")
+        elif status not in booked and status != "booking_error":
+            # An exit with nothing filled used to pass in silence, leaving the
+            # straddle open a day past its rule with a green run.
+            _alarm(alarms, f"{ticker} exit {status}; position still open.")
+        funnel["exited"] += status in booked
         _append_intended(stores.intended, _intended_row(log.run_id, asof, p, o, status, transmit))
     for e in entry_plans:
         o = by_group[f"{e.key}:entry"]
-        status = _book_entry(e, o, stores, transmit)
+        try:
+            status = _book_entry(e, o, stores, transmit)
+        except Exception as exc:  # noqa: BLE001
+            status = "booking_failed"
+            _alarm(
+                alarms,
+                f"{e.ticker} entry booking failed ({exc!r}); the broker may hold the straddle.",
+            )
         if o.alarm:
             _alarm(alarms, f"{e.ticker} entry {o.status}: a naked leg may be held at the broker.")
-        funnel["entered"] += status in ("filled", "dry_booked_at_mid")
+        elif status == "booking_error" and o.status == "filled":
+            _alarm(alarms, f"{e.ticker} entry filled at the broker but was not booked.")
+        funnel["entered"] += status in booked
         _append_intended(stores.intended, _intended_row(log.run_id, asof, e, o, status, transmit))
 
     paper_book.record_heartbeat(
@@ -855,6 +1160,139 @@ def run_session(
         f"{funnel['exited']} exited of {funnel['exits_due']} due; {len(alarms)} alarm(s)."
     )
     return SessionResult(log.run_id, funnel, alarms, outcomes)
+
+
+# ── recording a close made outside the harness ───────────────────────────────
+
+
+def record_manual_exit_fill(
+    ib: Any,
+    ticker: str,
+    right: str,
+    qty: int,
+    price: float,
+    reason: str,
+    asof: pd.Timestamp,
+    *,
+    config: LiveConfig = LIVE,
+    stores: Stores | None = None,
+) -> str:
+    """Record contracts of an open position bought back by hand, and book it if complete.
+
+    When the operator closes a leg in TWS (or it expires), the broker and the ledger
+    disagree and every later pass refuses the position as a ``broker_mismatch``. This
+    is the correction: one dated ``fill`` row in the order-event log carrying the
+    operator's price and reason, written only after the broker's position is seen to
+    equal what the ledger would hold once the fill is counted. Nothing is sent to the
+    broker. When the log then accounts for both legs in full the exit is booked at the
+    blended price straight away; otherwise the next pass works the remainder.
+
+    Parameters
+    ----------
+    ib : ib_async.IB
+        A connected paper client, used read-only (positions, and the spot for the
+        ledger row).
+    ticker, right : str
+        The open position and the leg, ``"C"`` or ``"P"``.
+    qty : int
+        Contracts closed by hand on that leg.
+    price : float
+        Average price paid per share; ``0`` for a leg that expired worthless.
+    reason : str
+        Why it was closed outside the harness. Required: it is the audit trail.
+    asof : pandas.Timestamp
+        Exchange date of the close.
+
+    Returns
+    -------
+    str
+        ``"booked"`` when the exit is now complete and in the ledgers, else
+        ``"recorded"``.
+
+    Raises
+    ------
+    ValueError
+        If the position is not open exactly once, the inputs are unusable, or the
+        broker's position does not match the ledger after the fill. Nothing is
+        written in any of these cases.
+    """
+    asof = pd.Timestamp(asof).normalize()
+    stores = stores or Stores.for_mode(True, config)
+    right = str(right).upper()[:1]
+    if right not in ("C", "P"):
+        raise ValueError(f"leg must be C or P, got {right!r}")
+    if not str(reason).strip():
+        raise ValueError("a reason is required: it is the only record of why")
+    if int(qty) <= 0 or not np.isfinite(price) or float(price) < 0:
+        raise ValueError(f"need a positive quantity and a non-negative price, got {qty}, {price}")
+    book = paper_book.load_open_positions(stores.open_positions)
+    rows = book[book["ticker"] == ticker] if not book.empty else book
+    if len(rows) != 1:
+        raise ValueError(f"{ticker}: expected exactly one open position, found {len(rows)}")
+    pos = rows.iloc[0]
+    key = _position_key(pos)
+    need = int(pos["contracts"])
+    prior = prior_exit_fills(load_order_events(stores.order_events), key)
+    done = prior.get(right, (0, 0.0))[0]
+    if done + int(qty) > need:
+        raise ValueError(
+            f"{key} leg {right}: {done} already bought back, {qty} more exceeds {need}"
+        )
+    ident = _leg_ident(ticker, pos["strike"], pos["front_expiry"], right)
+    held = sum(
+        q
+        for c, q in ib_orders.broker_option_positions(ib)
+        if _leg_ident(c.symbol, c.strike, c.lastTradeDateOrContractMonth, c.right) == ident
+    )
+    expect = -(need - done - int(qty))
+    if held != expect:
+        raise ValueError(
+            f"{key} leg {right}: broker holds {held}, but the ledger would hold {expect} "
+            "after this fill; nothing recorded"
+        )
+    log = OrderEventLog(
+        stores.order_events, asof, transmit=True, market_data_type=config.ib_market_data_type
+    )
+    log.record(
+        "fill",
+        ticker=ticker,
+        position_key=key,
+        leg=right,
+        strike=float(pos["strike"]),
+        expiry=str(pd.Timestamp(pos["front_expiry"]).date()),
+        purpose="exit",
+        side="BUY",
+        order_qty=int(qty),
+        fill_qty=int(qty),
+        fill_price=float(price),
+        cum_filled=int(qty),
+        avg_fill_price=float(price),
+        status="Filled",
+        reason=f"manual close: {str(reason).strip()}",
+    )
+    prior = prior_exit_fills(load_order_events(stores.order_events), key)
+    if any(prior.get(r, (0, 0.0))[0] != need for r in ("C", "P")):
+        return "recorded"
+    try:
+        spot = float(ib_market.qualify_underlying(ib, ticker).spot)
+    except (ValueError, RuntimeError):
+        spot = float("nan")
+    expiry = pd.Timestamp(pos["front_expiry"])
+    plan = ExitPlan(
+        position=pos,
+        call=None,
+        put=None,
+        spot=spot,
+        iv_exit=float("nan"),
+        t_exit=max((expiry - asof).days, 0) / 365.0,
+        prior=prior,
+    )
+    done_outcome = _closed_outcome(plan)
+    status = _book_exit(plan, done_outcome, stores, True, asof)
+    _append_intended(
+        stores.intended, _intended_row(log.run_id, asof, plan, done_outcome, status, True)
+    )
+    return "booked"
 
 
 def _intended_row(
@@ -884,15 +1322,19 @@ def _intended_row(
             "expiry": pd.Timestamp(pos["front_expiry"]).date(),
             "contracts": int(pos["contracts"]),
         }
+    resumed = isinstance(plan, ExitPlan) and bool(plan.prior)
     return {
         **base,
         "run_id": run_id,
         "session_date": asof.date(),
         "position_key": plan.key,
         "decision": "admit",
+        "reason": _exit_resume_note(plan) if resumed else "",
         "outcome": status,
-        "fill_ps": o.fill_ps,
-        "nbbo_mid_1559_ps": _mid_1559(o),
+        "fill_ps": _exit_fill_ps(plan, o) if resumed else o.fill_ps,
+        # Today's ladder quoted only the legs still open, so their mid is not a
+        # straddle mid and is left empty rather than passed off as one.
+        "nbbo_mid_1559_ps": float("nan") if resumed else _mid_1559(o),
         "transmit": transmit,
     }
 
@@ -908,6 +1350,9 @@ def _print_funnel(funnel: dict[str, int], entries: list[EntryPlan], exits: list[
             f"    exit  {pos['ticker']}: {int(pos['contracts'])}x {float(pos['strike']):g} "
             f"exp {pd.Timestamp(pos['front_expiry']).date()}"
         )
+        if p.prior:
+            left = {r: p.remaining(r) for r in ("C", "P") if p.remaining(r) > 0}
+            print(f"          resuming an incomplete exit: buying {left}; {_exit_resume_note(p)}")
     for e in entries:
         print(
             f"    entry {e.ticker}: {e.contracts}x {e.strike:g} exp {e.expiry.date()} "

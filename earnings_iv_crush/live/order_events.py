@@ -183,6 +183,52 @@ def load_order_events(path: str | Path = LIVE.order_events_path) -> pd.DataFrame
     return pd.read_csv(p, dtype={"order_id": "Int64", "perm_id": "Int64"})
 
 
+def prior_exit_fills(events: pd.DataFrame, key: str) -> dict[str, tuple[int, float]]:
+    """Contracts already bought back on each leg of one position, from transmitted fills.
+
+    An exit that ends incomplete leaves its filled leg closed at the broker while the
+    ledger still shows the whole straddle open. The fill rows are the only record of
+    what was closed and at what price, so the next session reads them here to work
+    only the remainder and to book the completed exit at the true blended price.
+
+    Parameters
+    ----------
+    events : pandas.DataFrame
+        Rows in the :data:`ORDER_EVENT_COLUMNS` schema.
+    key : str
+        The position key (:func:`position_key`).
+
+    Returns
+    -------
+    dict
+        ``{"C" | "P": (contracts, quantity-weighted average price)}`` for each leg
+        with at least one transmitted exit fill. Empty when there is none.
+
+    Raises
+    ------
+    ValueError
+        If a matching fill row has no usable quantity or price: a blended exit price
+        must never be built on a hole in the record.
+    """
+    if events.empty:
+        return {}
+    rows = events[
+        (events["event"] == "fill")
+        & (events["purpose"] == "exit")
+        & (events["position_key"] == key)
+        & (events["transmit"].astype(str).str.lower() == "true")
+    ]
+    out: dict[str, tuple[int, float]] = {}
+    for right, grp in rows.groupby("leg", sort=True):
+        qty = pd.to_numeric(grp["fill_qty"], errors="coerce")
+        px = pd.to_numeric(grp["fill_price"], errors="coerce")
+        # A zero price is a real record: a leg that expired worthless.
+        if qty.isna().any() or px.isna().any() or (qty <= 0).any() or (px < 0).any():
+            raise ValueError(f"exit fill rows for {key} leg {right} lack a quantity or price")
+        out[str(right)] = (int(qty.sum()), float((qty * px).sum() / qty.sum()))
+    return out
+
+
 def check_completeness(events: pd.DataFrame) -> pd.DataFrame:
     """Lifecycles that break the specification's completeness rule.
 
