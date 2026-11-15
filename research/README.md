@@ -1,6 +1,7 @@
 # Research
 
-How the team tests an idea. Read [`docs/RESEARCH_STATE.md`](../docs/RESEARCH_STATE.md) first:
+How the team tests an idea. Every result so far, one line each, is on
+[`docs/RESULTS.md`](../docs/RESULTS.md). Read [`docs/RESEARCH_STATE.md`](../docs/RESEARCH_STATE.md) first:
 most ideas that sound new have been tested, and the closed list says with what result. The rules
 every study follows are [`docs/PROTOCOL.md`](../docs/PROTOCOL.md).
 
@@ -40,10 +41,16 @@ copying a closed study.
    `research.protocol.matched_random_null`), prints an attrition funnel, and writes its outputs
    under `outputs/research/<slug>/`.
 6. **Run it once** on the declared blocks. Every run is a trial.
-7. **Write `findings.md` yourself**, in your own words: hypothesis, scope and criteria first, then
-   the result with N, the interval and the basis of every number, the funnel, the matched-null
-   comparison and the verdict against the pre-registered criterion.
-8. **Record it**: update `docs/RESEARCH_STATE.md` and the roadmap row in the same pull request.
+7. **Write `findings.md` yourself**, in your own words. It opens with two fixed lines so a reader
+   has the answer in ten seconds: a `**Verdict:**` line (the verdict against the pre-registered
+   criterion, with N, the interval and the basis), then a `**Reproduce:**` line followed by the
+   exact commands that rebuild every number. Then hypothesis, scope and criteria, the result with
+   N, the interval and the basis of every number, the funnel and the matched-null comparison.
+   `tests/test_catalogue.py` checks the two lines on every note dated from 2026-11-16.
+8. **Record it**: add the study's row to [`research/catalogue.csv`](catalogue.csv) and re-render
+   the results page (`python -m earnings_iv_crush.ops.catalogue`), then update
+   `docs/RESEARCH_STATE.md` and the roadmap row, all in the same pull request. A study that stops
+   without a verdict keeps a row with status `open`.
 
 A study that passes moves toward the forward book only through a decision record in
 `docs/decisions/` and a pre-registered forward test; it never goes straight to the paper account.

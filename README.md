@@ -19,6 +19,7 @@ has what is open.
 | If you want | Read |
 |---|---|
 | What we trade, what we know, what is decided | [`docs/SYSTEM.md`](docs/SYSTEM.md) |
+| Every result so far, one line each, with where the verdict is written | [`docs/RESULTS.md`](docs/RESULTS.md) |
 | What has already been tried (read before proposing anything) | [`docs/RESEARCH_STATE.md`](docs/RESEARCH_STATE.md) |
 | What to work on | [`docs/ROADMAP.md`](docs/ROADMAP.md) |
 | How a study is run | [`docs/PROTOCOL.md`](docs/PROTOCOL.md), [`research/README.md`](research/README.md) |
@@ -44,6 +45,15 @@ python -m pytest -q                    # offline, synthetic data; must be green
 python scripts/demo_pipeline.py        # the whole valuation and scoring path on synthetic events
 python -m earnings_iv_crush.ops.orient # measured state: repo, data, paper book, research
 ```
+
+**What you should see on a fresh clone.** The test suite ends with no failures and a
+handful of skips: the skipped tests read study outputs that live in the data bucket, and they
+run once you `sync pull`. The demo ends with a `SYNTHETIC DATA - WIRING CHECK ONLY, NOT A RESULT` banner.
+`orient` reports the pinned manifest as `not yet fetched`, the frozen book as `inputs absent
+(sync pull), cannot reproduce here`, no open positions and nothing on the paper ports. All of that
+is expected before you have the data; a section that cannot measure at all says `UNMEASURED` with
+the reason. The tests never touch a network: `conftest.py` refuses every outside connection and
+the gateway ports.
 
 The demo prices a synthetic panel through the same valuation, cost model and reporting contract
 every real result uses. Its generator prices announcement risk fairly, so the gross book is near

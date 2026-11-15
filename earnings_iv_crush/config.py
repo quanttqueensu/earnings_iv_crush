@@ -1100,3 +1100,44 @@ class ChainSurfaceConfig:
 
 
 CHAIN_SURFACE = ChainSurfaceConfig()
+
+
+@dataclass(frozen=True)
+class CatalogueConfig:
+    """The results catalogue: ``research/catalogue.csv`` rendered as ``docs/RESULTS.md``.
+
+    Attributes
+    ----------
+    csv_path, page_path : str
+        Repository-relative paths of the catalogue and of the page rendered from it.
+    kinds : tuple of str
+        How a result was produced: ``preregistered`` (a frozen pre-registration was scored),
+        ``exploratory`` (a programme run under the exploratory regime, or ad hoc), ``audit`` (a
+        data or defect investigation, not a strategy test) and ``reference`` (a dossier or a
+        compilation of verdicts).
+    statuses : tuple of str
+        Where a result stands, in the order the page lists them: ``adopted`` (the paper book uses
+        it), ``open`` (started, no verdict recorded), ``closed`` (tested and rejected),
+        ``superseded`` (replaced; the row names its successor) and ``reference``.
+    headline_max_chars : int
+        Longest headline, ``200``: about two lines of a rendered table, enough for one claim with
+        its N, interval and basis, short enough that the page stays a scan.
+    header_required_from : str
+        First catalogue date, ``2026-11-16``, from which a findings note must open with the
+        ``**Verdict:**`` and ``**Reproduce:**`` lines within ``header_lines`` lines. Earlier notes
+        are records and are not edited to fit.
+    header_lines : int
+        How far into a note the two lines may sit, ``40``: room for a title and a provenance
+        paragraph above them, close enough that a reader meets the verdict first.
+    """
+
+    csv_path: str = "research/catalogue.csv"
+    page_path: str = "docs/RESULTS.md"
+    kinds: tuple[str, ...] = ("preregistered", "exploratory", "audit", "reference")
+    statuses: tuple[str, ...] = ("adopted", "open", "closed", "superseded", "reference")
+    headline_max_chars: int = 200
+    header_required_from: str = "2026-11-16"
+    header_lines: int = 40
+
+
+CATALOGUE = CatalogueConfig()

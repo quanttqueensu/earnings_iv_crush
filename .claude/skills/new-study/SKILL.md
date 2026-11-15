@@ -17,5 +17,8 @@ argument-hint: [line] [short slug] [the idea]
    the package (`engine.pnl.build_trade`, `research.protocol`), print the funnel. No parameter is a
    literal in the body; each is a named constant at the top with its derivation.
 6. Add or claim the row in `docs/ROADMAP.md`.
-7. Run it once. The analyst writes `findings.md`; update `docs/RESEARCH_STATE.md` in the same pull
-   request.
+7. Run it once. The analyst writes `findings.md`, opening with the `**Verdict:**` and
+   `**Reproduce:**` lines (`research/README.md` step 7); you may draft the Reproduce commands, never
+   the verdict.
+8. Add the row to `research/catalogue.csv`, run `python -m earnings_iv_crush.ops.catalogue`, and
+   update `docs/RESEARCH_STATE.md`, all in the same pull request.
