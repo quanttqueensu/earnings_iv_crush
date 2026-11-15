@@ -12,6 +12,7 @@ earnings_iv_crush.ops.orient` measures them.
 | `CONTRIBUTING.md` | rules | Branches, pull requests, code standard, the order-path rule for contributors |
 | `docs/INDEX.md` | manifest | This table |
 | `docs/SYSTEM.md` | canonical | What we trade, what the evidence says, how it runs, standing decisions, the bar for new results |
+| `docs/RESULTS.md` | ledger | One line per study: status, kind, headline and where the verdict is written; generated from `research/catalogue.csv`, never edited by hand |
 | `docs/RESEARCH_STATE.md` | ledger | The trial count, every closed direction and its number, the never-quote list |
 | `docs/ROADMAP.md` | ledger | Every open item, its owner and status |
 | `docs/PROTOCOL.md` | rules | The research rules P1 to P15 and how a result is reported |

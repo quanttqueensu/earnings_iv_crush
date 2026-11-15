@@ -20,6 +20,9 @@ this file covers the mechanics.
 - Stage files explicitly (`git add path/to/file`), never `git add -A` or `git add .`: the working
   tree holds caches and outputs that must not ship.
 - One logical change per pull request. Fill in the template; say what you ran and what it printed.
+- A study's pull request carries its findings note, its row in `research/catalogue.csv` and the
+  re-rendered `docs/RESULTS.md` (`python -m earnings_iv_crush.ops.catalogue`); CI fails if the
+  page is stale or a study has no row.
 - Paths with a code owner (the paper book, `config.py`, `frozen.py`, the drivers, any
   pre-registration) need the owner's review. See `.github/CODEOWNERS`.
 
