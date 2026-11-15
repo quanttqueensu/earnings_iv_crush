@@ -62,7 +62,7 @@ env/
 .ipynb_checkpoints/
 .mypy_cache/
 .ruff_cache/
-build/
+/build/
 dist/
 .coverage
 htmlcov/
