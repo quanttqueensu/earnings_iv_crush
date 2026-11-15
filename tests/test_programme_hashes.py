@@ -309,7 +309,17 @@ MIN_CODE_PINS_CHECKED = 85
 
 
 def _sha(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    """The SHA-256 a freeze recorded for ``path``.
+
+    Files under ``outputs/research`` are stored byte for byte (``.gitattributes``), so their raw
+    bytes are hashed. Every other pinned file (package modules, tests) is line-converted by git,
+    and the freezes were taken on Windows checkouts, so it is hashed with CRLF endings: identical
+    content then hashes identically on a Linux or a Windows clone.
+    """
+    raw = path.read_bytes()
+    if RESEARCH in path.resolve().parents:
+        return hashlib.sha256(raw).hexdigest()
+    return hashlib.sha256(raw.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")).hexdigest()
 
 
 # ── tests ──
