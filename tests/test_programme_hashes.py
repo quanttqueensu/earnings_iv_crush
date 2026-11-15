@@ -308,18 +308,21 @@ MIN_PINS = 140
 MIN_CODE_PINS_CHECKED = 85
 
 
-def _sha(path: Path) -> str:
-    """The SHA-256 a freeze recorded for ``path``.
+def _shas(path: Path) -> set[str]:
+    """Every SHA-256 under which ``path`` counts as unchanged since its freeze.
 
-    Files under ``outputs/research`` are stored byte for byte (``.gitattributes``), so their raw
-    bytes are hashed. Every other pinned file (package modules, tests) is line-converted by git,
-    and the freezes were taken on Windows checkouts, so it is hashed with CRLF endings: identical
-    content then hashes identically on a Linux or a Windows clone.
+    Files under ``outputs/research`` are stored byte for byte (``.gitattributes``), so only their
+    raw bytes count. Elsewhere some pinned files are line-converted by git (package modules,
+    tests) and the freezes were taken on Windows checkouts, so the CRLF form of the same text
+    also counts; files stored byte for byte there (pre-registrations) match on their raw bytes.
+    Either way only line endings may differ, never content.
     """
     raw = path.read_bytes()
-    if RESEARCH in path.resolve().parents:
-        return hashlib.sha256(raw).hexdigest()
-    return hashlib.sha256(raw.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")).hexdigest()
+    shas = {hashlib.sha256(raw).hexdigest()}
+    if RESEARCH not in path.resolve().parents:
+        crlf = raw.replace(b"\r\n", b"\n").replace(b"\n", b"\r\n")
+        shas.add(hashlib.sha256(crlf).hexdigest())
+    return shas
 
 
 # ── tests ──
@@ -332,15 +335,16 @@ def test_pinned_file_matches(pin: Pin) -> None:
     path = pin.resolve()
     if path is None:
         pytest.skip(f"{pin.target} is not in this checkout")
-    actual = _sha(path)
+    shas = _shas(path)
+    actual = sorted(shas)[0] if len(shas) == 1 else " or ".join(sorted(shas))
     if pin.pair_id in EXPLAINED_EDITS:
         _reason, added = EXPLAINED_EDITS[pin.pair_id]
         frozen = hashlib.sha256(_undo_edit(path.read_bytes(), added)).hexdigest()
         assert frozen == pin.sha256, f"{pin.target}: undoing the explained edit does not recover it"
         return
-    if actual != pin.sha256 and pin.pair_id in KNOWN_MISMATCH:
+    if pin.sha256 not in shas and pin.pair_id in KNOWN_MISMATCH:
         pytest.xfail(KNOWN_MISMATCH[pin.pair_id])
-    assert actual == pin.sha256, (
+    assert pin.sha256 in shas, (
         f"{path.relative_to(ROOT).as_posix()} changed after it was frozen in "
         f"{pin.note.relative_to(ROOT).as_posix()} line {pin.line} ({pin.fmt} format): "
         f"recorded {pin.sha256}, now {actual}"
