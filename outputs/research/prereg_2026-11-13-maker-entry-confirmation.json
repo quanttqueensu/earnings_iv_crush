@@ -1,0 +1,33 @@
+{
+  "trial_id": "2026-11-13-maker-entry-confirmation",
+  "declared_utc": "2026-11-13",
+  "frozen_utc": "2026-11-13T17:02:06+00:00",
+  "prereg_file": "C:/Users/jodor/Documents/QUANTT_IVCrush_Project/research/execution/2026-11-13-maker-entry-confirmation/prereg.md",
+  "prereg_sha256": "aeee3fcc8235ce6c6db741d1569ed6ddd8080e40b3420e4e01b17ac3888d220c",
+  "n_trials_declared": 2,
+  "git_head": "8bdd1512c88f6a51c609b60b175e721cbeaa2297",
+  "scorer_file": "C:/Users/jodor/Documents/QUANTT_IVCrush_Project/research/execution/2026-11-13-maker-entry-confirmation/study.py",
+  "scorer_sha256": "5879d96872167de5219600a62a5e7d1be2eb20d1c05c344cce218ea63a1d4af7",
+  "inputs": [
+    {
+      "path": "C:/Users/jodor/Documents/QUANTT_IVCrush_Project/outputs/research/2026-11-02-hedged-event-hold/events.parquet",
+      "size": 1050480,
+      "sha256": "2640932022fd70897a6a521afcc1e1eef0cb6b8de8831cda7f1900f1d0b66f84"
+    },
+    {
+      "path": "C:/Users/jodor/Documents/QUANTT_IVCrush_Project/research/execution/research_flow_liquidity.py",
+      "size": 24254,
+      "sha256": "315e2f1e53b4e116fef23e3b10f6e566912eec0cb6e1df96078f3eed8a31edff"
+    },
+    {
+      "path": "C:/Users/jodor/Documents/QUANTT_IVCrush_Project/research/execution/research_fills_study.py",
+      "size": 24063,
+      "sha256": "e59bece62fc591620cc13a6c8522697df8dad54aea4d08316cbdc9279d3c8125"
+    }
+  ],
+  "trials": [
+    1629,
+    1630
+  ],
+  "review_pre": "go with changes; changes applied"
+}

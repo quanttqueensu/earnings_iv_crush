@@ -1,0 +1,8 @@
+{
+  "trial_id": "2026-11-02-index-hedged-hold",
+  "declared_utc": "2026-11-02T06:19:20+00:00",
+  "prereg_file": "research/off_earnings/2026-11-02-index-hedged-hold/prereg.md",
+  "prereg_sha256": "ea37a08a8bbbc0e83a6e07a76def737d2d9e16a201114bc8079aaad2a4f8e1c3",
+  "n_trials_declared": 1,
+  "dsr_trial_count": 1556
+}

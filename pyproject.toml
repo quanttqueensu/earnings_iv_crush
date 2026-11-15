@@ -58,6 +58,13 @@ known-first-party = ["earnings_iv_crush", "research", "scripts", "tests"]
 # Test fixtures build equal-length columns by construction, so the strict-zip
 # rule adds noise without catching bugs there.
 "tests/**" = ["B905"]
+# Closed studies are frozen (CLAUDE.md), so their lint findings are recorded here, not edited
+# away. The B023 closures in move-forecast-and-sizing are each called inside the loop pass that
+# defines them, so they bind the current values and the recorded results are unaffected.
+"research/off_earnings/2026-11-02-index-hedged-hold/study.py" = ["UP031"]
+"research/off_earnings/2026-11-02-next-day-expiry-settle/study.py" = ["UP031"]
+"research/selection/2026-11-12-move-forecast-and-sizing/study.py" = ["B905", "B023"]
+"research/selection/2026-11-12-tail-event-signals/study.py" = ["B905", "E731"]
 
 [tool.black]
 line-length = 100

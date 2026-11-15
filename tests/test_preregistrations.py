@@ -54,6 +54,15 @@ RECORDS = sorted(
 )
 
 
+def _run_log(record: str) -> list[dict[str, Any]]:
+    """The run log ``verify_prereg`` keeps beside a record, oldest first; empty if none."""
+    runs = ROOT / "outputs" / "research" / record.replace(".json", ".runs.jsonl")
+    if not runs.is_file():
+        return []
+    lines = runs.read_text(encoding="utf-8").splitlines()
+    return [json.loads(line) for line in lines if line.strip()]
+
+
 def test_records_are_present() -> None:
     assert RECORDS, "no pre-registration hash records found under outputs/research"
 
@@ -69,4 +78,18 @@ def test_recorded_hash_matches_shipped_text(record: str, name: str, sha: str) ->
         base = Path(name).name
         assert base in SHIPPED, f"{record} declares {base}, which is not under research/*/preregs"
         path = SHIPPED[base]
-    assert hashlib.sha256(path.read_bytes()).hexdigest() == sha
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    rec = json.loads((ROOT / "outputs" / "research" / record).read_text(encoding="utf-8"))
+    if Path(str(rec.get("scorer_file", ""))).as_posix() != name or sha != rec.get("scorer_sha256"):
+        assert digest == sha
+        return
+    # The scorer may change before outcomes are seen, as verify_prereg allows and logs; after an
+    # unblinded run it must be byte-identical to the code that produced the outcomes.
+    log = _run_log(record)
+    unblinded = [e.get("scorer_sha256") for e in log if e.get("event") == "unblinded_run"]
+    unblinded = [h for h in unblinded if h]
+    if unblinded:
+        assert digest == unblinded[-1]
+        return
+    changed = {e["scorer_sha256"] for e in log if e.get("event") == "code_change_pre_unblind"}
+    assert digest in {sha} | changed

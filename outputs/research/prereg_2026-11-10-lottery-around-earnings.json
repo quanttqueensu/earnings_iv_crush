@@ -1,0 +1,10 @@
+{
+  "trial_id": "2026-11-10-lottery-around-earnings",
+  "declared_utc": "2026-11-10",
+  "prereg_file": "research/timing/2026-11-10-lottery-around-earnings/prereg.md",
+  "prereg_sha256": "aee3803007e61589af0d4b319b5d256a5de2c2463eefb0d8ba191c13c68e6482",
+  "n_trials_declared": 2,
+  "trials_first": 1609,
+  "trials_last": 1610,
+  "dsr_trial_count": 1610
+}

@@ -1,0 +1,9 @@
+{
+  "trial_id": "2026-11-07-forward-combined-gates-amendment-01",
+  "declared_utc": "2026-11-07T22:13:48Z",
+  "prereg_file": "research/selection/2026-11-07-forward-combined-gates/prereg_amendment_01.md",
+  "prereg_sha256": "3e43d40af86fe7aa117ebac421b2ddb5c46b4c932fe784ee82930c5b6ea0e7dc",
+  "n_trials_declared": 1590,
+  "amends": "research/selection/2026-11-07-forward-combined-gates/prereg.md",
+  "dsr_trial_count": 1590
+}

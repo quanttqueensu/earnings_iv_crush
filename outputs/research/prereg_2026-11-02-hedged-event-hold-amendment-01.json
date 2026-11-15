@@ -1,0 +1,8 @@
+{
+  "trial_id": "2026-11-02-hedged-event-hold-amendment-01",
+  "declared_utc": "2026-11-02T05:39:29+00:00",
+  "prereg_file": "research/timing/2026-11-02-hedged-event-hold/amendment_01_confirmation.md",
+  "prereg_sha256": "91293d96670467b4dc4bd076690f7a3ddb981ca739c47fc4214add4f7956ca4c",
+  "n_trials_declared": 1,
+  "dsr_trial_count": 1551
+}

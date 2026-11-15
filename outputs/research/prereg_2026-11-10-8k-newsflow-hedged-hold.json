@@ -1,0 +1,8 @@
+{
+  "trial_id": "2026-11-10-8k-newsflow-hedged-hold",
+  "declared_utc": "2026-11-10",
+  "prereg_file": "research/selection/2026-11-10-8k-newsflow-hedged-hold/prereg.md",
+  "prereg_sha256": "ae5ccc67f3395c425e907dc1c044d93f2def8dedc84b541e2c886020cce0efcf",
+  "n_trials_declared": 1,
+  "dsr_trial_count": 1603
+}
