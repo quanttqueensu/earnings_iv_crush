@@ -23,6 +23,22 @@ from typing import Any
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+# Top-level folders a recorded file can sit under; an absolute path written on one machine is
+# matched from the first of these, so it resolves in any checkout on any platform.
+_REPO_TOPS = ("research", "outputs", "scripts", "earnings_iv_crush", "tests")
+
+
+def _in_checkout(name: str) -> Path:
+    """Where a recorded path lives in this checkout, however and wherever it was written."""
+    parts = Path(name.replace("\\", "/")).as_posix().split("/")
+    absolute = name.startswith(("/", "\\")) or (len(name) > 1 and name[1] == ":")
+    if absolute:
+        for i, part in enumerate(parts):
+            if part in _REPO_TOPS:
+                return ROOT.joinpath(*parts[i:])
+    return ROOT / name
+
+
 SHIPPED = {p.name: p for p in (ROOT / "research").glob("*/preregs/*.md")}
 
 
@@ -71,7 +87,7 @@ def test_records_are_present() -> None:
     "record, name, sha", RECORDS, ids=[f"{r[0]}:{Path(r[1]).name}" for r in RECORDS]
 )
 def test_recorded_hash_matches_shipped_text(record: str, name: str, sha: str) -> None:
-    as_written = ROOT / name
+    as_written = _in_checkout(name)
     if as_written.is_file() and "preregs" not in as_written.parts:
         path = as_written
     else:

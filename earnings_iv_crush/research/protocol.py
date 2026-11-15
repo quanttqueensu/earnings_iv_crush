@@ -200,6 +200,30 @@ def _file_fingerprint(path: str | Path) -> dict[str, Any]:
     return {"path": p.as_posix(), "size": p.stat().st_size, "sha256": sha256_file(p)}
 
 
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _repo_relative(path: str | Path) -> str:
+    """A recorded path: relative to the repository when inside it, so records travel to clones.
+
+    An absolute path names one machine's checkout and resolves on no other; a path outside the
+    repository (a test's temporary folder) is kept as given.
+    """
+    p = Path(path)
+    try:
+        return p.resolve().relative_to(_REPO_ROOT).as_posix()
+    except ValueError:
+        return p.as_posix()
+
+
+def _recorded_file(path: str) -> Path:
+    """The file a record names: a relative path is read from the repository root."""
+    p = Path(path)
+    if not p.is_absolute() and (_REPO_ROOT / p).is_file():
+        return _REPO_ROOT / p
+    return p
+
+
 def _git_head(cwd: Path) -> str | None:
     try:
         out = subprocess.run(
@@ -264,13 +288,13 @@ def freeze_prereg(
         "trial_id": trial_id,
         "declared_utc": declared_utc,
         "frozen_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "prereg_file": Path(prereg).as_posix(),
+        "prereg_file": _repo_relative(prereg),
         "prereg_sha256": sha256_file(prereg),
         "n_trials_declared": int(n_trials_declared),
         "git_head": _git_head(Path(prereg).resolve().parent),
     }
     if scorer is not None:
-        body["scorer_file"] = Path(scorer).as_posix()
+        body["scorer_file"] = _repo_relative(scorer)
         body["scorer_sha256"] = sha256_file(scorer)
     if inputs:
         body["inputs"] = [_file_fingerprint(f) for f in inputs]
@@ -349,7 +373,7 @@ def verify_prereg(
         known = [rec["scorer_sha256"]] + [
             e["scorer_sha256"] for e in runs if e.get("event") == "code_change_pre_unblind"
         ]
-        cur = sha256_file(rec["scorer_file"])
+        cur = sha256_file(_recorded_file(rec["scorer_file"]))
         if cur != known[-1]:
             if unblinded:
                 raise ValueError(
@@ -364,7 +388,9 @@ def verify_prereg(
                 f"{record} already has an unblinded run; pass rerun_reason to log why a second "
                 "one is needed"
             )
-        scorer_sha = sha256_file(rec["scorer_file"]) if "scorer_file" in rec else None
+        scorer_sha = (
+            sha256_file(_recorded_file(rec["scorer_file"])) if "scorer_file" in rec else None
+        )
         _append_run(
             record,
             {"event": "unblinded_run", "scorer_sha256": scorer_sha, "rerun_reason": rerun_reason},
