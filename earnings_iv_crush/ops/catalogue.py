@@ -176,7 +176,24 @@ def _verdict_cell(r: Row) -> str:
     return f"{text}, {_cell(section)}" if section else text
 
 
-def render(rows: list[Row], cfg: CatalogueConfig = CATALOGUE) -> str:
+def _has_text(root: Path, folder: str) -> bool:
+    """Whether an artefacts folder holds code or reports, which git tracks (``.gitignore``)."""
+    base = root / folder
+    return base.is_dir() and any(
+        p.suffix in (".md", ".py") and "__pycache__" not in p.parts for p in base.rglob("*")
+    )
+
+
+def _artefacts_cell(r: Row, root: Path) -> str:
+    if r.artefacts == _NONE:
+        return ""
+    folder = r.artefacts.rstrip("/")
+    if _has_text(root, folder):
+        return f"{_link(folder, 'code and reports')}, data in the bucket"
+    return f"`{r.artefacts}` (bucket)"
+
+
+def render(rows: list[Row], cfg: CatalogueConfig = CATALOGUE, root: Path = ROOT) -> str:
     """The full text of ``docs/RESULTS.md``: counts by status, then one table per line."""
     counts = Counter(r.status for r in rows)
     out = [
@@ -187,8 +204,9 @@ def render(rows: list[Row], cfg: CatalogueConfig = CATALOGUE) -> str:
         "`python -m earnings_iv_crush.ops.catalogue`; edit the CSV, never this page.",
         "",
         "Headlines are condensed from each study's own verdict, with its N, interval and basis.",
-        "Quote a number from the linked note, not from this page. Artefacts under",
-        "`outputs/research/` are shared through the data bucket (`docs/DATA.md`), not git.",
+        "Quote a number from the linked note, not from this page. A programme's code and reports",
+        "(briefs, lane reports, reviews, freeze notes) are in git under its artefacts folder; the",
+        "data files beside them come from the bucket (`docs/DATA.md`).",
         "",
         "| Status | Studies |",
         "|---|---|",
@@ -209,7 +227,7 @@ def render(rows: list[Row], cfg: CatalogueConfig = CATALOGUE) -> str:
             status = r.status
             if r.superseded_by != _NONE:
                 status = f"superseded by {_link(r.superseded_by, _label(r.superseded_by))}"
-            art = f"`{r.artefacts}`" if r.artefacts != _NONE else ""
+            art = _artefacts_cell(r, root)
             out.append(
                 f"| {r.date} | {status} | {r.kind} | {_link(r.path, _label(r.path))} "
                 f"| {_cell(r.headline)} | {_verdict_cell(r)} | {art} |"

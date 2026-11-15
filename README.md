@@ -69,6 +69,19 @@ python scripts/validate_screen.py            # must reproduce N=391, per-trade S
 
 Sources, licences and costs are in [`docs/DATA.md`](docs/DATA.md).
 
+## What you can see
+
+| Layer | Where | What you need |
+|---|---|---|
+| Every result and how it was reached: findings notes, pre-registrations and their hashes, the trial ledgers, and each programme's briefs, lane reports, reviews, freeze notes and scripts | [`docs/RESULTS.md`](docs/RESULTS.md) indexes it; the files are in `research/` and `outputs/research/` | a clone |
+| The data behind the numbers: caches, per-event files, run outputs, figures | the data bucket | keys from the team lead, then `sync pull` |
+| The paper book's own record: orders, fills, positions | the paper-book host | not shared; `orient` and `/book-status` report it where the book runs |
+
+Two things never reach git or a message outside the team: licensed vendor rows and credentials
+(`docs/decisions/0004-licensed-data-stays-out-of-git.md`). Every number in the shared files is an
+aggregate the project computed, so a clone can read every verdict and the code that produced it;
+rerunning it needs the bucket.
+
 ## Layout
 
 | Path | What it holds |

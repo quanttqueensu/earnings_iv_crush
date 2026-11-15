@@ -5,8 +5,9 @@ Research code cannot reach the order path, and the order path does not import re
 Only ``earnings_iv_crush/live/`` (and the paper-book drivers and probes under ``scripts/`` and
 ``deploy/``) may talk to the broker. The broker modules are derived from the code, not listed:
 every ``live/`` module that imports the IB client library, and every ``live/`` module that imports
-one of those. Everything on the research side, the studies under ``research/``, the data builders
-under ``scripts/build/`` and every package module outside ``live/``, must not import a broker
+one of those. Everything on the research side, the studies under ``research/``, the programme
+scripts under ``outputs/research/``, the data builders under ``scripts/build/`` and every package
+module outside ``live/``, must not import a broker
 module or the IB client library, nor name an order method. Reading the paper book's stores
 (``live/order_events.py``, ``live/paper_book.py``), as ``ops/orient.py`` does, stays allowed.
 In the other direction, ``live/`` must not import the top-level ``research`` package, whose
@@ -32,6 +33,7 @@ ORDER_METHODS = frozenset({"placeOrder", "cancelOrder", "reqGlobalCancel", "brac
 
 def _research_side() -> list[Path]:
     files = [*(ROOT / "research").rglob("*.py"), *(ROOT / "scripts" / "build").rglob("*.py")]
+    files += [*(ROOT / "outputs" / "research").rglob("*.py")]
     files += [p for p in PACKAGE.rglob("*.py") if "live" not in p.relative_to(PACKAGE).parts]
     return sorted(p for p in files if "__pycache__" not in p.parts)
 
@@ -64,7 +66,8 @@ def _names(tree: ast.AST) -> set[str]:
 
 
 def _parse(path: Path) -> ast.AST:
-    return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    # utf-8-sig: some programme scripts were saved with a byte-order mark.
+    return ast.parse(path.read_text(encoding="utf-8-sig"), filename=str(path))
 
 
 def _hits(imports: set[str], prefixes: tuple[str, ...]) -> list[str]:
