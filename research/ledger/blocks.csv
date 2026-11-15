@@ -1,0 +1,193 @@
+utc,panel,period,outcome_family,feature_family,viewed_by,kind
+2026-11-12T16:26:12+00:00,hedged_event_hold,2025-26,*,*,"trials 1,593-1,615, G1, entry clock (pre-ledger)",descriptive
+2026-11-12T16:26:12+00:00,hedged_event_hold,2015-19,tail_and_buyback,peer_shock,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2015-19,tail_and_buyback,distress,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2015-19,tail_and_buyback,price_path,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2015-19,tail_and_buyback,earnings_variability,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2015-19,tail_and_buyback,own_history,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2020-24,tail_and_buyback,peer_shock,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2020-24,tail_and_buyback,distress,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2020-24,tail_and_buyback,price_path,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2020-24,tail_and_buyback,earnings_variability,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2020-24,tail_and_buyback,own_history,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2025-26,tail_and_buyback,peer_shock,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2025-26,tail_and_buyback,distress,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2025-26,tail_and_buyback,price_path,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2025-26,tail_and_buyback,earnings_variability,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2025-26,tail_and_buyback,own_history,"1,616-1,622",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2016-24,move_size_and_buyback,term_structure_jump,"1,623-1,628",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2016-24,move_size_and_buyback,own_history,"1,623-1,628",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2016-24,move_size_and_buyback,characteristics,"1,623-1,628",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2016-24,move_size_and_buyback,sizing,"1,623-1,628",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2025-26,move_size_and_buyback,term_structure_jump,"1,623-1,628",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2025-26,move_size_and_buyback,own_history,"1,623-1,628",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2025-26,move_size_and_buyback,characteristics,"1,623-1,628",trial
+2026-11-12T16:26:12+00:00,hedged_event_hold,2025-26,move_size_and_buyback,sizing,"1,623-1,628",trial
+2026-11-13T06:14:55+00:00,hedged_event_hold,2016-24,move_size_and_buyback,jump_share_vs_implied_jump,alpha-hunt 2026-11-13 structural agent (exploratory regression),descriptive
+2026-11-13T06:14:55+00:00,w1_passive_fill_ledger,2025-26,overnight_rom,passive_fill_selection_and_markout,alpha-hunt 2026-11-13 liquidity-provider agent (exploratory),descriptive
+2026-11-13T06:14:55+00:00,fiam_submission,2019-24,monthly_excess_return,fiam_portfolio,alpha-hunt 2026-11-13 pivot agent (exploratory recompute),descriptive
+2026-11-13T17:49:54+00:00,broad_entry_ticks,2023-03-28..2024-12-31,entry_execution,resting_static_mid,trial 1779 (2026-11-13-maker-entry-confirmation),trial
+2026-11-13T17:49:54+00:00,broad_entry_ticks,2023-03-28..2024-12-31,entry_execution,resting_pegged_mid,trial 1780 (2026-11-13-maker-entry-confirmation),trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2013-18,residual_value,macro_state,"alpha hunt 2026-11-13, trials 1,629-1,657",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2019-24,residual_value,macro_state,"alpha hunt 2026-11-13, trials 1,629-1,657",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2013-21,buyback,forensics_liquidity_size,"alpha hunt 2026-11-13, trials 1,659-1,681",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2014-19,residual_value,quote_surface_flow,"alpha hunt 2026-11-13, trials 1,689-1,708",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2016-19,residual_value,event_richness_own_history,"alpha hunt 2026-11-13, trials 1,689-1,708",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2020-24,residual_value,event_richness_own_history,"alpha hunt 2026-11-13, trials 1,689-1,708",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2025-26,residual_value,event_richness_own_history,"alpha hunt 2026-11-13, trials 1,689-1,708",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2013-19,hold_vs_buyback,entry_clock_and_hold,"alpha hunt 2026-11-13, trials 1,719-1,740",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2020-24,hold_vs_buyback,entry_clock_and_hold,"alpha hunt 2026-11-13, trials 1,719-1,740",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2025-26,hold_vs_buyback,entry_clock_and_hold,"alpha hunt 2026-11-13, trials 1,719-1,740",trial
+2026-11-13T19:06:05+00:00,broad_entry_ticks,2025,entry_execution,entry_clock,"alpha hunt 2026-11-13, trials 1,719-1,740",trial
+2026-11-13T19:06:05+00:00,broad_entry_ticks,2026H1,entry_execution,entry_clock,"alpha hunt 2026-11-13, trials 1,719-1,740",trial
+2026-11-13T19:06:05+00:00,megacap_entry_ticks,2020-24,entry_execution,entry_clock,"alpha hunt 2026-11-13, trials 1,719-1,740",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2013-18,residual_value,calendar_niche,"alpha hunt 2026-11-13, trials 1,749-1,771",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2019-24,residual_value,calendar_niche,"alpha hunt 2026-11-13, trials 1,749-1,771",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2013-18,hold_vs_buyback,post_announcement_rules,"alpha hunt 2026-11-13, trials 1,781-1,798",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2019-24,hold_vs_buyback,post_announcement_rules,"alpha hunt 2026-11-13, trials 1,781-1,798",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2013-18,hedged_hold,contract_choice,"alpha hunt 2026-11-13, trials 1,811-1,826",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2019-24,hedged_hold,contract_choice,"alpha hunt 2026-11-13, trials 1,811-1,826",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2013-18,hold_vs_buyback,post_event_vol_forecast,"alpha hunt 2026-11-13, trials 1,841-1,856",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2019-24,hold_vs_buyback,post_event_vol_forecast,"alpha hunt 2026-11-13, trials 1,841-1,856",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2019-24,residual_value,structural_jump_model,"alpha hunt 2026-11-13, trials 1,871-1,896",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2013-18,residual_value,structural_jump_model,"alpha hunt 2026-11-13, trials 1,897-1,900",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2025-26,residual_value,structural_jump_model,"alpha hunt 2026-11-13, trial 1,898",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2016-21,residual_value,walk_forward_model,"alpha hunt 2026-11-13, trials 1,901-1,920",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2022-24,residual_value,walk_forward_model,"alpha hunt 2026-11-13, trial 1,921",trial
+2026-11-13T19:06:05+00:00,broad_exit_ticks,2025,exit_execution,resting_exit,"alpha hunt 2026-11-13, trials 1,931-1,950",trial
+2026-11-13T19:06:05+00:00,broad_exit_ticks,2026H1,exit_execution,resting_exit,"alpha hunt 2026-11-13, trials 1,951-1,958",trial
+2026-11-13T19:06:05+00:00,megacap_exit_ticks,2023-24,exit_execution,resting_exit,"alpha hunt 2026-11-13, trials 1,953-1,954",trial
+2026-11-13T19:06:05+00:00,index_event_nights,2016-18,index_event_straddle,megacap_reporters,"alpha hunt 2026-11-13, lane G",trial
+2026-11-13T19:06:05+00:00,index_event_nights,2019-24,index_event_straddle,megacap_reporters,"alpha hunt 2026-11-13, lane G",trial
+2026-11-13T19:06:05+00:00,index_event_nights,2025-26,index_event_straddle,megacap_reporters,"alpha hunt 2026-11-13, lane G",trial
+2026-11-13T19:06:05+00:00,dolthub_scheduled_events,2019-21,event_straddle,adcomm_product,"alpha hunt 2026-11-13, lane H",trial
+2026-11-13T19:06:05+00:00,dolthub_scheduled_events,2022-24,event_straddle,adcomm_product,"alpha hunt 2026-11-13, lane H",trial
+2026-11-13T19:06:05+00:00,dolthub_pre_event_chains,2019-24,entry_day,early_entry,"alpha hunt 2026-11-13, trials 2,021-2,036",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2013-18,residual_value,name_persistence,"alpha hunt 2026-11-13, trials 2,051-2,072",trial
+2026-11-13T19:06:05+00:00,hedged_event_hold,2019-24,residual_value,name_persistence,"alpha hunt 2026-11-13, trials 2,073-2,080",trial
+2026-11-13T21:00:52+00:00,index_chains_macro,2016-24,macro_straddle,release_and_tenor,"niche hunt 2026-11-13, N08",trial
+2026-11-13T21:00:52+00:00,index_chains_macro,2025-26,macro_straddle,release_and_tenor,"niche hunt 2026-11-13, N08",trial
+2026-11-13T21:00:52+00:00,adr_foreign_chains,2025,event_straddle,foreign_reporter,"niche hunt 2026-11-13, N15",trial
+2026-11-13T21:00:52+00:00,adr_foreign_chains,2026,event_straddle,foreign_reporter,"niche hunt 2026-11-13, N15",trial
+2026-11-13T21:00:52+00:00,forecastex_kalshi,pre-2026,event_contract,cross_venue_and_favourite,"niche hunt 2026-11-13, N11",trial
+2026-11-13T21:00:52+00:00,forecastex_kalshi,2026,event_contract,cross_venue_and_favourite,"niche hunt 2026-11-13, N11",trial
+2026-11-13T21:00:52+00:00,vx_futures_settles,2008-16,macro_vx_short,fomc_cpi_nfp,"niche hunt 2026-11-13, N09",trial
+2026-11-13T21:00:52+00:00,vx_futures_settles,2017-26,macro_vx_short,fomc_cpi_nfp,"niche hunt 2026-11-13, N09",trial
+2026-11-13T21:00:52+00:00,deribit_btc,2020-22,expiry_friday_straddle,monthly_expiry,"niche hunt 2026-11-13, N10",trial
+2026-11-13T21:00:52+00:00,deribit_btc,2023-26,expiry_friday_straddle,monthly_expiry,"niche hunt 2026-11-13, N10",trial
+2026-11-13T21:00:52+00:00,ng_settles,2002-18,event_variance,eia_storage,"niche hunt 2026-11-13, N03",trial
+2026-11-13T21:00:52+00:00,ng_settles,2019-24,event_variance,eia_storage,"niche hunt 2026-11-13, N03",trial
+2026-11-13T21:00:52+00:00,wti_ovx,2009-19,event_variance,eia_petroleum,"niche hunt 2026-11-13, N04",trial
+2026-11-13T21:00:52+00:00,wti_ovx,2021-26,event_variance,eia_petroleum,"niche hunt 2026-11-13, N04",trial
+2026-11-13T21:00:52+00:00,tlt_vxtlt,2016-20,macro_variance,cpi_nfp_fomc,"niche hunt 2026-11-13, N05",trial
+2026-11-13T21:00:52+00:00,tlt_vxtlt,2021-26,macro_variance,cpi_nfp_fomc,"niche hunt 2026-11-13, N05, N17",trial
+2026-11-13T21:00:52+00:00,sofr_atlanta_fed_tracker,2023-24,fomc_variance,fomc,"niche hunt 2026-11-13, N06",trial
+2026-11-13T21:00:52+00:00,sofr_atlanta_fed_tracker,2025-26,fomc_variance,fomc,"niche hunt 2026-11-13, N06",trial
+2026-11-13T21:00:52+00:00,metals_gvz_vxslv,2016-21,macro_variance,cpi_nfp_fomc,"niche hunt 2026-11-13, N12",trial
+2026-11-13T21:00:52+00:00,metals_gvz_vxslv,2022-26,macro_variance,cpi_nfp_fomc,"niche hunt 2026-11-13, N12, N17",trial
+2026-11-13T21:00:52+00:00,softs_settles,2000-13,event_variance,wasde,"niche hunt 2026-11-13, N13",trial
+2026-11-13T21:00:52+00:00,softs_settles,2014-26,event_variance,wasde,"niche hunt 2026-11-13, N13",trial
+2026-11-13T21:00:52+00:00,country_etf_vol_indices,discovery,event_variance,copom_elections,"niche hunt 2026-11-13, N16",trial
+2026-11-13T21:00:52+00:00,country_etf_vol_indices,held-out,event_variance,copom_elections,"niche hunt 2026-11-13, N16",trial
+2026-11-13T21:00:52+00:00,bank_closes_and_dolthub,2015-19,event_variance,stress_test,"niche hunt 2026-11-13, N14",trial
+2026-11-13T21:00:52+00:00,bank_closes_and_dolthub,2020-26,event_variance,stress_test,"niche hunt 2026-11-13, N14",trial
+2026-11-13T21:00:52+00:00,commodity_etf_vol_indices,2009-20,event_straddle,eia_and_macro,"niche hunt 2026-11-13, N17",trial
+2026-11-13T21:00:52+00:00,commodity_etf_vol_indices,2021-26,event_straddle,eia_and_macro,"niche hunt 2026-11-13, N17",trial
+2026-11-14T19:41:26+00:00,megacap_exit_ticks,2023-24,reaction_hour_long_gamma,intraday_hedge_frequency,"earnings-adjacent hunt 2026-11-14, E1 2,682-2,693",trial
+2026-11-14T19:41:26+00:00,broad_exit_ticks,2025H1,reaction_hour_long_gamma,intraday_hedge_frequency,"earnings-adjacent hunt 2026-11-14, E1 2,682-2,693",trial
+2026-11-14T19:41:26+00:00,broad_exit_ticks,2025H2-2026H1,reaction_hour_long_gamma,intraday_hedge_frequency,"earnings-adjacent hunt 2026-11-14, E1 2,682 held-out",trial
+2026-11-14T19:41:26+00:00,broad_exit_ticks,2025H1,stock_return_direction,reaction_hour_reversal,"earnings-adjacent hunt 2026-11-14, E1 2,693",trial
+2026-11-14T19:41:26+00:00,megacap_pre_ticks,2023-24,dm1_hour_long_gamma,intraday_hedge_frequency,"earnings-adjacent hunt 2026-11-14, E1 controls",descriptive
+2026-11-14T19:41:26+00:00,broad_pre_ticks,2025H1,dm1_hour_long_gamma,intraday_hedge_frequency,"earnings-adjacent hunt 2026-11-14, E1 controls",descriptive
+2026-11-14T19:41:26+00:00,flow_atm_ticks,2023-03-28..2024-12-31,stock_direction_next_session,signed_atm_option_flow,"earnings-adjacent hunt 2026-11-14, E2 2,712-2,722",trial
+2026-11-14T19:41:26+00:00,flow_atm_ticks,2025-01-01..2026-12-31,stock_direction_next_session,signed_atm_option_flow,"earnings-adjacent hunt 2026-11-14, E2 2,721-2,722 held-out",trial
+2026-11-14T19:41:26+00:00,hedged_event_hold,2023-03-28..2024-12-31,residual_value,signed_atm_option_flow,"earnings-adjacent hunt 2026-11-14, E2 2,714",trial
+2026-11-14T19:41:26+00:00,peer_spillover_nights,2013-18,peer_stock_return,bellwether_reaction,"earnings-adjacent hunt 2026-11-14, E3 2,742-2,752",trial
+2026-11-14T19:41:26+00:00,peer_spillover_nights,2013-18,peer_realised_variance,bellwether_reaction,"earnings-adjacent hunt 2026-11-14, E3 2,747, 2,749",trial
+2026-11-14T19:41:26+00:00,peer_spillover_nights,2019-24,peer_stock_return,bellwether_reaction,"earnings-adjacent hunt 2026-11-14, E3 2,742 held-out",trial
+2026-11-14T19:41:26+00:00,peer_spillover_nights,2019-24,peer_realised_variance,bellwether_reaction,"earnings-adjacent hunt 2026-11-14, E3 2,749 held-out",trial
+2026-11-14T19:41:26+00:00,hedged_event_hold,2013-18,expiry_pinning,strike_grid,"earnings-adjacent hunt 2026-11-14, E4 2,772",trial
+2026-11-14T19:41:26+00:00,hedged_event_hold_megacap,2013-18,expiry_pinning,strike_grid,"earnings-adjacent hunt 2026-11-14, E4 2,772",trial
+2026-11-14T19:41:26+00:00,hedged_event_hold,2019-24,expiry_pinning,strike_grid,"earnings-adjacent hunt 2026-11-14, E4 2,772 held-out",trial
+2026-11-14T19:41:26+00:00,hedged_event_hold_megacap,2019-24,expiry_pinning,strike_grid,"earnings-adjacent hunt 2026-11-14, E4 2,772 held-out",trial
+2026-11-14T19:41:26+00:00,hedged_event_hold_megacap,2014-18,hedged_hold,open_interest_proxy,"earnings-adjacent hunt 2026-11-14, E4 2,773",trial
+2026-11-14T19:41:26+00:00,hedged_event_hold_megacap,2019-24,hedged_hold,open_interest_proxy,"earnings-adjacent hunt 2026-11-14, E4 2,773 held-out",trial
+2026-11-14T19:41:26+00:00,hedged_event_hold,2013-24,hedged_hold,exdiv_exercise_bias,"earnings-adjacent hunt 2026-11-14, E4 part (b)",descriptive
+2026-11-14T19:41:26+00:00,crsp_event_windows,2019-21,stock_return_direction,pre_event_return_and_unconditional,"earnings-adjacent hunt 2026-11-14, E5 2,802-2,803",trial
+2026-11-14T19:41:26+00:00,crsp_event_windows,2022-24,stock_return_direction,pre_event_return_and_unconditional,"earnings-adjacent hunt 2026-11-14, E5 2,802-2,803 held-out",trial
+2026-11-14T19:41:26+00:00,crsp_expiry_weeks,2019-21,basket_return,option_expiration_week,"earnings-adjacent hunt 2026-11-14, E5 2,804",trial
+2026-11-14T19:41:26+00:00,hedged_event_hold,2013-18,residual_value,report_session,"earnings-adjacent hunt 2026-11-14, E5 2,805",trial
+2026-11-14T19:41:26+00:00,hedged_event_hold,2019-24,residual_value,report_session,"earnings-adjacent hunt 2026-11-14, E5 2,805 held-out",trial
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,hedged_hold,valuation_correction,"slate tests 2026-11-14, L1-corrections: L1-corrections score_corrections.py",descriptive
+2026-11-15T08:36:21+00:00,base_corrected,2019-24,hedged_hold,valuation_correction,"slate tests 2026-11-14, L1-corrections: L1-corrections score_corrections.py",descriptive
+2026-11-15T08:36:21+00:00,base_corrected,2025-26,hedged_hold,valuation_correction,"slate tests 2026-11-14, L1-corrections: L1-corrections score_corrections.py",descriptive
+2026-11-15T08:36:21+00:00,laneB_contract_choice_netted,2013-18,hedged_hold,contract_choice,"slate tests 2026-11-14, L1-corrections: L1-corrections a5_revalue.py, trials 2,832 and 2,834",trial
+2026-11-15T08:36:21+00:00,laneB_contract_choice_netted,2019-24,hedged_hold,contract_choice,"slate tests 2026-11-14, L1-corrections: L1-corrections a5_revalue.py, trials 2,833 and 2,835",trial
+2026-11-15T08:36:21+00:00,oos_2026_ledger_restrike,2025-26,naked_straddle,term_gate,"slate tests 2026-11-14, L1-corrections: L1-corrections a1_restrike.py, trials 2,836 to 2,838",trial
+2026-11-15T08:36:21+00:00,maker_entry_53aa4898_restrike,2025-26,resting_entry,execution,"slate tests 2026-11-14, L1-corrections: L1-corrections a6_restrike.py, trials 2,839 and 2,840",trial
+2026-11-15T08:36:21+00:00,base_corrected,2013-24,hedged_hold,special_dividend,"slate tests 2026-11-14, L1-corrections: L1-corrections a4_special_divs.py",descriptive
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,hedged_hold,execution_moc_auction,"slate tests 2026-11-14, L2-execution: L2-execution b1_auction.py",trial
+2026-11-15T08:36:21+00:00,base_corrected,2019-24,hedged_hold,execution_moc_auction,"slate tests 2026-11-14, L2-execution: L2-execution b1_auction.py",trial
+2026-11-15T08:36:21+00:00,base_corrected,2025-26,hedged_hold,execution_moc_auction,"slate tests 2026-11-14, L2-execution: L2-execution b1_auction.py",trial
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,hedged_hold,execution_fee_schedule,"slate tests 2026-11-14, L2-execution: L2-execution b10_fees.py",descriptive
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,hedged_hold,execution_expiry_choice,"slate tests 2026-11-14, L2-execution: L2-execution b6_score.py",trial
+2026-11-15T08:36:21+00:00,base_corrected,2019-24,hedged_hold,execution_expiry_choice,"slate tests 2026-11-14, L2-execution: L2-execution b6_score.py",trial
+2026-11-15T08:36:21+00:00,base_corrected,2019-24,hedged_hold,execution_fee_schedule,"slate tests 2026-11-14, L2-execution: L2-execution b10_fees.py",descriptive
+2026-11-15T08:36:21+00:00,base_corrected,2025-26,hedged_hold,execution_fee_schedule,"slate tests 2026-11-14, L2-execution: L2-execution b10_fees.py",descriptive
+2026-11-15T08:36:21+00:00,laneB_arms,2013-18,entry_execution,capacity_1819,"slate tests 2026-11-14, L2-execution: L2-execution b4_capacity.py",descriptive
+2026-11-15T08:36:21+00:00,laneB_arms,2019-24,entry_execution,capacity_1819,"slate tests 2026-11-14, L2-execution: L2-execution b4_capacity.py",descriptive
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,hedged_hold,execution_min_variance_delta,"slate tests 2026-11-14, L2-execution: L2-execution b2_mvdelta.py",trial
+2026-11-15T08:36:21+00:00,broad_entry_ticks,2023-24,entry_execution,capacity_1779,"slate tests 2026-11-14, L2-execution: L2-execution b4_capacity.py",descriptive
+2026-11-15T08:36:21+00:00,base_corrected,2019-24,hedged_hold,execution_min_variance_delta,"slate tests 2026-11-14, L2-execution: L2-execution b2_mvdelta.py",trial
+2026-11-15T08:36:21+00:00,broad_entry_ticks,2023,entry_execution,entry_minute_spread_state,"slate tests 2026-11-14, L2-execution: L2-execution b5_entry_minute.py",trial
+2026-11-15T08:36:21+00:00,broad_entry_ticks,2024,entry_execution,entry_minute_spread_state,"slate tests 2026-11-14, L2-execution: L2-execution b5_entry_minute.py",trial
+2026-11-15T08:36:21+00:00,base_corrected,2016-18,hedged_hold,execution_strangle_width_forecast,"slate tests 2026-11-14, L2-execution: L2-execution b8_strangle.py",trial
+2026-11-15T08:36:21+00:00,base_corrected,2019-24,hedged_hold,execution_strangle_width_forecast,"slate tests 2026-11-14, L2-execution: L2-execution b8_strangle.py",trial
+2026-11-15T08:36:21+00:00,base_corrected,2025-26,hedged_hold,execution_strangle_width_forecast,"slate tests 2026-11-14, L2-execution: L2-execution b8_2025.py",descriptive
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,hedged_hold,execution_delta_band_commission,"slate tests 2026-11-14, L2-execution: L2-execution b11_band.py",trial
+2026-11-15T08:36:21+00:00,base_corrected,2019-24,hedged_hold,execution_delta_band_commission,"slate tests 2026-11-14, L2-execution: L2-execution b11_band.py",trial
+2026-11-15T08:36:21+00:00,base_corrected,2025-26,hedged_hold,execution_delta_band_commission,"slate tests 2026-11-14, L2-execution: L2-execution b11_band.py (logged by hand, see diagnosis [26])",trial
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,residual_value,implied_borrow,"slate tests 2026-11-14, L3-selection: L3 c1_score.py trial 2,952",trial
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,hedged_hold,implied_borrow,"slate tests 2026-11-14, L3-selection: L3 c1_score.py trial 2,952",trial
+2026-11-15T08:36:21+00:00,base_corrected,2013-24,hedged_hold,implied_borrow_cost,"slate tests 2026-11-14, L3-selection: L3 c1_cost.py",descriptive
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,residual_value,option_stock_volume_d1,"slate tests 2026-11-14, L3-selection: L3 c8_score.py trial 2,953 (megacap)",trial
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,hedged_hold,option_stock_volume_d1,"slate tests 2026-11-14, L3-selection: L3 c8_score.py trial 2,953 (megacap)",trial
+2026-11-15T08:36:21+00:00,base_corrected,2019-24,residual_value,option_stock_volume_d1,"slate tests 2026-11-14, L3-selection: L3 c8_score.py trial 2,953 (megacap)",trial
+2026-11-15T08:36:21+00:00,base_corrected,2019-24,hedged_hold,option_stock_volume_d1,"slate tests 2026-11-14, L3-selection: L3 c8_score.py trial 2,953 (megacap)",trial
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,hedged_hold,session_concentration_cap,"slate tests 2026-11-14, L3-selection: L3 f3_risk.py",descriptive
+2026-11-15T08:36:21+00:00,base_corrected,2019-24,hedged_hold,session_concentration_cap,"slate tests 2026-11-14, L3-selection: L3 f3_risk.py",descriptive
+2026-11-15T08:36:21+00:00,base_corrected,2025-26,hedged_hold,session_concentration_cap,"slate tests 2026-11-14, L3-selection: L3 f3_risk.py",descriptive
+2026-11-15T08:36:21+00:00,forecastex_index_contracts,disc,event_contract_vs_option_digital,ladder_shape,"slate tests 2026-11-14, L3-selection: L3 e5_score.py trials 2,954-2,955",trial
+2026-11-15T08:36:21+00:00,hedged_event_hold_megacap,2013-18,residual_value,option_stock_volume_d1,"slate tests 2026-11-14, L3-selection: L3 c8_score.py trial 2,953 (restates the base_corrected-labelled rows above under the megacap panel name)",trial
+2026-11-15T08:36:21+00:00,hedged_event_hold_megacap,2013-18,hedged_hold,option_stock_volume_d1,"slate tests 2026-11-14, L3-selection: L3 c8_score.py trial 2,953 (restatement)",trial
+2026-11-15T08:36:21+00:00,hedged_event_hold_megacap,2019-24,residual_value,option_stock_volume_d1,"slate tests 2026-11-14, L3-selection: L3 c8_score.py trial 2,953 (restatement)",trial
+2026-11-15T08:36:21+00:00,hedged_event_hold_megacap,2019-24,hedged_hold,option_stock_volume_d1,"slate tests 2026-11-14, L3-selection: L3 c8_score.py trial 2,953 (restatement)",trial
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,residual_value,implied_borrow,"slate tests 2026-11-14, L3-selection: L3 c1_describe.py (exploratory)",descriptive
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,hedged_hold,implied_borrow,"slate tests 2026-11-14, L3-selection: L3 c1_describe.py (exploratory)",descriptive
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,hedged_hold_H_corr,online_bayes_1559_cost_structure,"slate tests 2026-11-14, L4-bayes: L4 fit_discovery (trials 3,012 and 3,017)",trial
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,hedged_hold_H_corr,online_bayes_iteration_round_1,"slate tests 2026-11-14, L4-bayes: L4 search_discovery (rolling origin 2015-18)",trial
+2026-11-15T08:36:21+00:00,base_corrected,2013-18,residual_value,online_bayes_iteration_round_1,"slate tests 2026-11-14, L4-bayes: L4 search_discovery (rolling origin 2015-18)",trial
+2026-11-15T08:36:21+00:00,base_corrected,2019-24,hedged_hold_H_corr,online_bayes_iteration_round_1,"slate tests 2026-11-14, L4-bayes: L4 score_heldout (H_corr, frozen champion)",trial
+2026-11-15T08:36:21+00:00,base_corrected,2025-26,hedged_hold_H_corr,online_bayes_iteration_round_1,"slate tests 2026-11-14, L4-bayes: L4 score_heldout (H_corr, frozen champion)",trial
+2026-11-15T08:36:21+00:00,base_corrected,2019-24,residual_value,online_bayes_iteration_round_1,"slate tests 2026-11-14, L4-bayes: L4 score_heldout (residual_value, frozen champion)",trial
+2026-11-15T08:36:21+00:00,base_corrected,2025-26,residual_value,online_bayes_iteration_round_1,"slate tests 2026-11-14, L4-bayes: L4 score_heldout (residual_value, frozen champion)",trial
+2026-11-15T08:36:21+00:00,base_corrected,2025-26,hedged_hold_H_corr,online_bayes_round_2_no_cost,"slate tests 2026-11-14, L4-bayes: L4 round2 (exploratory, after the 2019-24 read)",trial
+2026-11-15T17:51:03+00:00,base_corrected,2025-26,hedged_hold_H_stored_and_residual_value,attrition_no_commission,"deep learning 2026-11-15, D0-surface: D0 step1_targets (attrition test, trial 3,134)",trial
+2026-11-15T17:51:03+00:00,base_corrected,2013-26,hedged_hold_H_corr,online_bayes_iteration_round_1,"deep learning 2026-11-15, D0-surface: D0 step2_benchmark (reproduction of L4 run_H_corr, not a trial)",descriptive
+2026-11-15T17:51:03+00:00,base_corrected,2013-18,hedged_hold_H_net,online_bayes_iteration_round_1,"deep learning 2026-11-15, D0-surface: D0 step2_benchmark (L4 champion re-run on H_net)",trial
+2026-11-15T17:51:03+00:00,base_corrected,2019-24,hedged_hold_H_net,online_bayes_iteration_round_1,"deep learning 2026-11-15, D0-surface: D0 step2_benchmark (L4 champion re-run on H_net), trial 3,132",trial
+2026-11-15T17:51:03+00:00,base_corrected,2025-26,hedged_hold_H_net,online_bayes_iteration_round_1,"deep learning 2026-11-15, D0-surface: D0 step2_benchmark (L4 champion re-run on H_net), trial 3,133",trial
+2026-11-15T17:51:03+00:00,base_corrected,2013-18,hedged_hold_H_net,chain_surface_fill,"deep learning 2026-11-15, D0-surface: D0 check_surfaces (sparse-surface attrition, trial 3,135)",trial
+2026-11-15T17:51:03+00:00,base_corrected,2019-24,hedged_hold_H_net,chain_surface_fill,"deep learning 2026-11-15, D0-surface: D0 check_surfaces (sparse-surface attrition, trial 3,135)",trial
+2026-11-15T17:51:03+00:00,D0 targets (base_corrected),2013-18,H_net_log_density_and_book,dl_surface_network,"deep learning 2026-11-15, D1-surface-net: D1 dev (loaded 2026-11-15T16:26:44+00:00)",trial
+2026-11-15T17:51:03+00:00,D0 targets (base_corrected),2019-24,H_net_log_density_and_book,dl_surface_network,"deep learning 2026-11-15, D1-surface-net: D1 primary frozen held-out scorer (loaded 2026-11-15T16:32:26+00:00)",trial
+2026-11-15T17:51:03+00:00,D1 held-out cards,2019-24,H_net_log_density_and_book,dl_surface_network,"deep learning 2026-11-15, D1-surface-net: D1 explore_gain primary (loaded 2026-11-15T16:40:38+00:00)",descriptive
+2026-11-15T17:51:03+00:00,D1 held-out cards,2019-24,H_net_log_density_and_book,dl_surface_network,"deep learning 2026-11-15, D1-surface-net: D1 surface_contribution (loaded 2026-11-15T17:04:19+00:00)",trial
+2026-11-15T17:51:03+00:00,D0 targets (base_corrected),2025-26,H_net_log_density_and_book,dl_surface_network,"deep learning 2026-11-15, D1-surface-net: D1 primary frozen held-out scorer (loaded 2026-11-15T17:04:42+00:00)",trial
+2026-11-15T17:51:03+00:00,D1 held-out cards,2025-26,H_net_log_density_and_book,dl_surface_network,"deep learning 2026-11-15, D1-surface-net: D1 surface_contribution (loaded 2026-11-15T17:14:20+00:00)",trial
+2026-11-15T17:51:03+00:00,D0_targets_base_corrected,2013-18,hedged_hold_H_net,d2_tabular_mdn_l4_declared,"deep learning 2026-11-15, D2-tabular: D2 development load check (no fit)",trial
+2026-11-15T17:51:03+00:00,D0_targets_base_corrected,2019-24,hedged_hold_H_net,d2_tabular_mdn_l4_declared,"deep learning 2026-11-15, D2-tabular: D2 score_heldout 2019-24 (frozen)",trial
+2026-11-15T17:51:03+00:00,D0_targets_base_corrected,2025-26,hedged_hold_H_net,d2_tabular_mdn_l4_declared,"deep learning 2026-11-15, D2-tabular: D2 score_heldout 2025-26 (frozen)",trial
+2026-11-15T17:51:03+00:00,D0_targets_base_corrected,2019-24,hedged_hold_H_net,d2_tabular_mdn_l4_declared,"deep learning 2026-11-15, D2-tabular: D2 explore_2019_24 (exploratory, after the frozen read)",descriptive
+2026-11-15T17:51:03+00:00,D0 targets and lane per-event outputs,2013-18,hedged_hold_H_net,dl_review_checks,"deep learning 2026-11-15, review: review check_density (development rows)",descriptive
+2026-11-15T17:51:03+00:00,D0 targets and lane per-event outputs,2019-24,hedged_hold_H_net,dl_review_checks,"deep learning 2026-11-15, review: review check_gain_source (stored per-event files, exploratory)",descriptive

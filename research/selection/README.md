@@ -73,5 +73,9 @@ Frozen texts, verified byte for byte against `outputs/research/prereg_*.json` by
 - [`reverse_alpha.md`](findings/reverse_alpha.md): Reverse-engineering the term gate: the profitable region is a jump-risk premium, not an inefficiency
 - [`season_state_and_earnings_covariance.md`](findings/season_state_and_earnings_covariance.md): Pivot experiments: season state and earnings covariance
 - [`section21_peer.md`](findings/section21_peer.md): Peer-informed selection scored on repricing: findings
+- [`2026-11-13-alpha-hunt.md`](findings/2026-11-13-alpha-hunt.md): Alpha hunt, five lanes: no selector survives a held-out read (exploratory)
+- [`2026-11-13-alpha-hunt-2.md`](findings/2026-11-13-alpha-hunt-2.md): Alpha hunt, round 2: ten lanes (exploratory)
+- [`2026-11-14-idea-slate.md`](findings/2026-11-14-idea-slate.md): Idea slate: fifty candidates after the earnings-adjacent hunt, with test status
+- [`2026-11-15-deep-learning.md`](findings/2026-11-15-deep-learning.md): Deep learning on the 15:59 chain: the surface adds nothing; the gain over L4 is its scale by tenor (exploratory)
 
 Verdicts and key figures for every study are tabulated in [`docs/RESEARCH_STATE.md`](../../docs/RESEARCH_STATE.md).

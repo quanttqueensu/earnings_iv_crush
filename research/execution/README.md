@@ -35,5 +35,6 @@ Frozen texts, verified byte for byte against `outputs/research/prereg_*.json` by
 - [`dolthub_defect.md`](findings/dolthub_defect.md): DoltHub option chains: stale exit snapshots invalidate the 2019-2024 DoltHub straddle results
 - [`entry_spread_dolthub.md`](findings/entry_spread_dolthub.md): Entry-spread filter on DoltHub 2019-2024: not confirmed
 - [`flow_liquidity.md`](findings/flow_liquidity.md): W1: resting orders on the earnings straddle (F1) and customer demand pressure (F2)
+- [`2026-11-14-slate-tests.md`](findings/2026-11-14-slate-tests.md): Slate tests: corrected valuation, cost levers and a sequential Bayesian model (exploratory)
 
 Verdicts and key figures for every study are tabulated in [`docs/RESEARCH_STATE.md`](../../docs/RESEARCH_STATE.md).
