@@ -5,7 +5,12 @@
 research/**/preregs/*.md -text
 research/**/prereg.md -text
 research/**/prereg_amendment_*.md -text
+research/**/amendment_*.md -text
+research/**/forward_prereg.md -text
 outputs/research/prereg_*.json -text
+outputs/research/prereg_*.runs.jsonl -text
+# A scorer whose hash a record pins (its `scorer_file`) is frozen byte for byte too.
+research/execution/2026-11-13-maker-entry-confirmation/study.py -text
 
 # Shell scripts run inside Linux containers and must keep LF endings everywhere.
 *.sh text eol=lf

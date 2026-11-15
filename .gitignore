@@ -47,6 +47,9 @@ outputs/research/*
 # The pre-registration hash records: the project's own declarations (trial id, date,
 # SHA-256 of the frozen text), checked against research/*/preregs by the test suite.
 !outputs/research/prereg_*.json
+# Their run logs (timestamp, event and scorer SHA-256 only), which the same test reads to check
+# that a pinned scorer is the code that produced the outcomes.
+!outputs/research/prereg_*.runs.jsonl
 
 # Python
 __pycache__/
