@@ -27,7 +27,8 @@ RUN pip install --no-cache-dir --no-deps .
 
 COPY scripts/paper_trade_ibkr.py scripts/forward_report.py scripts/sweep_term_panel.py ./scripts/
 COPY outputs/research/events_megacap_v2.parquet outputs/research/events_broad_oos_2025.parquet ./outputs/research/
-COPY deploy/run_paper_daily.sh deploy/session_check.py ./deploy/
+COPY data/universe_broad.csv ./data/
+COPY deploy/run_paper_daily.sh deploy/session_check.py deploy/gateway_probe.py ./deploy/
 RUN chmod +x deploy/run_paper_daily.sh
 
 CMD ["deploy/run_paper_daily.sh"]

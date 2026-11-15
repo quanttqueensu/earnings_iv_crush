@@ -46,22 +46,21 @@ case $? in
 esac
 
 log "-- gateway check (${IB_HOST}:${IB_PORT}) --"
-# The gateway restarts nightly and may still be logging in after a reboot, so
-# allow it a few minutes before calling the login broken.
+# A listening port is not a logged-in gateway: after a refused overnight reconnect
+# the port stays open and every request times out. The probe asks for positions
+# read-only. The gateway restarts nightly and may still be logging in, so allow it
+# a few minutes before calling the login broken.
 ready=0
 for _ in $(seq 1 12); do
-    if python - <<'PY'
-import os, socket, sys
-try:
-    socket.create_connection((os.environ["IB_HOST"], int(os.environ["IB_PORT"])), 5).close()
-except OSError:
-    sys.exit(1)
-PY
-    then ready=1; break; fi
+    python deploy/gateway_probe.py >>"$LOG" 2>&1
+    case $? in
+        0) ready=1; break ;;
+        3) fail "gateway probe refused the endpoint (live port or non-paper account)" ;;
+    esac
     sleep 15
 done
-[ "$ready" = 1 ] || fail "no IB paper gateway on ${IB_HOST}:${IB_PORT} after 3 minutes"
-log "Gateway reachable."
+[ "$ready" = 1 ] || fail "IB paper gateway on ${IB_HOST}:${IB_PORT} not logged in after 3 minutes"
+log "Gateway logged in."
 
 transmit=""
 if [ -f "$CONTROL/TRANSMIT_OK" ]; then
@@ -75,12 +74,16 @@ status=0
 
 # One pass: exits and entries run through the same 15:45-15:55 ET ladder, so the
 # pass must start by 15:20 to leave time for calendar confirmation and snapshots.
+# Hard ceilings so a session lost mid-pass fails loudly instead of hanging until
+# the next cron run: 60 min from a 15:20 start ends after the 16:00 close, when
+# DAY orders have expired; exit 124 is a timeout.
 log "-- session pass --"
-python -m scripts.paper_trade_ibkr session $transmit >>"$LOG" 2>&1 \
-    || { log "session exit $?"; status=1; }
+timeout --kill-after=60 3600 python -m scripts.paper_trade_ibkr session $transmit >>"$LOG" 2>&1 \
+    || { rc=$?; log "session exit $rc$([ "$rc" = 124 ] && echo ' (timed out)')"; status=1; }
 
 log "-- significance report --"
-python scripts/forward_report.py --out "$CONTROL/reports/forward_report.md" >>"$LOG" 2>&1 \
+timeout --kill-after=30 600 python scripts/forward_report.py \
+    --out "$CONTROL/reports/forward_report.md" >>"$LOG" 2>&1 \
     || { log "report exit $?"; status=1; }
 
 # An entry pass where candidates were seen and none priced is a data fault the

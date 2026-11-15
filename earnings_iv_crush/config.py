@@ -382,6 +382,10 @@ class LiveConfig:
         cancel; reading the status straight after sending the cancel books that leg
         as unfilled while the broker has in fact closed it. Defaults to ``2.0``,
         several gateway round trips.
+    cancel_confirm_s, cancel_confirm_poll_s : float
+        Longest wait, and poll interval, for the broker to confirm a cancel before
+        the ladder acts on that order: the price-cap re-price after the sweep, and
+        the flatten of a legged entry. Defaults to ``30.0`` and ``1.0``.
     halt_file : str
         Second switch. When it exists, nothing transmits on any path (entry, exit,
         flatten), and working orders are cancelled at the next rung. ``STOP``
@@ -414,6 +418,14 @@ class LiveConfig:
         Latest time (ET) a pass may begin pricing. A pass that starts after the
         final rung cannot run the ladder and must not improvise one, so it raises
         an alarm and sends nothing. Defaults to ``"15:54:00"``.
+    exit_sweep_at : str
+        Time (ET), between the last rung and the cancel, at which every unfilled
+        buy-back is re-priced once through the displayed ask. Defaults to
+        ``"15:56:30"``.
+    exit_sweep_frac, exit_sweep_min : float
+        The sweep's allowance above the displayed ask: the larger of this fraction
+        of the ask and this many dollars per share. Defaults ``0.20`` and ``0.10``;
+        the rationale sits beside the fields.
     max_names_per_day : int
         Entry cap. The specification's value is 12 (keeps 81.7% of 2025-26
         trades); the default of 3 is the shakedown value, held until 20
@@ -460,6 +472,16 @@ class LiveConfig:
     exit_reprice_steps: int = 2
     exit_step_wait_s: float = 10.0
     exit_cancel_settle_s: float = 2.0
+    # How long the ladder keeps re-reading an order the broker is still cancelling
+    # (PendingCancel) before acting on it. On the paper account a cancel near the
+    # close took from 2 s to over 60 s to confirm (2026-11-13: a price-capped CSCO
+    # sweep sat in PendingCancel at +2 s, so its re-price never ran; a part-filled
+    # TSN entry was still PendingCancel a minute after its cancel, and the flatten
+    # sent beside it was repriced by IB so as not to cross it, and never filled).
+    # 30 s keeps the sweep's re-price before 15:57:00 and leaves the flatten at least
+    # 18 s before the 15:58:50 cancel; poll each second.
+    cancel_confirm_s: float = 30.0
+    cancel_confirm_poll_s: float = 1.0
 
     halt_file: str = "outputs/live/HALT"
     dry_dir: str = "outputs/live/dry"
@@ -476,6 +498,20 @@ class LiveConfig:
     ladder_cancel_at: str = "15:58:00"
     ladder_nbbo_at: str = "15:59:00"
     ladder_latest_start: str = "15:54:00"
+    # Closing sweep for buy-backs. The touch rung bids the displayed ask, and on a
+    # delayed feed that ask is about fifteen minutes old, so a leg can sit unfilled
+    # under the real offer and leave a naked short (the first transmitted exit did).
+    # After the last rung every unfilled exit leg, and every flatten of a legged
+    # entry, is re-priced once through the displayed ask by the larger of
+    # exit_sweep_frac of the ask and exit_sweep_min dollars per share. The broker
+    # fills a marketable limit at the real offer, so the allowance bounds the worst
+    # price rather than setting it. 20% covers roughly a two-sigma fifteen-minute
+    # move in an at-the-money weekly on a post-earnings day (author's estimate, not
+    # measured); the 0.10 floor is two coarse ticks, for cheap wings where 20% of
+    # the ask is under a tick. No environment override: they bound what is paid.
+    exit_sweep_at: str = "15:56:30"
+    exit_sweep_frac: float = 0.20
+    exit_sweep_min: float = 0.10
 
     max_names_per_day: int = field(default_factory=lambda: _env_int("MAX_NAMES_PER_DAY", 3))
     max_contracts_per_leg: int = 5
@@ -491,9 +527,576 @@ class LiveConfig:
             )
 
 
+@dataclass(frozen=True)
+class HedgedHoldConfig:
+    """
+    Parameters of the delta-hedged hold-to-expiry studies and their HAR selector.
+
+    Every value is fixed by the 2026-10-20 pre-registrations
+    (``research/timing/2026-10-20-hedged-hold/prereg.md`` and siblings); none was swept.
+
+    Attributes
+    ----------
+    pre_event_dte : tuple[int, int]
+        Calendar days to expiry for the pre-event sale. ``(20, 45)``: long enough that a single
+        half-spread is spread over several weeks of diffusive premium, short enough to stay in
+        the liquid monthly expiries.
+    post_event_dte : tuple[int, int]
+        The same window for the post-event sale. ``(14, 45)``, matching the unhedged post-event
+        study so the hedge is the only difference.
+    split_min_gap_days : int
+        Minimum days between the two expiries of the jump split when the sold expiry is the
+        front one. ``14``: below this the variance difference is dominated by quote noise.
+    jump_split_min_gap_days : int
+        The same gap for the next-session jump-richness book. ``7``: the weekly after the front.
+    fee_per_contract_leg : float
+        Option commission per contract per leg, USD. ``0.65``, the book's broker rate.
+    disposal_bps : float
+        Cost of disposing of delivered stock at settlement, bp of spot. ``5``.
+    equity_cost_floor_bps : float
+        Floor on the per-side equity half-spread, bp. ``1``: CRSP closing quotes on megacaps can
+        be a cent wide, which understates impact.
+    hedge_margin_frac : float
+        Reg-T margin on the stock hedge. ``0.5``.
+    har_lags : tuple[int, int, int]
+        HAR-RV regressor windows in trading days (Corsi 2009). ``(1, 5, 22)``.
+    har_min_rows : int
+        Minimum complete regression rows before a HAR forecast is issued. ``500``, about two
+        years.
+    tercile_min_prior : int
+        Minimum strictly earlier events before a causal tercile is assigned. ``200``.
+    decile_min_prior : int
+        The same for the equity decile sorts. ``300``.
+    jump_hist_windows : tuple[int, int, int]
+        Prior announcements averaged in the HAR-style jump forecast. ``(1, 4, 8)``.
+    jump_hist_min : int
+        Minimum prior announcements for a jump forecast. ``4``.
+    equity_hold_days : int
+        Holding period of the post-event equity signals, trading days. ``20``.
+    put_delta_target : float
+        Delta of the skew leg. ``-0.25``.
+    slope_min_gap_days : int
+        Days beyond the sold expiry for the far leg of the post-event term slope. ``21``.
+    net_assignment : bool
+        How a hedged hold settles at expiry. ``False`` unwinds the whole stock hedge at the
+        settlement close and pays ``disposal_bps`` on the assigned share, the convention frozen
+        in every hedged-hold study registered before 2026-11-13, kept so those studies reproduce.
+        ``True`` lets physical assignment of the in-the-money leg net against the hedge, so only
+        the residual ``h - sign(S - K)`` trades and nothing is disposed of; that is how the
+        position actually settles (trial 1,856, adopted 2026-11-13). New work uses
+        ``HEDGED_NET``. A naked hold has no hedge to net against and keeps the disposal charge
+        under either value.
+    """
+
+    pre_event_dte: tuple[int, int] = (20, 45)
+    post_event_dte: tuple[int, int] = (14, 45)
+    split_min_gap_days: int = 14
+    jump_split_min_gap_days: int = 7
+    fee_per_contract_leg: float = 0.65
+    disposal_bps: float = 5.0
+    equity_cost_floor_bps: float = 1.0
+    hedge_margin_frac: float = 0.5
+    har_lags: tuple[int, int, int] = (1, 5, 22)
+    har_min_rows: int = 500
+    tercile_min_prior: int = 200
+    decile_min_prior: int = 300
+    jump_hist_windows: tuple[int, int, int] = (1, 4, 8)
+    jump_hist_min: int = 4
+    equity_hold_days: int = 20
+    put_delta_target: float = -0.25
+    slope_min_gap_days: int = 21
+    net_assignment: bool = False
+
+
+@dataclass(frozen=True)
+class HoldCorrectionsConfig:
+    """
+    Valuation corrections to the hedged hold: early assignment, financing, special dividends.
+
+    Introduced by the 2026-11-14 slate-tests corrections lane. Nothing here changes a default
+    of ``hedged_short_straddle``; every correction is opt-in. The broker spreads are declared
+    assumptions (recalled from IBKR Pro's published schedule, not verified at source), not fits.
+
+    Attributes
+    ----------
+    long_spread_bps : float
+        Annual spread over the overnight rate charged on a long stock hedge financed on margin,
+        bp. ``150``: IBKR Pro's benchmark plus 1.5% on the smallest debit tier, the dearest
+        tier, so the long-hedge charge is conservative.
+    short_rebate_spread_bps : float
+        Annual spread below the overnight rate on the rebate paid on short-sale proceeds, bp.
+        ``25``: the broker's stated haircut on short credit for balances that earn a rebate.
+    borrow_fee_bps : float
+        Annual stock-loan fee on a short hedge, bp. ``25``: general-collateral borrow. Names
+        that are hard to borrow cost more; the implied-borrow lane measures that separately.
+    cash_credit_spread_bps : float
+        Annual spread below the overnight rate on interest paid on the premium held as cash,
+        bp. ``50``: IBKR Pro's benchmark less 0.5%. The credit rate is floored at zero.
+    day_basis : float
+        Day-count denominator for money-market accrual. ``360``: the federal funds rate and
+        broker interest on USD balances accrue ACT/360.
+    min_recovered_div : float
+        Smallest dividend recovered from CRSP total against price return, USD per share.
+        ``0.005``: below this the gap is rounding in CRSP's prices (as in the E4 audit).
+    special_div_per_contract : float
+        OCC adjusts a contract for a non-regular cash dividend of at least this much per
+        contract, USD. ``12.50`` (OCC By-Laws, Article VI, Section 11A; recalled).
+    contract_multiplier : float
+        Shares per standard equity option contract. ``100``.
+    special_div_ratio : float
+        A dividend counts as non-regular when it exceeds this multiple of the median of the
+        name's previous recovered dividends. ``2.0``: regular dividend increases are a few
+        percent to a few tens of percent, specials are typically several times the regular.
+    occ_large_div_frac : float
+        A cash dividend of at least this fraction of the cum-dividend close is adjusted by OCC
+        whether or not it is regular. ``0.10`` (recalled).
+    """
+
+    long_spread_bps: float = 150.0
+    short_rebate_spread_bps: float = 25.0
+    borrow_fee_bps: float = 25.0
+    cash_credit_spread_bps: float = 50.0
+    day_basis: float = 360.0
+    min_recovered_div: float = 0.005
+    special_div_per_contract: float = 12.50
+    contract_multiplier: float = 100.0
+    special_div_ratio: float = 2.0
+    occ_large_div_frac: float = 0.10
+
+
+@dataclass(frozen=True)
+class ShadowConfig:
+    """
+    The shadow book: alternatives marked beside every real paper trade, never traded.
+
+    Attributes
+    ----------
+    equity_half_spread_bps : float
+        Per-side half-spread charged on every shadow stock-hedge trade. ``3.0``, the value
+        frozen in amendment 01 of the hedged-event-hold study (the 90th percentile of CRSP
+        closing half-spreads across its names in 2024 was 2.93 bp).
+    gate_min_prior : int
+        Prior transmitted trades needed before the G1 flag is computed. ``25``, the
+        ``research.gates.MIN_HIST`` warm-up the forward gate study uses.
+    gate_term_q, gate_spread_q : float
+        G1's cuts as frozen in the forward combined-gates pre-registration: term spread at or
+        above its causal two-thirds quantile, entry spread at or below its causal median.
+    out_name : str
+        File written next to the pass's other stores (dry passes in their own folder).
+    """
+
+    equity_half_spread_bps: float = 3.0
+    gate_min_prior: int = 25
+    gate_term_q: float = 2 / 3
+    gate_spread_q: float = 0.5
+    out_name: str = "shadow_book.csv"
+
+
+ONLINE_BAYES_VARIANCE_WEIGHTS = ("none", "premium_share")
+ONLINE_BAYES_FEATURE_SETS = ("declared", "wide")
+ONLINE_BAYES_TRANSFORMS = ("none", "yj_loss")
+
+
+@dataclass(frozen=True)
+class OnlineBayesConfig:
+    """
+    The sequential Bayesian model of the hedged hold (``research/online_bayes.py``).
+
+    Introduced by the 2026-11-14 slate-tests lane L4. The four searched fields (``discount``,
+    ``coef_prior_scale``, ``name_prior_scale``, ``variance_weight``) hold the values selected on
+    2013-18 by mean log predictive score over the declared grids and frozen in
+    ``outputs/research/2026-11-14-slate-tests/L4-bayes/freeze_online_bayes.md``; every other
+    value is declared, not fitted.
+
+    Attributes
+    ----------
+    discount : float
+        Discount on the coefficient block of the covariance, applied once per update date.
+        ``1.0`` is no forgetting; the half-life in update dates is ``ln 0.5 / ln discount``.
+    variance_discount : float
+        Multiplier on the inverse-gamma ``a`` and ``b`` per update date. ``1.0``: off, not
+        searched; the coefficient discount is the declared forgetting mechanism.
+    coef_prior_scale : float
+        Prior variance of each standardised feature's coefficient, in units of ``sigma^2``.
+    intercept_prior_scale : float
+        Prior variance of the intercept in units of ``sigma^2``. ``1.0``: weak against the 200
+        trades that settle before any prediction is scored.
+    name_prior_scale : float
+        ``kappa_u = tau^2 / sigma^2``, the name intercepts' prior variance. Zero switches the name
+        effect off.
+    prior_df : float
+        Prior degrees of freedom ``2 a0`` of ``sigma^2``. ``2.0``: the weakest prior with a finite
+        predictive scale.
+    prior_sigma : float
+        Prior guess of the residual standard deviation in the target's units (``b0 = a0
+        prior_sigma^2``). ``5.0`` % of m0, an order of magnitude (conjecture); with ``prior_df``
+        2 it carries the weight of one trade.
+    variance_weight : str
+        ``"none"`` (``v_j = 1``) or ``"premium_share"`` (``v_j`` proportional to ``(s0 / m0)^2``
+        over its causal expanding mean): the hedged P&L scales with the premium, so its variance
+        in % of m0 scales with the premium's share of m0.
+    min_settled : int
+        Settled trades in the posterior before a prediction is scored or acted on. ``200``.
+    min_prior_events : int
+        Events with strictly earlier entry dates before features are standardised. ``200``.
+    margin_spot_frac : float
+        The spot fraction in ``m0 = margin_spot_frac x forward + bid``. ``0.20``, the project's
+        margin unit; inverted to recover the 15:59 forward.
+    decision_threshold : float
+        Trade when the predictive P(y > 0) exceeds this. ``0.5``, declared and not tuned; with a
+        symmetric predictive it is a positive predictive mean.
+    interval_level : float
+        Central predictive interval whose coverage is checked. ``0.90``.
+    pit_bins : int
+        Bins of the probability-integral-transform histogram. ``10``.
+    gauge_level : float
+        Credible level of the book gauge's interval. ``0.95``.
+    gauge_stop, gauge_promote : float
+        Monitor thresholds on the design-effect P(book mean > 0). ``0.05`` and ``0.95``,
+        declared; coherent under optional stopping as a posterior, with no frequentist error
+        guarantee.
+    discount_grid, coef_prior_grid, name_prior_grid, variance_weight_grid : tuple
+        The declared search space, scored on 2013-18 only. Updates fall on about 43 dates a year
+        on the base panel, so the discount half-lives are about 3.2 years (0.995), 0.8 years
+        (0.98) and 0.3 years (0.95).
+    pct_per_unit : float
+        Multiplier from a fraction of m0 to % of m0. ``100``: ``H_corr``, ``residual_value`` and
+        the shadow book's ``H_shadow`` are stored as fractions; the model's target is in %.
+    obs_df : float
+        Degrees of freedom ``nu`` of a Student-t observation error, written as a scale mixture
+        ``e_j | lambda_j ~ N(0, sigma^2 v_j / lambda_j)``, ``lambda_j ~ Gamma(nu / 2, nu / 2)``.
+        ``inf`` (the default) is the Gaussian model, unchanged. Added by the L4 iteration round;
+        the hedged P&L has gap tails, so a finite ``nu`` is a searched option.
+    group_prior_scale : float
+        ``kappa_g``, the prior variance of an industry intercept shared by the names in it, in
+        ``sigma^2`` units. Zero (the default) switches the level off.
+    variance_power : float
+        Exponent ``k`` of the premium-share weight, ``v_j = ps_j^k / mean(ps^k)``. ``2.0`` (the
+        default) is the original weight; searched in the iteration round.
+    feature_set : str
+        Which 15:59 feature set ``online_bayes.FEATURE_SETS`` builds. ``"declared"`` (the
+        default) is the seven declared features.
+    mixture_nodes, mixture_log_lo, mixture_log_hi : int, float, float
+        Trapezoid grid in ``log lambda`` on which the Student-t mixture predictive and the
+        posterior weight of an observation are integrated. 241 nodes over ``[-14, 4]``: the
+        Gamma mass outside it is below 1e-9 for ``nu >= 2``, and the integrand is smooth in
+        ``log lambda``, so the rule converges geometrically (checked against adaptive
+        quadrature in the tests).
+    z_clip : float
+        Bound on every causally standardised feature, ``|z| <= z_clip``. ``inf`` (the default)
+        leaves the declared features as they were; the wide set's skewed cost and wing fields
+        are clipped at 5 so one stale quote cannot dominate a coefficient.
+    target_transform, yj_power : str, float
+        ``"none"`` (the default) models ``y`` itself. ``"yj_loss"`` models the Yeo-Johnson
+        transform, power ``yj_power``, of the loss ratio ``-y / U`` with ``U`` the 15:59 premium
+        in % of m0 (``100 s0 / m0``), and scores the density on the original scale through the
+        Jacobian. The seller's outcome is bounded above near the premium and has a long loss
+        tail, so a symmetric predictive on ``y`` misplaces both tails; on the payout-ratio scale
+        the outcome is close to symmetric. ``yj_power`` 1 is the identity on ``-y / U``.
+    ev_draws, ev_seed : int
+        Common random numbers for the predictive mean of a transformed target (Monte Carlo),
+        used only by the expected-value decision rule. 2,000 draws, seed 0.
+    """
+
+    discount: float = 1.0
+    variance_discount: float = 1.0
+    coef_prior_scale: float = 0.01
+    intercept_prior_scale: float = 1.0
+    name_prior_scale: float = 0.01
+    prior_df: float = 2.0
+    prior_sigma: float = 5.0
+    variance_weight: str = "premium_share"
+    min_settled: int = 200
+    min_prior_events: int = 200
+    margin_spot_frac: float = 0.20
+    decision_threshold: float = 0.5
+    interval_level: float = 0.90
+    pit_bins: int = 10
+    gauge_level: float = 0.95
+    gauge_stop: float = 0.05
+    gauge_promote: float = 0.95
+    discount_grid: tuple[float, ...] = (1.0, 0.995, 0.98, 0.95)
+    coef_prior_grid: tuple[float, ...] = (0.001, 0.01, 0.1)
+    name_prior_grid: tuple[float, ...] = (0.0, 0.003, 0.01, 0.03, 0.1)
+    variance_weight_grid: tuple[str, ...] = ONLINE_BAYES_VARIANCE_WEIGHTS
+    pct_per_unit: float = 100.0
+    obs_df: float = float("inf")
+    group_prior_scale: float = 0.0
+    variance_power: float = 2.0
+    feature_set: str = "declared"
+    mixture_nodes: int = 241
+    mixture_log_lo: float = -14.0
+    mixture_log_hi: float = 4.0
+    z_clip: float = float("inf")
+    target_transform: str = "none"
+    yj_power: float = 1.0
+    ev_draws: int = 2000
+    ev_seed: int = 0
+
+    def __post_init__(self) -> None:
+        if not 0 < self.discount <= 1 or not 0 < self.variance_discount <= 1:
+            raise ValueError("discounts lie in (0, 1]")
+        if self.target_transform not in ONLINE_BAYES_TRANSFORMS or not 0 <= self.yj_power < 2:
+            raise ValueError(f"target_transform in {ONLINE_BAYES_TRANSFORMS}, 0 <= yj_power < 2")
+        if not self.z_clip > 0 or self.ev_draws < 1:
+            raise ValueError("z_clip > 0 and ev_draws >= 1 required")
+        if not self.obs_df > 0 or self.group_prior_scale < 0 or not self.variance_power > 0:
+            raise ValueError("obs_df > 0, group_prior_scale >= 0 and variance_power > 0 required")
+        if self.feature_set not in ONLINE_BAYES_FEATURE_SETS:
+            raise ValueError(f"feature_set is one of {ONLINE_BAYES_FEATURE_SETS}")
+        if self.variance_weight not in ONLINE_BAYES_VARIANCE_WEIGHTS:
+            raise ValueError(f"variance_weight is one of {ONLINE_BAYES_VARIANCE_WEIGHTS}")
+        if min(self.coef_prior_scale, self.intercept_prior_scale) <= 0:
+            raise ValueError("coefficient prior scales are positive")
+        if self.name_prior_scale < 0 or self.prior_df <= 0 or self.prior_sigma <= 0:
+            raise ValueError("name_prior_scale >= 0, prior_df > 0 and prior_sigma > 0 required")
+
+
 # Canonical singletons. Domain modules import these and re-export the individual
 # fields under their established names, so this file stays the single source of
 # truth without altering any public API.
+@dataclass(frozen=True)
+class ExecutionLeversConfig:
+    """
+    Declared inputs of the execution and cost levers (2026-11-14 slate-tests lane L2).
+
+    Nothing here is fitted and nothing changes an existing default. Fee figures carry their
+    status: "verified" was read on the published schedule; "recalled" could not be read at the
+    source (Interactive Brokers' site refuses automated clients) and is the project's recollection.
+
+    Attributes
+    ----------
+    auction_cost_grid_bps : tuple[float, ...]
+        Per-side price impact of a market-on-close order relative to the closing print, bp.
+        ``(0, 0.5, 1)``: a declared grid, since no auction data exist on disk; the result is read
+        as a function of it and through its break-even.
+    moc_cutoff_minutes : float
+        Minutes before the close at which an MOC order, and so the hedge ratio, must be fixed.
+        ``10``: NYSE and Nasdaq accept MOC entries until 15:50 ET (recalled).
+    session_minutes, trading_days_per_year : float
+        Regular-session length (390 minutes) and the project's 252-day year, used only to scale
+        the hold's annual sigma to the cutoff interval.
+    tracking_seed : int
+        Seed of the simulated pre-cutoff price. ``0``.
+    stock_tiered_per_share, stock_tiered_min_order : float
+        IBKR Pro Tiered US stock commission at the lowest volume tier, USD 0.0035 per share with a
+        USD 0.35 minimum per order (recalled).
+    stock_fixed_per_share, stock_fixed_min_order : float
+        IBKR Pro Fixed US stock commission, USD 0.005 per share, USD 1.00 minimum (recalled).
+    stock_clearing_per_share : float
+        Clearing fee passed through on Tiered, USD 0.0002 per share (recalled).
+    moc_exchange_fee_per_share : float
+        NYSE charge for a non-tier MOC order executed in the closing auction, USD 0.0010 per share
+        (verified: NYSE Price List 2026, last updated 2026-11-02).
+    stock_take_fee_per_share : float
+        Exchange fee for a marketable order removing displayed liquidity, USD 0.0030 per share,
+        the Reg NMS access-fee cap of Rule 610(c) (recalled), the dearest case.
+    commission_contract_sizes : tuple[int, ...]
+        Straddles per event at which per-order minimums are evaluated. ``(1, 5)``: one contract,
+        the dearest per share, and the paper book's ``max_contracts_per_leg``.
+    option_fixed_per_contract : float
+        IBKR Pro Fixed US option commission for a premium of USD 0.10 or more, USD 0.65 per
+        contract, exchange and regulatory fees included (recalled).
+    option_tiered_per_contract : float
+        IBKR Pro Tiered US option commission at the lowest volume tier (up to 10,000 contracts a
+        month), USD 0.65 per contract (recalled).
+    option_clearing_per_contract : float
+        OCC clearing fee passed through on Tiered, USD 0.02 per contract (recalled).
+    option_regulatory_per_contract : float
+        Options Regulatory Fee and FINRA trading-activity fee passed through on Tiered, about
+        USD 0.03 per contract in all (recalled; the ORF rate changes several times a year).
+    option_customer_take_fee : float
+        Cboe Options (C1) customer fee for an equity option order of under 100 contracts that
+        removes liquidity, USD 0.00 (verified: Cboe Exchange Fees Schedule, 2026-11-09).
+    option_maker_rebate : float
+        Customer rebate for adding liquidity in a penny class on a maker-taker options venue,
+        USD 0.25 per contract (recalled), the relevant figure for a resting entry that fills.
+    option_maker_taker_take_fee : float
+        Customer fee for removing liquidity in a penny class on a maker-taker options venue,
+        USD 0.50 per contract (recalled), the dear case for a marketable entry.
+    option_min_per_order : float
+        IBKR Pro minimum commission per option order, USD 1.00 (recalled); the straddle is one
+        combo order, so it binds only below two contracts in all.
+    expiry_min_gap_days, expiry_max_gap_days : int
+        The later expiry for the per-event expiry choice lies 7 to 60 days after the front,
+        the window of the closed later-expiry study (imported, so the two agree).
+    depth_sizes : tuple[int, ...]
+        Order sizes in contracts per leg for the capacity read. ``(1, 5, 10, 25)``.
+    depth_beyond_book_ticks : int
+        Size beyond the displayed top of book fills this many price increments worse per leg,
+        per multiple of the displayed size (declared, conservative in the absence of depth
+        beyond level 0). ``1``.
+    entry_window : tuple[str, str]
+        First and last entry minute searched by the causal spread-state entry. 15:00 to 15:59.
+    stock_max_commission_frac : float
+        IBKR Pro cap on the stock commission of one order, as a fraction of its trade value.
+        ``0.01`` (recalled); it binds on small orders in low-priced names, below the minimum.
+    delta_band_grid : tuple[float, ...]
+        No-trade bands in delta units (shares per straddle-share) searched on 2013-18 for the
+        commission-aware delta band (B11). ``0`` is the every-close Black-Scholes hedge.
+    sec_fee_rate_bound : float
+        SEC Section 31 fee on the value of every sale (stock and option), as a fraction. ``27.8e-6``
+        (USD 27.80 per million, the fiscal-2024 rate; recalled, and the rate is reset each fiscal
+        year, so this is used only to bound the size of the omitted fee, not charged).
+    finra_taf_per_share : float
+        FINRA trading activity fee per share sold, USD. ``0.000166`` (recalled; bound only).
+    """
+
+    auction_cost_grid_bps: tuple[float, ...] = (0.0, 0.5, 1.0)
+    moc_cutoff_minutes: float = 10.0
+    session_minutes: float = 390.0
+    trading_days_per_year: float = 252.0
+    tracking_seed: int = 0
+    stock_tiered_per_share: float = 0.0035
+    stock_tiered_min_order: float = 0.35
+    stock_fixed_per_share: float = 0.005
+    stock_fixed_min_order: float = 1.00
+    stock_clearing_per_share: float = 0.0002
+    moc_exchange_fee_per_share: float = 0.0010
+    stock_take_fee_per_share: float = 0.0030
+    commission_contract_sizes: tuple[int, ...] = (1, 5)
+    option_fixed_per_contract: float = 0.65
+    option_tiered_per_contract: float = 0.65
+    option_clearing_per_contract: float = 0.02
+    option_regulatory_per_contract: float = 0.03
+    option_customer_take_fee: float = 0.0
+    option_maker_rebate: float = 0.25
+    option_maker_taker_take_fee: float = 0.50
+    option_min_per_order: float = 1.00
+    expiry_min_gap_days: int = 7
+    expiry_max_gap_days: int = 60
+    depth_sizes: tuple[int, ...] = (1, 5, 10, 25)
+    depth_beyond_book_ticks: int = 1
+    entry_window: tuple[str, str] = ("15:00", "15:59")
+    stock_max_commission_frac: float = 0.01
+    delta_band_grid: tuple[float, ...] = (0.0, 0.02, 0.05, 0.10, 0.20, 0.30)
+    sec_fee_rate_bound: float = 27.8e-6
+    finra_taf_per_share: float = 0.000166
+
+
 GLOBAL = GlobalConfig()
 STRATEGY = StrategyConfig()
 LIVE = LiveConfig()
+HEDGED = HedgedHoldConfig()
+# The settlement convention signed off on 2026-11-13; HEDGED stays as frozen for closed studies.
+HEDGED_NET = HedgedHoldConfig(net_assignment=True)
+HOLD_CORRECTIONS = HoldCorrectionsConfig()
+SHADOW = ShadowConfig()
+ONLINE_BAYES = OnlineBayesConfig()
+# Lane L4 iteration round 1 champions, each the best of its class by 2015-18 rolling-origin mean
+# log predictive score (outputs/research/2026-11-14-slate-tests/L4-bayes/search_log.csv, 800
+# rows) and frozen in that folder's freeze_online_bayes.md. ONLINE_BAYES keeps the stage-1
+# defaults. H_corr: a Student-t (nu 30) model of the Yeo-Johnson (power 0) loss ratio -H/U on the
+# seven declared features; the baseline is the same likelihood with only the intercept and name.
+ONLINE_BAYES_L4_MODEL = OnlineBayesConfig(
+    discount=1.0,
+    variance_discount=0.99,
+    coef_prior_scale=0.03,
+    name_prior_scale=0.01,
+    variance_weight="none",
+    obs_df=30.0,
+    target_transform="yj_loss",
+    yj_power=0.0,
+)
+ONLINE_BAYES_L4_BASELINE = OnlineBayesConfig(
+    discount=1.0,
+    variance_discount=0.99,
+    coef_prior_scale=0.01,
+    name_prior_scale=0.03,
+    variance_weight="none",
+    obs_df=30.0,
+    target_transform="yj_loss",
+    yj_power=0.0,
+)
+# residual_value (secondary target): Student-t (nu 4) on the wide set, SIC-division level.
+ONLINE_BAYES_L4_RV_MODEL = OnlineBayesConfig(
+    discount=0.98,
+    variance_discount=0.99,
+    coef_prior_scale=0.1,
+    name_prior_scale=0.03,
+    group_prior_scale=0.03,
+    variance_weight="premium_share",
+    obs_df=4.0,
+    feature_set="wide",
+    z_clip=5.0,
+)
+ONLINE_BAYES_L4_RV_BASELINE = OnlineBayesConfig(
+    discount=0.98,
+    variance_discount=0.99,
+    coef_prior_scale=0.01,
+    name_prior_scale=0.1,
+    variance_weight="premium_share",
+    obs_df=6.0,
+)
+EXECUTION_LEVERS = ExecutionLeversConfig()
+
+
+@dataclass(frozen=True)
+class ChainSurfaceConfig:
+    """The 15:59 option-surface tensor of ``research/chain_surface.py`` (deep-learning lane D0).
+
+    Attributes
+    ----------
+    exchange_tz : str
+        Time zone of the snapshot and expiry clocks, ``America/New_York``.
+    snapshot_time : str
+        Entry snapshot, ``15:59``: the clock of ``research/chains.py::SNAPSHOT``, which pulled the
+        cached backfill chains as the 15:59:00 ET one-minute consolidated BBO. A row stamped
+        after it on the entry date is excluded.
+    expiry_time : str
+        Expiry clock for time to expiry, ``16:00`` ET, the close of the last trading session.
+    days_per_year : float
+        ACT/365 day count, the project convention.
+    grid_lo, grid_hi : float
+        Ends of the standardised-moneyness grid ``x = ln(K/F) / (sigma_atm sqrt(tau))``,
+        ``-2`` and ``+2``: two ATM standard deviations each side, where implied moves differing
+        about tenfold across names still land on quoted strikes.
+    grid_points : int
+        Grid size, ``9``: a step of 0.5 ATM standard deviations.
+    iv_lo, iv_hi : float
+        Bracket of the implied-vol inversion in decimals, ``1e-4`` and ``5.0``, the bracket of
+        ``hedged_hold.option_iv``, so both inverters return NaN on the same prices.
+    iv_iterations : int
+        Bisection steps of the vectorised inverter, ``60``: the bracket width over 2^60 is below
+        1e-17 in vol, under double-precision rounding.
+    parity_strikes : int
+        Strikes nearest the front forward whose put-call parity forwards are pooled (median) for
+        the next expiry's forward, ``5``.
+    parity_min_strikes : int
+        Fewest two-sided call-put pairs among those for the next expiry's forward to count as
+        found, ``3``: a median of fewer is one quote's noise.
+    max_gap_x : float
+        Widest bracket, in grid units of x, across which a channel is interpolated, ``1.0`` (two
+        grid steps). A wider hole between quoted strikes leaves the point masked rather than
+        bridged by a straight line.
+    sparse_fill : float
+        Grid fill below which a surface counts as sparse in the attrition test, ``0.5``.
+    recon_iv_tol : float
+        Reconciliation tolerance of the front ATM straddle IV against the lane E panel's
+        ``front_iv``, ``0.005`` (half a vol point): the surface discounts at DFF and times to the
+        minute where the panel used a zero rate and whole days, about 0.1% of the vol on a
+        one-month front.
+    recon_spread_tol : float
+        Reconciliation tolerance of the front ATM straddle half-spread against the panel's
+        ``half_spread``, ``1e-9``: both are the same quote arithmetic.
+    """
+
+    exchange_tz: str = "America/New_York"
+    snapshot_time: str = "15:59"
+    expiry_time: str = "16:00"
+    days_per_year: float = 365.0
+    grid_lo: float = -2.0
+    grid_hi: float = 2.0
+    grid_points: int = 9
+    iv_lo: float = 1e-4
+    iv_hi: float = 5.0
+    iv_iterations: int = 60
+    parity_strikes: int = 5
+    parity_min_strikes: int = 3
+    max_gap_x: float = 1.0
+    sparse_fill: float = 0.5
+    recon_iv_tol: float = 0.005
+    recon_spread_tol: float = 1e-9
+
+
+CHAIN_SURFACE = ChainSurfaceConfig()

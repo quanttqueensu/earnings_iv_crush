@@ -1,0 +1,10 @@
+{
+  "trial_id": "2026-11-10-pre-event-direction",
+  "declared_utc": "2026-11-10",
+  "prereg_file": "research/timing/2026-11-10-pre-event-direction/prereg.md",
+  "prereg_sha256": "e0a8ae419ad6323384c7908e1c04bf945b7180f12d65b58da341a46ac253f05f",
+  "n_trials_declared": 5,
+  "trials_first": 1593,
+  "trials_last": 1597,
+  "dsr_trial_count": 1597
+}

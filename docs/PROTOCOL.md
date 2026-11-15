@@ -81,6 +81,50 @@ when another is tested on it.
 call, pass a hard `--cap` in dollars, get the team lead's go-ahead, and reconcile the actual
 spend against the estimate afterwards (see [`DATA.md`](DATA.md)).
 
+**P16. Freeze the code and data, not only the words.** `freeze_prereg(..., scorer=, inputs=)`
+records the hashes of `study.py` and every input file, git HEAD and the freeze time;
+`verify_prereg` refuses a changed input, and refuses a scorer change once an unblinded run is
+logged. *On 2026-11-12 two scorers were edited after their freezes, and the record could not
+show whether any edit followed an outcome.*
+
+**P17. Power and metric validity before the freeze.** Every pre-registration has a `## Power`
+section with the minimum detectable effect (`min_detectable_effect`,
+`min_detectable_rate_ratio`) from data already viewed, and states that the primary statistic can
+answer the question given the known sign and scale of the outcome. `freeze_prereg` refuses a
+text without `## Mechanism` and `## Power`. *A tail gate was frozen with 16 treated events, and
+a sizing study compared per-date Sharpe ratios on a book known to lose money, where Sharpe
+rewards concentration; neither could answer its question.*
+
+**P18. Develop blind, unblind once, stop at the first failure.** Scorers run on `blind()`
+outcomes until they work, then `verify_prereg(..., unblind=True)` once; a second unblinded run
+needs a logged reason. Blocks are scored through `staged_scoring`, so a failed trial has no
+later-block numbers. *The 2026-11-12 tail scorer printed validation and confirmation rows for
+failed trials, and two withdrawn conclusions were drawn from them.*
+
+**P19. The block ledger decides what is clean.** Every viewing of outcomes, by a trial or a
+descriptive query, adds a row to `research/ledger/blocks.csv` (`log_block_view`). A block
+confirms a hypothesis only if `block_is_clean` finds no row for that outcome and feature family.
+Any clean block may confirm, which keeps data scarce enough to use; no block confirms a
+hypothesis descended from its own numbers.
+
+**P20. Confirmation is significance plus mechanism.** A confirmed result needs the
+date-clustered interval excluding zero, the matched-null percentile at least 95, a t-statistic of
+at least 3 (Harvey, Liu and Zhu 2016), its `date_clustered_pvalue` passing Benjamini-Hochberg at
+5% within its slate, and an economic or microstructure mechanism accepted before the freeze.
+Significance without a mechanism stays exploratory. The LOND alpha (`lond_alpha`) is recorded
+beside every trial in `research/ledger/trials.csv` and reported with any confirmation, but it is
+advisory, not binding: with no discoveries it falls to about 3e-4 by the tenth trial, which no
+sample this size can meet. The first result confirmed under this rule gets a full independent
+review before it changes the paper book.
+
+**P21. Separate roles, review per slate.** The designing agent does not grade its own work. The
+`quant-reviewer` agent, with fresh context and no outcome access, reviews each slate before the
+freeze (`review_pre.md`: power, metric validity, mechanism, block cleanliness, closed list) and
+after scoring (`review_post.md`: every claim against the logs). Freezing needs "go" in
+`review_pre.md`; only claims `review_post.md` marks supported reach a chat answer or a document,
+each labelled confirmatory, exploratory or descriptive. A slate is at most seven trials. Any
+trial that passes discovery gets a full independent review before its next block.
+
 ## Reporting a result
 
 A findings note (`research/<line>/<study>/findings.md`) leads with hypothesis, scope and success

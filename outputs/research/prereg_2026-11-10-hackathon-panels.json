@@ -1,0 +1,10 @@
+{
+  "trial_id": "2026-11-10-hackathon-panels",
+  "declared_utc": "2026-11-10",
+  "prereg_file": "research/selection/2026-11-10-hackathon-panels/prereg.md",
+  "prereg_sha256": "1be03571966934ad0f0ce14505e2bd4834a0abae617d7a3fe5eac9816218362a",
+  "n_trials_declared": 3,
+  "trials_first": 1604,
+  "trials_last": 1606,
+  "dsr_trial_count": 1606
+}

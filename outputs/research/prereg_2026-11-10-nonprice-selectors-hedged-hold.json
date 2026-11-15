@@ -1,0 +1,10 @@
+{
+  "trial_id": "2026-11-10-nonprice-selectors-hedged-hold",
+  "declared_utc": "2026-11-10",
+  "prereg_file": "research/selection/2026-11-10-nonprice-selectors-hedged-hold/prereg.md",
+  "prereg_sha256": "ac563fda6247665c6334843942fc71aa5b3d0875c38869faf0b79bb4e3a1b951",
+  "n_trials_declared": 5,
+  "trials_first": 1598,
+  "trials_last": 1602,
+  "dsr_trial_count": 1602
+}

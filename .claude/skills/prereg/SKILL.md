@@ -14,14 +14,29 @@ Write it before any outcome exists. A pre-registration written afterwards is a r
    the primary statistic and its basis; date-clustered inference and the matched null; the
    success criterion; the kill criterion; trials declared. Model: any file in
    `research/*/preregs/`, for example `research/selection/preregs/p1_skew_reaction_prereg.md`.
-3. Check the kill criterion cannot be reread as a pass, and that no parameter was chosen by
+3. Fill `## Mechanism` (economic or microstructure, stated before data) and `## Power` (the
+   minimum detectable effect from `protocol.min_detectable_effect` or
+   `min_detectable_rate_ratio`, using data already viewed, and a line saying why the primary
+   statistic can answer the question given the outcome's known sign and scale). Check every
+   declared block with `protocol.block_is_clean`.
+4. Check the kill criterion cannot be reread as a pass, and that no parameter was chosen by
    looking at the declared blocks.
-4. Show the analyst the final text. When they approve, freeze it:
+5. Write `study.py` from the template and debug it on blinded outcomes only (`--blind`, the
+   default).
+6. Review per slate (at most seven trials): run the `quant-reviewer` agent in pre-freeze mode on
+   the slate's prereg and scorer, with no outcome access. It writes `review_pre.md` ending in
+   `go` or `no-go` per trial. The team lead has delegated approval to this review; do not freeze
+   a `no-go` trial.
+7. Freeze with the scorer and every input:
    ```bash
-   python -c "from earnings_iv_crush.research.protocol import freeze_prereg as f; f('research/<line>/<slug>/prereg.md', 'outputs/research/prereg_<slug>.json', trial_id='<slug>', n_trials_declared=<n>, declared_utc='<YYYY-MM-DD>')"
+   python -c "from earnings_iv_crush.research.protocol import freeze_prereg as f; f('research/<line>/<slug>/prereg.md', 'outputs/research/prereg_<slug>.json', trial_id='<ids>', n_trials_declared=<n>, declared_utc='<YYYY-MM-DD>', scorer='research/<line>/<slug>/study.py', inputs=[<every input path>])"
    ```
-5. Add the trial to `docs/RESEARCH_STATE.md` section 1 and commit the text, the record and the
-   count together.
+8. Add the trial rows to `research/ledger/trials.csv` (LOND index and alpha) and
+   `docs/RESEARCH_STATE.md` section 1.
+9. Run `study.py --unblind` once. Log the blocks it viewed with `protocol.log_block_view`.
+10. Run `quant-reviewer` in post-score mode on the findings; it writes `review_post.md`. Only the
+   claims it marks supported go to the team lead, each labelled confirmatory, exploratory or
+   descriptive.
 
 After freezing, the text is never edited. A change is `prereg_amendment_01.md` with its own hash
 recorded, written before the outcome it would affect.

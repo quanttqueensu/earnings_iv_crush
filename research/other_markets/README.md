@@ -31,5 +31,6 @@ Frozen texts, verified byte for byte against `outputs/research/prereg_*.json` by
 - [`kalshi_maker.md`](findings/kalshi_maker.md): Kalshi favourites bought as a maker: the sign turns, the interval does not clear
 - [`kalshi_replication.md`](findings/kalshi_replication.md): Kalshi maker result does not replicate on unseen series
 - [`kalshi_tails.md`](findings/kalshi_tails.md): Selling the tails of Kalshi scheduled-release distributions: not tradable at the touch
+- [`2026-11-13-niche-hunt.md`](findings/2026-11-13-niche-hunt.md): Niche hunt: scheduled-event volatility beyond US single-name earnings (exploratory)
 
 Verdicts and key figures for every study are tabulated in [`docs/RESEARCH_STATE.md`](../../docs/RESEARCH_STATE.md).

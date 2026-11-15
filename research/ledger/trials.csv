@@ -1,0 +1,114 @@
+record,trial_id,n_trials_declared,declared_utc,regime,lond_index,discovery_p,lond_alpha,verdict
+prereg_2026-10-20-hedged-hold.json,2026-10-20-hedged-hold,4,2026-10-21,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-10-20-hedged-hold_amendment_01.json,2026-10-20-hedged-hold-wave2,3,2026-10-21,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-10-20-jump-richness.json,2026-10-20-jump-richness,1,2026-10-21,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-10-20-jump-richness_amendment_01.json,2026-10-20-jump-richness-amendment-01,0,2026-10-21,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-10-20-post-event-equity.json,2026-10-20-post-event-equity,2,2026-10-21,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-10-21-inversion-confirm.json,2026-10-21-inversion-confirm,1,2026-10-21,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-10-21-post-event-inversion.json,2026-10-21-post-event-inversion,1,2026-10-21,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-01-index-event-crush.json,2026-11-01-index-event-crush,5,2026-11-02T03:57:43+00:00,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-gap-continuation-size.json,2026-11-02-gap-continuation-size,1563,2026-11-02T21:30:37Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-hedged-event-hold-amendment-01.json,2026-11-02-hedged-event-hold-amendment-01,1,2026-11-02T05:39:29+00:00,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-hedged-event-hold-amendment-02.json,2026-11-02-hedged-event-hold-amendment-02,1,2026-11-02T05:42:46+00:00,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-hedged-event-hold.json,2026-11-02-hedged-event-hold,1,2026-11-02T05:18:12+00:00,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-implied-move-gap-fade.json,2026-11-02-implied-move-gap-fade,1562,2026-11-02T21:28:28Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-implied-surprise-drift.json,2026-11-02-implied-surprise-drift,1564,2026-11-02T21:35:11Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-index-hedged-hold.json,2026-11-02-index-hedged-hold,1,2026-11-02T06:19:20+00:00,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-ivol-max-hedged-hold.json,2026-11-02-ivol-max-hedged-hold,1559,2026-11-02T21:12:57Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-later-expiry-hedged-hold.json,2026-11-02-later-expiry-hedged-hold,1,2026-11-02T05:58:08+00:00,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-maker-entry-hedged-hold.json,2026-11-02-maker-entry-hedged-hold,1,2026-11-02T05:52:42+00:00,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-next-day-expiry-settle-forward.json,2026-11-02-next-day-expiry-settle-forward,1565,2026-11-02T21:51:53Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-next-day-expiry-settle.json,2026-11-02-next-day-expiry-settle,1565,2026-11-02T21:47:12Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-open-hedge.json,2026-11-02-open-hedge,1,2026-11-02T05:48:17+00:00,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-overnight-drift-inventory.json,2026-11-02-overnight-drift-inventory,1566,2026-11-03T00:09:04Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-parity-leg-choice-amendment-01.json,2026-11-02-parity-leg-choice-amendment-01,1561,2026-11-02T21:22:24Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-parity-leg-choice.json,2026-11-02-parity-leg-choice,1560,2026-11-02T21:18:26Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-smallcap-night-day-spread.json,2026-11-02-smallcap-night-day-spread,1567,2026-11-03T00:13:42Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-smile-strike-hedged-hold-amendment-01.json,2026-11-02-smile-strike-hedged-hold-amendment-01,1557,2026-11-02T21:06:27Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-02-smile-strike-hedged-hold.json,2026-11-02-smile-strike-hedged-hold,1557,2026-11-02T20:55:14Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-07-analyst-disagreement-hedged-hold.json,2026-11-07-analyst-disagreement-hedged-hold,1591,2026-11-07T22:17:26Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-07-forward-combined-gates-amendment-01.json,2026-11-07-forward-combined-gates-amendment-01,1590,2026-11-07T22:13:48Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-07-forward-combined-gates.json,2026-11-07-forward-combined-gates,1569,2026-11-07T21:52:52Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-07-pairwise-tercile-gates.json,2026-11-07-pairwise-tercile-gates,1590,2026-11-07T22:00:10Z,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-09-combined-levers-hedged-hold.json,2026-11-09-combined-levers-hedged-hold,1592,2026-11-09T20:50:39+00:00,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-10-8k-newsflow-hedged-hold.json,2026-11-10-8k-newsflow-hedged-hold,1,2026-11-10,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-10-hackathon-panels.json,2026-11-10-hackathon-panels,3,2026-11-10,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-10-lottery-around-earnings.json,2026-11-10-lottery-around-earnings,2,2026-11-10,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-10-nonprice-selectors-hedged-hold.json,2026-11-10-nonprice-selectors-hedged-hold,5,2026-11-10,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-10-pre-event-direction.json,2026-11-10-pre-event-direction,5,2026-11-10,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-10-preannounced-megacap-replication.json,2026-11-10-preannounced-megacap-replication,1,2026-11-10,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-10-wikipedia-attention-hedged-hold.json,2026-11-10-wikipedia-attention-hedged-hold,1,2026-11-10,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-11-exogenous-cost-and-stability.json,2026-11-11-exogenous-cost-and-stability,5,2026-11-12,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-12-move-forecast-and-sizing.json,1623-1628,6,2026-11-12T15:46:45+00:00,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-12-tail-event-signals.json,1616-1622,7,2026-11-12T15:34:19+00:00,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_cost_levers.json,cost_levers_hold_and_spread_gate,2,2026-10-07,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_date_shift.json,date_shift,1,2026-10-16,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_deribit_macro_event.json,deribit_macro_event_pilot,1,2026-10-09,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_entry_spread_dolthub.json,entry_spread_filter_dolthub_2019_2024,1,2026-10-09,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_final_earnings_set.json,final_earnings_set,3,2026-10-09,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_flow_liquidity_side.json,flow_liquidity_side,2,2026-10-15,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_kalshi_macro_tails.json,kalshi_macro_tails_pilot,1,2026-10-09,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_kalshi_maker.json,kalshi_maker_favourites,1,2026-10-15,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_kalshi_maker_replication.json,kalshi_maker_replication,1,2026-10-15,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_ml_ratio.json,ml_ratio,9,2026-10-16,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_ml_ratio_confirm2.json,ml_ratio_confirm2,1,2026-10-16,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_oos_2026.json,oos_2026_broad_term_gate,1,2026-08-15,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_p1_skew_reaction.json,p1_skew_reaction,1,2026-10-15,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_p2_term_slope.json,p2_deeventised_term_slope_dolthub_2021_2026,1,2026-10-15,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_p5_strangle.json,p5_strangle,1,2026-10-15,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_parity_spread.json,parity_spread,1,2026-10-15,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_post_event_vrp.json,post_event_vrp,1,2026-10-15,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_section21.json,section21_peer_informed,3,2026-10-05,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_spy_macro_straddle.json,spy_macro_straddle,2,2026-10-15,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_vega_runup.json,vega_runup,1,2026-10-15,pre-ledger,,,,see docs/RESEARCH_STATE.md
+prereg_2026-11-13-maker-entry-confirmation.json,2026-11-13-maker-entry-confirmation:A (1629),1,2026-11-13,P16-P21,1,,0.0304,pending
+prereg_2026-11-13-maker-entry-confirmation.json,2026-11-13-maker-entry-confirmation:B (1630),1,2026-11-13,P16-P21,2,,0.0076,pending
+prereg_2026-11-13-maker-entry-confirmation-amendment-01.json,"2026-11-13-maker-entry-confirmation:A (1779, renumbers 1629)",1,2026-11-13,P16-P21,1,,0.0304,pending
+prereg_2026-11-13-maker-entry-confirmation-amendment-01.json,"2026-11-13-maker-entry-confirmation:B (1780, renumbers 1630)",1,2026-11-13,P16-P21,2,,0.0076,pending
+prereg_2026-11-13-maker-entry-confirmation-amendment-01.json,"2026-11-13-maker-entry-confirmation:A (1779) verdict",1,2026-11-13,P16-P21,1,0.0002,0.0304,PASS (review_post: confirmatory for sign; size 4x below 53aa4898)
+prereg_2026-11-13-maker-entry-confirmation-amendment-01.json,"2026-11-13-maker-entry-confirmation:B (1780) verdict",1,2026-11-13,P16-P21,2,0.0002,0.0076,PASS (review_post: baseline is a plain 15:45 cross, not the book's ladder)
+outputs/research/2026-11-13-alpha-hunt/lane1-macro/trials.csv,"alpha hunt 1,629-1,657 and 1,644b",29,2026-11-13,exploratory-unhashed,,,,no held-out pass; C2 held-out t 1.84
+outputs/research/2026-11-13-alpha-hunt/lane2-forensics/trials.csv,"alpha hunt 1,659-1,681",23,2026-11-13,exploratory-unhashed,,,,discovery screens only; spread gate
+outputs/research/2026-11-13-alpha-hunt/lane3-surface-flow/trials.csv,"alpha hunt 1,689-1,708",20,2026-11-13,exploratory-unhashed,,,,R5 reversed on held-out
+outputs/research/2026-11-13-alpha-hunt/lane4-structure/trials.csv,"alpha hunt 1,719-1,740",22,2026-11-13,exploratory-unhashed,,,,15:45 entry and package exploratory passes; no book positive at the touch
+outputs/research/2026-11-13-alpha-hunt/lane5-niche/trials.csv,"alpha hunt 1,749-1,771",23,2026-11-13,exploratory-unhashed,,,,early-in-industry failed held-out
+outputs/research/2026-11-13-alpha-hunt-2/laneA-hold-exit/trials.csv,"alpha hunt 1,781-1,798",18,2026-11-13,exploratory-unhashed,,,,"band 0.10 held-out pass, cost recovery only"
+outputs/research/2026-11-13-alpha-hunt-2/laneB-contract-choice/trials.csv,"alpha hunt 1,811-1,826",16,2026-11-13,exploratory-unhashed,,,,"1,819 held-out pass (confirmatory status contested); 1,826 exploratory; cost recovery"
+outputs/research/2026-11-13-alpha-hunt-2/laneC-post-event-vrp/trials.csv,"alpha hunt 1,841-1,856",16,2026-11-13,exploratory-unhashed,,,,"fail; 1,856 netting correction adopted 2026-11-13"
+outputs/research/2026-11-13-alpha-hunt-2/laneD-jump-model/trials.csv,"alpha hunt 1,871-1,900 and 2,081",31,2026-11-13,exploratory-unhashed,,,,"1,897 exploratory pass t 2.91, 1,898 replication failed; 2,081 not read (underpowered)"
+outputs/research/2026-11-13-alpha-hunt-2/laneE-walk-forward-model/trials.csv,"alpha hunt 1,901-1,922",22,2026-11-13,exploratory-unhashed,,,,fail
+outputs/research/2026-11-13-alpha-hunt-2/laneF-resting-exit/trials.csv,"alpha hunt 1,931-1,958",28,2026-11-13,exploratory-unhashed,,,,"re-pegged exit exploratory pass broad 2026, fail megacap; loses to the hold"
+outputs/research/2026-11-13-alpha-hunt-2/laneG-index-event-vol/trials.csv,"alpha hunt 1,961-1,984",24,2026-11-13,exploratory-unhashed,,,,fail; held-out C not clean
+outputs/research/2026-11-13-alpha-hunt-2/laneH-other-scheduled-events/trials.csv,"alpha hunt 1,991-2,017",27,2026-11-13,exploratory-unhashed,,,,"fail; pilot, N under 20"
+outputs/research/2026-11-13-alpha-hunt-2/laneI-entry-day/trials.csv,"alpha hunt 2,021-2,036",16,2026-11-13,exploratory-unhashed,,,,fail; cost check passes (early entry loses)
+outputs/research/2026-11-13-alpha-hunt-2/laneJ-name-persistence/trials.csv,"alpha hunt 2,051-2,080",30,2026-11-13,exploratory-unhashed,,,,fail
+outputs/research/2026-11-13-niche-hunt/N02-livestock-usda/trials.csv,"niche hunt 2,112-2,113",2,2026-11-13,exploratory-unhashed,,,,abandoned unscored; no free data
+outputs/research/2026-11-13-niche-hunt/N03-natgas-storage/trials.csv,"niche hunt 2,142-2,145",4,2026-11-13,exploratory-unhashed,,,,held-out fail; storage-day excess gone after 2018
+outputs/research/2026-11-13-niche-hunt/N04-crude-eia-opec/trials.csv,"niche hunt 2,172-2,177",6,2026-11-13,exploratory-unhashed,,,,held-out fail; seller test uninformative; Yahoo trials withdrawn
+outputs/research/2026-11-13-niche-hunt/N05-treasuries-macro/trials.csv,"niche hunt 2,202-2,221",20,2026-11-13,exploratory-unhashed,,,,"held-out fail (index level); Cboe rebuild 2,218-2,221"
+outputs/research/2026-11-13-niche-hunt/N06-sofr-fomc/trials.csv,"niche hunt 2,232-2,240",9,2026-11-13,exploratory-unhashed,,,,"held-out fail, underpowered by construction (synthetic settle marks)"
+outputs/research/2026-11-13-niche-hunt/N08-index-macro-cached/trials.csv,"niche hunt 2,292-2,314",23,2026-11-13,exploratory-unhashed,,,,"held-out fail at the touch; 2,313-2,314 rebuild biased, not cited"
+outputs/research/2026-11-13-niche-hunt/N09-vix-complex/trials.csv,"niche hunt 2,322-2,332",11,2026-11-13,exploratory-unhashed,,,,held-out fail; published FOMC VX trade decayed
+outputs/research/2026-11-13-niche-hunt/N10-crypto-scheduled/trials.csv,"niche hunt 2,352-2,372",14,2026-11-13,exploratory-unhashed,,,,held-out fail; discovery pass was a statistic switch
+outputs/research/2026-11-13-niche-hunt/N11-forecastex-event-contracts/trials.csv,"niche hunt 2,382-2,387",6,2026-11-13,exploratory-unhashed,,,,both hypotheses held-out fail
+outputs/research/2026-11-13-niche-hunt/N12-metals-macro/trials.csv,"niche hunt 2,412-2,422",11,2026-11-13,exploratory-unhashed,,,,held-out fail (index level)
+outputs/research/2026-11-13-niche-hunt/N13-softs-ice/trials.csv,"niche hunt 2,442-2,451",10,2026-11-13,exploratory-unhashed,,,,held-out fail (settle)
+outputs/research/2026-11-13-niche-hunt/N14-bank-stress-tests-and-regulatory/trials.csv,"niche hunt 2,472-2,480",9,2026-11-13,exploratory-unhashed,,,,"fail; stage A unfrozen, stage B 2-4 clusters"
+outputs/research/2026-11-13-niche-hunt/N15-adr-overnight-reporters/trials.csv,"niche hunt 2,502-2,504",3,2026-11-13,exploratory-unhashed,,,,held-out fail at the touch
+outputs/research/2026-11-13-niche-hunt/N16-country-etf-politics/trials.csv,"niche hunt 2,532-2,535",4,2026-11-13,exploratory-unhashed,,,,held-out fail (index level)
+outputs/research/2026-11-13-niche-hunt/N17-commodity-etf-options/trials.csv,"niche hunt 2,562-2,587",26,2026-11-13,exploratory-unhashed,,,,held-out fail; GLD/SLV/TLT rows descriptive (viewed block)
+outputs/research/2026-11-14-earnings-adjacent-hunt/E1-gamma-scalp/trials.csv,"earnings-adjacent hunt 2,682-2,694",13,2026-11-14,exploratory-unhashed,,,,held-out fail; reaction-hour long gamma pays about 12x its gross
+outputs/research/2026-11-14-earnings-adjacent-hunt/E2-informed-flow/trials.csv,"earnings-adjacent hunt 2,712-2,722",11,2026-11-14,exploratory-unhashed,,,,held-out fail; reversed book adopted after discovery
+outputs/research/2026-11-14-earnings-adjacent-hunt/E3-spillover/trials.csv,"earnings-adjacent hunt 2,742-2,754",13,2026-11-14,exploratory-unhashed,,,,held-out fail; transfer complete by the reaction close
+outputs/research/2026-11-14-earnings-adjacent-hunt/E4-expiry-mechanics/trials.csv,"earnings-adjacent hunt 2,772-2,773",2,2026-11-14,exploratory-unhashed,,,,"held-out fail; no pinning, OI-proxy strike choice null"
+outputs/research/2026-11-14-earnings-adjacent-hunt/E5-literature-and-practice/trials.csv,"earnings-adjacent hunt 2,802-2,805",4,2026-11-14,exploratory-unhashed,,,,held-out fail on all read screens
+outputs/research/2026-11-14-slate-tests/L1-corrections/trials.csv,"slate tests 2,832-2,840",9,2026-11-14,exploratory-unhashed,,,,"valuation corrections; netting, early call assignment, financing; A1 re-strike"
+outputs/research/2026-11-14-slate-tests/L2-execution/trials.csv,"slate tests 2,892-2,916",25,2026-11-14,exploratory-unhashed,,,,cost levers; 0.30 delta band with commission holds held-out (cost recovery)
+outputs/research/2026-11-14-slate-tests/L3-selection/trials.csv,"slate tests 2,952-2,954",3,2026-11-14,exploratory-unhashed,,,,"no selector survives; C8 fails held-out, carried by tenor"
+outputs/research/2026-11-14-slate-tests/L4-bayes/trials.csv,"slate tests 3,012-3,023",12,2026-11-14,exploratory-unhashed,,,,density forecast beats baseline held-out; selected book fails economically
+outputs/research/2026-11-14-slate-tests/SUMMARY.md,"slate tests 3,072-3,073 (team lead, review)",2,2026-11-14,exploratory-unhashed,,,,"statistic switch and an unnumbered scored comparison, charged after review"
+outputs/research/2026-11-15-deep-learning/D0-surface/trials.csv,"deep learning 3,132-3,135",4,2026-11-15,exploratory-unhashed,,,,targets net of commission; L4 benchmark on H_net; 15:59 chain grids built
+outputs/research/2026-11-15-deep-learning/D1-surface-net/trials.csv,"deep learning 3,142-3,169",28,2026-11-15,exploratory-unhashed,,,,surface adds nothing beyond its no-surface twin; selected book fails
+outputs/research/2026-11-15-deep-learning/D2-tabular/trials.csv,"deep learning 3,182-3,189",8,2026-11-15,exploratory-unhashed,,,,gain over L4 is per-event scale on L4's features; selected book fails
+outputs/research/2026-11-15-deep-learning/SUMMARY.md,"deep learning 3,212 (team lead, review check)",1,2026-11-15,exploratory-unhashed,,,,L4 rescaled by tenor tercile recovers most of the networks' gain; exploratory
+prereg_2026-11-13-maker-entry-confirmation-amendment-01.json,"2026-11-13-maker-entry-confirmation:B (1780) verdict, correction",0,2026-11-15,correction,,,,"Correction of the 1,780 verdict row above, whose unquoted comma split it into 10 fields; no new trial. Read: lond_index 2, discovery_p 0.0002, lond_alpha 0.0076, verdict PASS (review_post: baseline is a plain 15:45 cross, not the book's ladder)"

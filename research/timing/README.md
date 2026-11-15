@@ -34,5 +34,6 @@ Frozen texts, verified byte for byte against `outputs/research/prereg_*.json` by
 - [`post_announcement_overpricing.md`](findings/post_announcement_overpricing.md): Post-earnings volatility overpricing: pre-registered test, both controls fail, and the test is underpowered
 - [`post_event_vrp.md`](findings/post_event_vrp.md): Post-announcement short straddle held to expiry
 - [`vega_runup.md`](findings/vega_runup.md): Pre-announcement vega run-up (state of record section 2.5)
+- [`2026-11-14-earnings-adjacent-hunt.md`](findings/2026-11-14-earnings-adjacent-hunt.md): Earnings-adjacent hunt: return sources next to the event straddle (exploratory)
 
 Verdicts and key figures for every study are tabulated in [`docs/RESEARCH_STATE.md`](../../docs/RESEARCH_STATE.md).

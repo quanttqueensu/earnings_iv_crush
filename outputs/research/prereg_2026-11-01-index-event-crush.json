@@ -1,0 +1,20 @@
+{
+  "trial_id": "2026-11-01-index-event-crush",
+  "declared_utc": "2026-11-02T03:57:43+00:00",
+  "prereg_file": "research/off_earnings/2026-11-01-index-event-crush/prereg.md",
+  "prereg_sha256": "aa6ebe47789f8b9a2403975ee35630aea6c8274bfce33e467dc9ba0e4047bc82",
+  "n_trials_declared": 5,
+  "dsr_trial_count": 1549,
+  "amendment_file": "research/off_earnings/preregs/spy_macro_and_runup_amendment_03.md",
+  "amendment_sha256": "a64a23ce73c72e8dfc8e403bbc9d4d625f26b0b124f9e2cdd348d8517182a7b9",
+  "calendar_macro_sha256": "78f52e297f34c3e52ebe9a70e53d33849fa875830eaf430802bdd43ca3b9082a",
+  "calendar_megacap_sha256": "860aa6093bb9ddcb7fb8e520e77c5c281ae25e96a76b792cd3e2af5cc839fc44",
+  "calendar_spy_macro_frozen_sha256": "f0c36526a4d31c9164af3bdc1e21271367a1867181d4bc8ad2963a0fde272e8b",
+  "families": [
+    "B1",
+    "B2",
+    "B3",
+    "A1 (amendment 03)",
+    "A2 (amendment 03)"
+  ]
+}

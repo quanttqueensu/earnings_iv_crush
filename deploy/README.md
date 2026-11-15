@@ -60,6 +60,7 @@ Always Free limits) and add a budget alert at US$1 so any charge is visible at o
 | Halt new entries (exits continue) | `touch state/live/STOP` |
 | Run a pass now | `docker compose --profile run run --rm runner` |
 | Gateway status | `docker compose ps` and `docker compose logs --tail 100 ib-gateway` |
+| Check the gateway is logged in (restart once if not) | `./gateway_preflight.sh`; cron runs it at 15:00 ET, log in `state/control/gateway_preflight.log` |
 | Inspect the gateway UI | `ssh -L 5900:127.0.0.1:5900 <user>@<vm>`, then VNC to `localhost:5900` |
 | Copy the book home | `scp '<user>@<vm>:/opt/ivcrush/deploy/state/live/*.parquet' outputs/live/` |
 | Deploy a code change | re-pack, copy, extract, `docker compose --profile run build runner` |

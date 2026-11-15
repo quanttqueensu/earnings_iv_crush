@@ -1,0 +1,10 @@
+{
+  "trial_id": "2026-11-07-pairwise-tercile-gates",
+  "declared_utc": "2026-11-07T22:00:10Z",
+  "prereg_file": "research/selection/2026-11-07-pairwise-tercile-gates/prereg.md",
+  "prereg_sha256": "fd6f20af604eb4aab99ece90bb7c48afcb2cea4ac388a560a22454977cc95831",
+  "n_trials_declared": 1590,
+  "trials_first": 1570,
+  "trials_last": 1590,
+  "dsr_trial_count": 1590
+}

@@ -1,0 +1,22 @@
+{
+  "trial_id": "2026-11-13-maker-entry-confirmation-amendment-01",
+  "declared_utc": "2026-11-13",
+  "frozen_utc": "2026-11-13T17:07:14+00:00",
+  "prereg_file": "research/execution/2026-11-13-maker-entry-confirmation/amendment_01_renumber.md",
+  "prereg_sha256": "6f6277c9260b6c6b1688bd12044ee7d7948e04c49e5fb00035031ae3cfd61d62",
+  "n_trials_declared": 1780,
+  "git_head": "8bdd1512c88f6a51c609b60b175e721cbeaa2297",
+  "scorer_file": "research/execution/2026-11-13-maker-entry-confirmation/study.py",
+  "scorer_sha256": "9598c72c0e66bd72478cb36e148dc1c606001c1963ec492e32fd4794fe0ea599",
+  "amends": "outputs/research/prereg_2026-11-13-maker-entry-confirmation.json",
+  "amends_prereg_sha256": "aeee3fcc8235ce6c6db741d1569ed6ddd8080e40b3420e4e01b17ac3888d220c",
+  "trials": [
+    1779,
+    1780
+  ],
+  "renumbers": {
+    "1629": 1779,
+    "1630": 1780
+  },
+  "reason": "trial-number collision with the 2026-11-13 alpha hunt (1,629 to 1,778)"
+}

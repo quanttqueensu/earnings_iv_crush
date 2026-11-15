@@ -16,6 +16,7 @@ earnings_iv_crush.ops.orient` measures them.
 | `docs/ROADMAP.md` | ledger | Every open item, its owner and status |
 | `docs/PROTOCOL.md` | rules | The research rules P1 to P15 and how a result is reported |
 | `docs/DATA.md` | reference | Sources, licences, costs, the shared bucket and the manifest |
+| `docs/DATA_CATALOGUE.md` | reference | Every dataset held: vendor, span, size, builder, readers, shared or not |
 | `docs/ARCHITECTURE.md` | reference | Code layout, the live-path map, valuation, costs, reporting, tests |
 | `docs/RUNBOOK.md` | reference | Operating the paper book: setup, the daily pass, switches, alarms |
 | `docs/FORWARD_TEST_SPEC.md` | canonical | The paper book's rules, ladder, limits, logs and verdict criteria |
@@ -29,6 +30,7 @@ earnings_iv_crush.ops.orient` measures them.
 | `research/*/findings/*.md` | record | Dated findings, each true as of its date |
 | `research/_template/*.md` | template | The card and pre-registration a new study starts from |
 | `research/*/*/*.md` | record | A new study's card, pre-registration and findings |
+| `research/ledger/README.md` | rules | The block and trial ledgers that decide clean data and the online alpha |
 | `scripts/README.md` | reference | The stable entry points and the data builders |
 | `deploy/README.md` | reference | The cloud host for the paper book |
 | `work-logs/**/*.md` | record | Session logs, one folder per person |

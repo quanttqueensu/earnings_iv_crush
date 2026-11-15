@@ -6,7 +6,9 @@ A pre-registration is frozen by recording the SHA-256 of its text before any out
 viewed (``outputs/research/prereg_*.json``). The records name the file where it was written
 at the time; the files now live under ``research/<line>/preregs/``. This test resolves each
 recorded file by name, hashes it, and fails on any difference, so an edit to a frozen text,
-or a line-ending conversion on checkout, cannot pass unnoticed.
+or a line-ending conversion on checkout, cannot pass unnoticed. Studies started from
+``research/_template/`` keep their text at ``research/<line>/<slug>/prereg.md``, where every
+file shares a name, so a record whose path exists as written is resolved by that path.
 """
 
 from __future__ import annotations
@@ -21,6 +23,22 @@ from typing import Any
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+# Top-level folders a recorded file can sit under; an absolute path written on one machine is
+# matched from the first of these, so it resolves in any checkout on any platform.
+_REPO_TOPS = ("research", "outputs", "scripts", "earnings_iv_crush", "tests")
+
+
+def _in_checkout(name: str) -> Path:
+    """Where a recorded path lives in this checkout, however and wherever it was written."""
+    parts = Path(name.replace("\\", "/")).as_posix().split("/")
+    absolute = name.startswith(("/", "\\")) or (len(name) > 1 and name[1] == ":")
+    if absolute:
+        for i, part in enumerate(parts):
+            if part in _REPO_TOPS:
+                return ROOT.joinpath(*parts[i:])
+    return ROOT / name
+
+
 SHIPPED = {p.name: p for p in (ROOT / "research").glob("*/preregs/*.md")}
 
 
@@ -45,18 +63,49 @@ def _pairs(node: Any) -> Iterator[tuple[str, str]]:
 
 RECORDS = sorted(
     {
-        (rec.name, Path(f).name, h)
+        (rec.name, Path(f).as_posix(), h)
         for rec in (ROOT / "outputs" / "research").glob("prereg_*.json")
         for f, h in _pairs(json.loads(rec.read_text(encoding="utf-8")))
     }
 )
 
 
+def _run_log(record: str) -> list[dict[str, Any]]:
+    """The run log ``verify_prereg`` keeps beside a record, oldest first; empty if none."""
+    runs = ROOT / "outputs" / "research" / record.replace(".json", ".runs.jsonl")
+    if not runs.is_file():
+        return []
+    lines = runs.read_text(encoding="utf-8").splitlines()
+    return [json.loads(line) for line in lines if line.strip()]
+
+
 def test_records_are_present() -> None:
     assert RECORDS, "no pre-registration hash records found under outputs/research"
 
 
-@pytest.mark.parametrize("record, name, sha", RECORDS, ids=[f"{r[0]}:{r[1]}" for r in RECORDS])
+@pytest.mark.parametrize(
+    "record, name, sha", RECORDS, ids=[f"{r[0]}:{Path(r[1]).name}" for r in RECORDS]
+)
 def test_recorded_hash_matches_shipped_text(record: str, name: str, sha: str) -> None:
-    assert name in SHIPPED, f"{record} declares {name}, which is not under research/*/preregs"
-    assert hashlib.sha256(SHIPPED[name].read_bytes()).hexdigest() == sha
+    as_written = _in_checkout(name)
+    if as_written.is_file() and "preregs" not in as_written.parts:
+        path = as_written
+    else:
+        base = Path(name).name
+        assert base in SHIPPED, f"{record} declares {base}, which is not under research/*/preregs"
+        path = SHIPPED[base]
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    rec = json.loads((ROOT / "outputs" / "research" / record).read_text(encoding="utf-8"))
+    if Path(str(rec.get("scorer_file", ""))).as_posix() != name or sha != rec.get("scorer_sha256"):
+        assert digest == sha
+        return
+    # The scorer may change before outcomes are seen, as verify_prereg allows and logs; after an
+    # unblinded run it must be byte-identical to the code that produced the outcomes.
+    log = _run_log(record)
+    unblinded = [e.get("scorer_sha256") for e in log if e.get("event") == "unblinded_run"]
+    unblinded = [h for h in unblinded if h]
+    if unblinded:
+        assert digest == unblinded[-1]
+        return
+    changed = {e["scorer_sha256"] for e in log if e.get("event") == "code_change_pre_unblind"}
+    assert digest in {sha} | changed

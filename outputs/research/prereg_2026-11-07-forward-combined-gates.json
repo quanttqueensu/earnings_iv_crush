@@ -1,0 +1,12 @@
+{
+  "trial_id": "2026-11-07-forward-combined-gates",
+  "declared_utc": "2026-11-07T21:52:52Z",
+  "prereg_file": "research/selection/2026-11-07-forward-combined-gates/prereg.md",
+  "prereg_sha256": "209a0282e6a39f4b44ca8dc891f31f74b74365c91aec658afbf3c84635b26ed4",
+  "n_trials_declared": 1569,
+  "trials": {
+    "G1": 1568,
+    "G2": 1569
+  },
+  "dsr_trial_count": 1569
+}

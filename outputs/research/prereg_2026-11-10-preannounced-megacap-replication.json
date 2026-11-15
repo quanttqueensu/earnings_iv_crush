@@ -1,0 +1,8 @@
+{
+  "trial_id": "2026-11-10-preannounced-megacap-replication",
+  "declared_utc": "2026-11-10",
+  "prereg_file": "research/selection/2026-11-10-preannounced-megacap-replication/prereg.md",
+  "prereg_sha256": "fa2fa68de602b3e6c7f82d4a9aaea4bf20b317d07aada31c71f75755a454c50e",
+  "n_trials_declared": 1,
+  "dsr_trial_count": 1608
+}

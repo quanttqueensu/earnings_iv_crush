@@ -1,0 +1,8 @@
+{
+  "trial_id": "2026-11-02-hedged-event-hold",
+  "declared_utc": "2026-11-02T05:18:12+00:00",
+  "prereg_file": "research/timing/2026-11-02-hedged-event-hold/prereg.md",
+  "prereg_sha256": "3e80d470da881715b7cecd1939a2573c3257f64b4f83ca790492c1e7fc1e6332",
+  "n_trials_declared": 1,
+  "dsr_trial_count": 1550
+}
