@@ -10,8 +10,9 @@ from dataclasses import replace
 import numpy as np
 import pandas as pd
 import pytest
+from scipy.stats import norm
 
-from earnings_iv_crush.config import HEDGED
+from earnings_iv_crush.config import HEDGED, HEDGED_NET
 from earnings_iv_crush.engine.pnl import build_trade
 from earnings_iv_crush.research import hedged_hold as hh
 
@@ -221,6 +222,89 @@ def test_naked_hold_reconciles_to_build_trade() -> None:
     )
     assert res.net_pnl * 100 == pytest.approx(row["pnl"], rel=1e-9)
     assert res.margin * 100 == pytest.approx(row["margin"], rel=1e-9)
+
+
+# ── settlement convention at expiry ──────────────────────────────────────────
+
+_K, _S0, _TAU, _SIG, _HS = 100.0, 100.0, 3 / 365, 0.40, 0.002
+
+
+def _one_close(settle: float, cfg, hedge: bool = True) -> hh.HedgedResult:
+    """One hedging close at the strike, then settlement: the expiry leg is the only unknown."""
+    return hh.hedged_short_straddle(
+        sale_price=4.0,
+        sale_mid=4.1,
+        strike=_K,
+        fwd=_S0,
+        closes=np.array([_S0]),
+        rets=np.array([settle / _S0 - 1.0]),
+        taus=np.array([_TAU]),
+        sigmas=np.array([_SIG]),
+        half_spreads=np.array([_HS]),
+        settle_close=settle,
+        hedge=hedge,
+        cfg=cfg,
+    )
+
+
+def _hand_delta() -> float:
+    sd = _SIG * np.sqrt(_TAU)
+    return float(2.0 * norm.cdf(0.5 * sd) - 1.0)  # straddle delta at the money, ln(S/K) = 0
+
+
+@pytest.mark.parametrize("settle", [92.0, 99.5, 100.0, 100.5, 108.0])
+def test_unwind_convention_is_unchanged(settle: float) -> None:
+    """HEDGED keeps the frozen convention: whole hedge unwound, 5 bp on the assigned share."""
+    h = _hand_delta()
+    disposal = HEDGED.disposal_bps / 1e4 * settle if settle != _K else 0.0
+    cost = abs(h) * _S0 * _HS + abs(h) * settle * _HS
+    fees = 2.0 * HEDGED.fee_per_contract_leg / 100.0
+    hand = 4.0 - abs(settle - _K) + h * _S0 * (settle / _S0 - 1.0) - cost - fees - disposal
+    assert _one_close(settle, HEDGED).net_pnl == pytest.approx(hand, abs=1e-12)
+
+
+@pytest.mark.parametrize("settle", [92.0, 99.5, 100.0, 100.5, 108.0])
+def test_net_assignment_trades_only_the_residual(settle: float) -> None:
+    """HEDGED_NET: the assigned share offsets the hedge, the residual pays the half-spread."""
+    h = _hand_delta()
+    residual = h - (1.0 if settle > _K else -1.0 if settle < _K else 0.0)
+    cost = abs(h) * _S0 * _HS + abs(residual) * settle * _HS
+    fees = 2.0 * HEDGED_NET.fee_per_contract_leg / 100.0
+    hand = 4.0 - abs(settle - _K) + h * _S0 * (settle / _S0 - 1.0) - cost - fees
+    r = _one_close(settle, HEDGED_NET)
+    assert r.net_pnl == pytest.approx(hand, abs=1e-12)
+    assert r.gross_pnl_mid == pytest.approx(_one_close(settle, HEDGED).gross_pnl_mid)
+    # Netting can cost more than the old convention: with a small final hedge and an
+    # in-the-money finish, the residual is nearly a whole share at the equity half-spread,
+    # where the old convention charged only the flat disposal rate on it.
+
+
+def test_deep_in_the_money_hedge_nets_to_almost_nothing() -> None:
+    """A hedge near one share against an assigned call leaves almost nothing to trade."""
+    r_net = hh.hedged_short_straddle(
+        sale_price=4.0,
+        sale_mid=4.0,
+        strike=_K,
+        fwd=_S0,
+        closes=np.array([120.0]),
+        rets=np.array([0.0]),
+        taus=np.array([1 / 365]),
+        sigmas=np.array([0.2]),
+        half_spreads=np.array([_HS]),
+        settle_close=120.0,
+        cfg=HEDGED_NET,
+    )
+    h = hh.straddle_delta(120.0, _K, 1 / 365, 0.2)
+    assert h > 0.999
+    assert r_net.equity_cost == pytest.approx(abs(h) * 120.0 * _HS + (1.0 - h) * 120.0 * _HS)
+
+
+@pytest.mark.parametrize("settle", [92.0, 108.0])
+def test_naked_hold_ignores_the_netting_flag(settle: float) -> None:
+    """With no hedge there is nothing to net: the build_trade reconciliation is unaffected."""
+    a = _one_close(settle, HEDGED, hedge=False)
+    b = _one_close(settle, HEDGED_NET, hedge=False)
+    assert a.net_pnl == b.net_pnl
 
 
 def test_hedged_rejects_ragged_paths() -> None:
